@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="TbsTerrainDefinition" format=3 uid="uid://crwvb3qit6ifs"]
+
+[ext_resource type="Script" uid="uid://ivs5w0pmd56d" path="res://addons/tbsge/resources/terrain_definition.gd" id="1"]
+[ext_resource type="Texture2D" uid="uid://3a16t288gp0l" path="res://assets/tiles_sliced/tiles_terrain/grass.png" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = "GRASS"
+display_name = "Grass"
+tile_texture = ExtResource("2")

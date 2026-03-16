@@ -1,0 +1,15 @@
+res://addons/tbsge/core/tile_state.gd
+res://addons/tbsge/core/base_unit_state.gd
+res://addons/tbsge/core/game_controller.gd
+res://addons/tbsge/core/board_state.gd
+res://addons/tbsge/scenes/base_board.gd
+res://addons/tbsge/resources/simple_ruleset.gd
+res://addons/tbsge/example/board_basic.tres
+res://addons/tbsge/example/simple_ruleset_basic.tres
+res://addons/tbsge/example/terrain_grass.tres
+res://addons/tbsge/example/terrain_mountain.tres
+res://addons/tbsge/example/unit_knight.tres
+res://addons/tbsge/templates/StarterGame.tscn
+res://addons/tbsge/scenes/BaseHexTile.tscn
+res://addons/tbsge/scenes/BaseUnit.tscn
+res://addons/tbsge/scenes/base_hex_tile.gd

@@ -1,0 +1,21 @@
+[gd_scene format=3 uid="uid://b6fq3igrrp0f0"]
+
+[ext_resource type="Script" uid="uid://b1ej664fxydi3" path="res://addons/tbsge/core/game_controller.gd" id="1"]
+[ext_resource type="PackedScene" path="res://addons/tbsge/scenes/BaseBoard.tscn" id="2"]
+[ext_resource type="PackedScene" path="res://addons/tbsge/scenes/BaseHexTile.tscn" id="3"]
+[ext_resource type="PackedScene" path="res://addons/tbsge/scenes/BaseUnit.tscn" id="4"]
+[ext_resource type="Resource" path="res://addons/tbsge/example/board_basic.tres" id="5"]
+[ext_resource type="Resource" path="res://addons/tbsge/example/simple_ruleset_basic.tres" id="6"]
+
+[node name="StarterGame" type="Node2D" unique_id=1176024490]
+
+[node name="GameController" type="Node" parent="." unique_id=23078264]
+script = ExtResource("1")
+ruleset = ExtResource("6")
+board_config = ExtResource("5")
+
+[node name="Board" parent="." unique_id=1635834044 instance=ExtResource("2")]
+hex_tile_scene = ExtResource("3")
+unit_scene = ExtResource("4")
+
+[node name="Camera2D" type="Camera2D" parent="." unique_id=518902771]

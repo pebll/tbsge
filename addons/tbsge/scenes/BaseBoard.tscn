@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3 uid="uid://tbsge_base_board"]
+
+[ext_resource type="Script" path="res://addons/tbsge/scenes/base_board.gd" id="1"]
+
+[node name="BaseBoard" type="Node2D"]
+script = ExtResource("1")
+

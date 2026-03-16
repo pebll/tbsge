@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="TbsUnitDefinition" format=3 uid="uid://b1gtjrhka602h"]
+
+[ext_resource type="Script" uid="uid://810x5xumubqf" path="res://addons/tbsge/resources/unit_definition.gd" id="1"]
+[ext_resource type="Texture2D" uid="uid://ebjjfvtpv4rr" path="res://assets/units_sliced/units_front/knight.png" id="2"]
+[ext_resource type="Texture2D" uid="uid://bghvthroebm5n" path="res://assets/units_sliced/units_back/knight.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = "KNIGHT"
+display_name = "Knight"
+attack_power = 3
+sprite_front = ExtResource("2")
+sprite_back = ExtResource("3")
