@@ -20,7 +20,6 @@ func _ready() -> void:
 	unit_type = UNITS[randi() % 6]
 	direction_front = true
 	direction_right = true if randi() % 2 == 0 else false
-	move_tween = create_tween()
 	update_sprite()
 	start_idle_animation()
 
@@ -97,7 +96,7 @@ func juice_direct(direction: Vector2):
 	if not direction_front:
 		target_rot *= 1.2
 	var attack_time = 0.2
-	var move_tween = create_tween()
+	move_tween = create_tween()
 	move_tween.tween_property(sprite, "position", current_offset + target_pos, attack_time).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
 	move_tween.parallel().tween_property(sprite, "rotation", target_rot, attack_time).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
 
@@ -105,6 +104,6 @@ func juice_direct_reset():
 	var target_pos = Vector2.ZERO
 	var target_rot = 0
 	var attack_time = 0.2
-	var move_tween = create_tween()
+	move_tween = create_tween()
 	move_tween.tween_property(sprite, "position", current_offset + target_pos, attack_time).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
 	move_tween.parallel().tween_property(sprite, "rotation", target_rot, attack_time).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
