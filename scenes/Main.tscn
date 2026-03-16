@@ -6,8 +6,6 @@
 y_sort_enabled = true
 
 [node name="MapGenerator" parent="." unique_id=759752136 instance=ExtResource("1_elqb8")]
-tile_size = 135.285
-tile_size_xy_ratio = 0.75
 
 [node name="Camera2D" type="Camera2D" parent="." unique_id=462650787]
 y_sort_enabled = true

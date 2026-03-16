@@ -1,31 +1,19 @@
-@tool
+class_name MapGenerator
 extends Node
 
-@export var radius: int = 3:
-	set(value):
-		radius = value
-		generate_hex_map()
+var tile_size: float = 135.3
+var tile_size_xy_ratio: float = 0.75
 
-
-@export var tile_size: float = 64.0:
-	set(value):
-		tile_size = value
-		generate_hex_map()
-
-@export var tile_size_xy_ratio: float = 1.4:
-	set(value):
-		tile_size_xy_ratio = value
-		generate_hex_map()
-		
 @onready var gamemanager : GameManager = GameManagerGlobal
 
 
-func generate_hex_map():
-	if not is_inside_tree():
-		return
-	
+func init(p_tile_size: float, p_tile_size_xy_ratio: float) -> void:
+	tile_size = tile_size
+	tile_size_xy_ratio = p_tile_size_xy_ratio
+
+func generate_hex_map(radius: int, parent: Node):
 	# Clear existing tiles
-	for child in get_children():
+	for child in parent.get_children():
 		child.queue_free()
 	
 	# Loop through all possible coords in a square
@@ -40,7 +28,5 @@ func generate_hex_map():
 			hex_tile.position = Vector2(x, y)
 			hex_tile.z_index = y / 10
 			hex_tile.setup(q, r)
-			add_child(hex_tile)
+			parent.add_child(hex_tile)
 			gamemanager.grid[Vector2i(q, r)] = hex_tile
-func _ready() -> void:
-	generate_hex_map()
