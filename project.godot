@@ -22,6 +22,8 @@ config/icon="res://icon.svg"
 [autoload]
 
 GameManagerGlobal="*res://scripts/game_manager.gd"
+UtilsGlobal="*uid://bx3q5sehimq23"
+UserInterfaceGlobal="*uid://d17ix0xv1vs7h"
 
 [editor]
 

@@ -1,1 +1,6 @@
 res://scripts/unit.gd
+res://scenes/Main.tscn
+res://scripts/game_manager.gd
+res://scripts/user_interface.gd
+res://scripts/utils.gd
+res://scripts/hextile.gd
