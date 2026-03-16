@@ -1,0 +1,14 @@
+[gd_scene load_steps=2 format=3 uid="uid://dcustqp0wa881"]
+
+[ext_resource type="PackedScene" uid="uid://cj1jn1n5g6vag" path="res://scenes/map_generator.tscn" id="1_ug7dm"]
+
+[node name="Main" type="Node2D"]
+y_sort_enabled = true
+
+[node name="MapGenerator" parent="." instance=ExtResource("1_ug7dm")]
+tile_size = 135.285
+tile_size_xy_ratio = 0.75
+
+[node name="Camera2D" type="Camera2D" parent="."]
+y_sort_enabled = true
+position = Vector2(3, -10)

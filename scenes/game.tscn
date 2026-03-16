@@ -1,0 +1,31 @@
+[gd_scene load_steps=5 format=4 uid="uid://beytyniqa3pe6"]
+
+[ext_resource type="PackedScene" uid="uid://bx5sl20vlpv1s" path="res://scenes/knight.tscn" id="2_yqjtg"]
+[ext_resource type="PackedScene" uid="uid://cj1jn1n5g6vag" path="res://scenes/map_generator.tscn" id="3_lnu2h"]
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_yqjtg"]
+texture_region_size = Vector2i(690, 570)
+0:0/0 = 0
+
+[sub_resource type="TileSet" id="TileSet_8cj0n"]
+tile_shape = 3
+tile_layout = 5
+tile_size = Vector2i(681, 510)
+sources/3 = SubResource("TileSetAtlasSource_yqjtg")
+
+[node name="Game" type="Node2D"]
+
+[node name="TileMapLayer" type="TileMapLayer" parent="."]
+visible = false
+tile_map_data = PackedByteArray("AAD//wAAAwAAAAAAAAD+/wAAAwAAAAAAAAD+/wEAAwAAAAAAAAD9/wEAAwAAAAAAAAD8/wEAAwAAAAAAAAD8/wIAAwAAAAAAAAA=")
+tile_set = SubResource("TileSet_8cj0n")
+
+[node name="Knight" parent="." instance=ExtResource("2_yqjtg")]
+position = Vector2(-5, -96)
+
+[node name="Camera2D" type="Camera2D" parent="Knight"]
+position = Vector2(0, -216)
+zoom = Vector2(0.3, 0.3)
+position_smoothing_enabled = true
+
+[node name="MapGenerator" parent="." instance=ExtResource("3_lnu2h")]
