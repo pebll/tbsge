@@ -1,0 +1,24 @@
+[remap]
+
+importer="wav"
+type="AudioStreamWAV"
+uid="uid://y3mwseu1lgf5"
+path="res://.godot/imported/battle_theme_5.wav-360c06984a6993e9b8e223ac539b1bec.sample"
+
+[deps]
+
+source_file="res://assets_raw/music/CCBY battlemusic/battle_theme_5.wav"
+dest_files=["res://.godot/imported/battle_theme_5.wav-360c06984a6993e9b8e223ac539b1bec.sample"]
+
+[params]
+
+force/8_bit=false
+force/mono=false
+force/max_rate=false
+force/max_rate_hz=44100
+edit/trim=false
+edit/normalize=false
+edit/loop_mode=0
+edit/loop_begin=0
+edit/loop_end=-1
+compress/mode=2

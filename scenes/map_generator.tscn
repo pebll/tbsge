@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3 uid="uid://cj1jn1n5g6vag"]
+
+[ext_resource type="Script" uid="uid://q2mnnduc3ddh" path="res://scripts/mapgen.gd" id="1_qw5ad"]
+
+[node name="MapGenerator" type="Node"]
+script = ExtResource("1_qw5ad")
+rows = 3
+columns = 14
+tile_size = 159.95
+tile_size_xy_ratio = 0.56
