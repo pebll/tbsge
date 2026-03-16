@@ -1,13 +1,23 @@
 class_name GameManager
 extends Node2D
 
-var grid : Dictionary[Vector2i, HexTile] = {}
-var units : Array[Unit] = []
+@export var map_radius: int = 3
+var tile_size: float = 135.3
+var tile_size_xy_ratio: float = 0.75
+
+@onready var grid : Dictionary[Vector2i, HexTile] = {}
+@onready var units : Array[Unit] = []
 
 @onready var utils : Utils = UtilsGlobal
+@onready var mapGenerator : MapGenerator = MapGeneratorGlobal
 
 func _ready():
-	pass
+	mapGenerator.init(tile_size, tile_size_xy_ratio)
+	var root = get_tree().root
+	var container = Node.new()
+	container.name = "Tiles" 
+	root.add_child.call_deferred(container)
+	mapGenerator.generate_hex_map(map_radius, container)
 	
 func spawn_unit(tile: HexTile):
 	# Spawns random unit at given coords
