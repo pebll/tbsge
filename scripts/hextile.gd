@@ -8,7 +8,8 @@ const TERRAINS = ["MOUNTAIN", "WATER", "GRASS", "DESERT", "FOREST"]
 @onready var base_sprite: Sprite2D = $base_sprite
 @onready var terrain_sprite: Sprite2D
 @onready var qr_label: Label = $QR_Label
-@onready var gamemanager: GameManager = GameManagerGlobal
+@onready var userInterface : UserInterface = UserInterfaceGlobal
+
 # gameplay
 var terrain_type: String
 var walkable : bool
@@ -50,10 +51,10 @@ func setup(q: int, r: int):
 	coords = Vector2i(q, r)
 
 func _on_mouse_entered():
-	gamemanager.on_tile_hover_entry(self)
+	userInterface.on_tile_hover_entry(self)
 
 func _on_mouse_exited():
-	gamemanager.on_tile_hover_exit(self)
+	userInterface.on_tile_hover_exit(self)
 	
 func juice_go_to(target: float):
 	var time = 0.8
@@ -76,4 +77,4 @@ func update_state(state: String):
 
 func _on_clicked(_viewport, event, _shape_idx):
 	if event is InputEventMouseButton and event.pressed:
-		gamemanager.on_tile_clicked(self)
+		userInterface.on_tile_clicked(self)
