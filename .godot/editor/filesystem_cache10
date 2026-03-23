@@ -1,5 +1,5 @@
 63f7b34db8d8cdea90c76aacccf841ec
-::res://::1774291638
+::res://::1774292295
 icon.svg::CompressedTexture2D::1887526850541034123::1773683353::1773683470::1::::<><><>0<>0<>a5bf7d455efbf902bdbde98f673e3023<>res://.godot/imported/icon.svg-218a8f2b3041327d8a5756f3a245f83b.ctex::
 README.md::TextFile::-1::1773683353::0::1::::<><><>0<>0<><>::
 ::res://assets/::1773689861
@@ -112,15 +112,16 @@ attacks.wav::AudioStreamWAV::1701117754269367084::1773683353::1773683478::1::::<
 dies.wav::AudioStreamWAV::2144642223403378294::1773683353::1773683478::1::::<><><>0<>0<>d51fc0163b260a38aff69f6b7a5a9b9c<>res://.godot/imported/dies.wav-8d1095750389a41ac151f1d935128c6a.sample::
 moves.wav::AudioStreamWAV::1849408275327184178::1773683353::1773683478::1::::<><><>0<>0<>07fb853b0a974a3a8abfaacf95533934<>res://.godot/imported/moves.wav-b3f6dda20de50e17baa911396f46b2c4.sample::
 selected.wav::AudioStreamWAV::1167228693801101715::1773683353::1773683478::1::::<><><>0<>0<>5b044349ac9d8dd2e5c914ed484f11ab<>res://.godot/imported/selected.wav-7c93fb45722ee689bceab6fb12546878.sample::
-::res://scenes/::1773692339
+::res://scenes/::1774291838
 character.tscn::PackedScene::5745223763958003791::1773683353::0::1::::<><><>0<>0<><>::
 hextile.tscn::PackedScene::6086669166831880315::1773683353::0::1::::<><><>0<>0<><>::uid://c3o2behb02vdy::::res://scripts/hextile.gd<>uid://ccglgt7ixtyd8::::res://assets/tiles_sliced/tiles_bottom/base.png<>uid://c3ogiyafsl7e::::res://assets/tiles_sliced/tiles_terrain/water.png<>uid://df7hx5dby2ks0::::res://scenes/unit.tscn
-Main.tscn::PackedScene::7342054994101545664::1773692339::0::1::::<><><>0<>0<><>::uid://cj1jn1n5g6vag::::res://scenes/map_generator.tscn
 map_generator.tscn::PackedScene::5458785837051594162::1773683353::0::1::::<><><>0<>0<><>::uid://q2mnnduc3ddh::::res://scripts/mapgen.gd
 unit.tscn::PackedScene::7576734030022054237::1773683353::0::1::::<><><>0<>0<><>::uid://detc3omu8kocj::::res://scripts/unit.gd<>uid://bq54stu7cp4wn::::res://assets/units_sliced/units_back/dragon.png
-::res://scripts/::1773692766
+::res://scenes/runnables/::0
+Main.tscn::PackedScene::7342054994101545664::1774291838::0::1::::<><><>0<>0<><>::
+::res://scripts/::1774292110
 character.gd::GDScript::2781947396786906660::1773683353::0::1::::<>Node2D<><>0<>0<><>::
-game_manager.gd::GDScript::8467787523036241604::1773692766::0::1::::GameManager<>Node2D<><>0<>0<><>::
+game_manager.gd::GDScript::8467787523036241604::1774292110::0::1::::GameManager<>Node2D<><>0<>0<><>::
 hextile.gd::GDScript::6768671643393506074::1773691086::0::1::::HexTile<>Node2D<><>0<>0<><>::
 mapgen.gd::GDScript::1179512205152543673::1773692339::0::1::::MapGenerator<>Node<><>0<>0<><>::
 unit.gd::GDScript::7479412793991210341::1773689912::0::1::::Unit<>Node2D<><>0<>0<><>::

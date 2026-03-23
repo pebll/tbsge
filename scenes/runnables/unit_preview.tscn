@@ -1,0 +1,12 @@
+[gd_scene format=3 uid="uid://bfjtt8wwoljiv"]
+
+[ext_resource type="PackedScene" uid="uid://csyos1abqsmet" path="res://scenes/hextile.tscn" id="1_rkf7y"]
+[ext_resource type="PackedScene" uid="uid://df7hx5dby2ks0" path="res://scenes/unit.tscn" id="2_wrmj3"]
+
+[node name="UnitPreview" type="Node2D" unique_id=2032121888]
+
+[node name="HexTile" parent="." unique_id=1224402106 instance=ExtResource("1_rkf7y")]
+
+[node name="Unit" parent="." unique_id=1436405919 instance=ExtResource("2_wrmj3")]
+
+[node name="Camera2D" type="Camera2D" parent="." unique_id=479630036]
