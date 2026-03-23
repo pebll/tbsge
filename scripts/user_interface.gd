@@ -1,12 +1,17 @@
 class_name UserInterface
-extends Node
+
+var gamemanager : GameManager
 
 var selected_tile : HexTile = null
 var movable_tiles : Array[HexTile] = []
 var attackable_tiles : Array[HexTile] = []
 
-@onready var gamemanager : GameManager = GameManagerGlobal
-
+func _init(gamemanager_ : GameManager) -> void:
+	gamemanager = gamemanager_
+	EventBus.tile_clicked.connect(on_tile_clicked)
+	EventBus.tile_hover_entered.connect(on_tile_hover_entry)
+	EventBus.tile_hover_exited.connect(on_tile_hover_exit)
+	
 func on_tile_clicked(tile: HexTile):
 	# if selected tile is movable tile
 	if tile in movable_tiles:

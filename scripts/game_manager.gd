@@ -11,9 +11,12 @@ var tile_size_xy_ratio: float = 0.75
 @onready var mapGenerator : MapGenerator = MapGeneratorGlobal
 
 var tilesContainer : Node
+var ui : UserInterface
 
 func _ready():
 	mapGenerator.init(tile_size, tile_size_xy_ratio)
+	ui = UserInterface.new(self)
+	# TODO: fix this when refactor mapgenerator
 	tilesContainer = Node.new()
 	tilesContainer.name = "Tiles" 
 	get_tree().root.add_child.call_deferred(tilesContainer)
