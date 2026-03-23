@@ -4,3 +4,5 @@ res://scenes/runnables/unit_preview.tscn
 res://scenes/runnables/Main.tscn
 res://scripts/utils.gd
 res://scripts/user_interface.gd
+res://scripts/event_bus.gd
+res://scripts/hextile.gd

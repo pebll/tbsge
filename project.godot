@@ -22,8 +22,8 @@ config/icon="res://icon.svg"
 [autoload]
 
 GameManagerGlobal="*res://scripts/game_manager.gd"
-UserInterfaceGlobal="*uid://d17ix0xv1vs7h"
 MapGeneratorGlobal="*uid://q2mnnduc3ddh"
+EventBus="*uid://clv0mgnobyc36"
 
 [editor]
 
