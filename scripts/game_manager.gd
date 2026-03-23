@@ -8,14 +8,13 @@ var tile_size_xy_ratio: float = 0.75
 @onready var grid : Dictionary[Vector2i, HexTile] = {}
 @onready var units : Array[Unit] = []
 
-@onready var mapGenerator : MapGenerator = MapGeneratorGlobal
-
 var tilesContainer : Node
 var ui : UserInterface
+var mapGenerator : MapGenerator
 
 func _ready():
-	mapGenerator.init(tile_size, tile_size_xy_ratio)
 	ui = UserInterface.new(self)
+	mapGenerator = MapGenerator.new(tile_size, tile_size_xy_ratio)
 	# TODO: fix this when refactor mapgenerator
 	tilesContainer = Node.new()
 	tilesContainer.name = "Tiles" 
@@ -25,7 +24,7 @@ func _ready():
 
 func setup_game():
 	# Generate map
-	mapGenerator.generate_hex_map(map_radius, tilesContainer)
+	mapGenerator.generate_hex_map(map_radius, tilesContainer, self.grid)
 	
 func spawn_unit(tile: HexTile):
 	# Spawns random unit at given coords
