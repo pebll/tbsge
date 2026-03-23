@@ -13,6 +13,7 @@ func _init(gamemanager_ : GameManager) -> void:
 	EventBus.tile_hover_exited.connect(on_tile_hover_exit)
 	
 func on_tile_clicked(tile: HexTile):
+	AudioManager.play_sfx("tile_click")
 	# if selected tile is movable tile
 	if tile in movable_tiles:
 		gamemanager.move_unit(selected_tile, tile)
@@ -36,6 +37,7 @@ func on_tile_clicked(tile: HexTile):
 		
 func on_tile_hover_entry(tile: HexTile):
 	if tile in movable_tiles + attackable_tiles:
+		AudioManager.play_sfx("tile_hover")
 		tile.juice_go_to(6)
 		var dir = Utils.get_direction(selected_tile, tile)
 		selected_tile.unit.update_direction(dir)
