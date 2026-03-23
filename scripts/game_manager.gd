@@ -11,13 +11,19 @@ var tile_size_xy_ratio: float = 0.75
 @onready var utils : Utils = UtilsGlobal
 @onready var mapGenerator : MapGenerator = MapGeneratorGlobal
 
+var tilesContainer : Node
+
 func _ready():
 	mapGenerator.init(tile_size, tile_size_xy_ratio)
-	var root = get_tree().root
-	var container = Node.new()
-	container.name = "Tiles" 
-	root.add_child.call_deferred(container)
-	mapGenerator.generate_hex_map(map_radius, container)
+	tilesContainer = Node.new()
+	tilesContainer.name = "Tiles" 
+	get_tree().root.add_child.call_deferred(tilesContainer)
+	
+	setup_game.call_deferred()
+
+func setup_game():
+	# Generate map
+	mapGenerator.generate_hex_map(map_radius, tilesContainer)
 	
 func spawn_unit(tile: HexTile):
 	# Spawns random unit at given coords
