@@ -1,17 +1,13 @@
 class_name MapGenerator
-extends Node
 
 var tile_size: float = 135.3
 var tile_size_xy_ratio: float = 0.75
 
-@onready var gamemanager : GameManager = GameManagerGlobal
-
-
-func init(p_tile_size: float, p_tile_size_xy_ratio: float) -> void:
+func _init(p_tile_size: float, p_tile_size_xy_ratio: float) -> void:
 	tile_size = tile_size
 	tile_size_xy_ratio = p_tile_size_xy_ratio
 
-func generate_hex_map(radius: int, parent: Node):
+func generate_hex_map(radius: int, parent: Node, grid: Dictionary):
 	# Clear existing tiles
 	for child in parent.get_children():
 		child.queue_free()
@@ -29,4 +25,4 @@ func generate_hex_map(radius: int, parent: Node):
 			hex_tile.z_index = y / 10
 			hex_tile.setup(q, r)
 			parent.add_child(hex_tile)
-			gamemanager.grid[Vector2i(q, r)] = hex_tile
+			grid[Vector2i(q, r)] = hex_tile

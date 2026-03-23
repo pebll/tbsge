@@ -6,3 +6,4 @@ res://scripts/utils.gd
 res://scripts/user_interface.gd
 res://scripts/event_bus.gd
 res://scripts/hextile.gd
+res://scripts/mapgen.gd

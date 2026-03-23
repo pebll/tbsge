@@ -1,5 +1,7 @@
 [gd_scene format=3 uid="uid://dcustqp0wa881"]
 
+[ext_resource type="Script" uid="uid://dsv4hugmgl4eq" path="res://scripts/game_manager.gd" id="1_jhjyv"]
+
 [node name="Main" type="Node2D" unique_id=1909808696]
 y_sort_enabled = true
 
@@ -7,6 +9,5 @@ y_sort_enabled = true
 y_sort_enabled = true
 position = Vector2(3, -10)
 
-[node name="GameManager" type="Node" parent="." unique_id=1602425282]
-
-[node name="MapGenerator" type="Node" parent="." unique_id=1465846075]
+[node name="GameManager" type="Node2D" parent="." unique_id=1434233067]
+script = ExtResource("1_jhjyv")
