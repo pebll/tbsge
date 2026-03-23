@@ -19,11 +19,6 @@ func _ready():
 	tilesContainer = Node.new()
 	tilesContainer.name = "Tiles" 
 	get_tree().root.add_child.call_deferred(tilesContainer)
-	
-	setup_game.call_deferred()
-
-func setup_game():
-	# Generate map
 	mapGenerator.generate_hex_map(map_radius, tilesContainer, self.grid)
 	
 func spawn_unit(tile: HexTile):

@@ -15,7 +15,7 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 [application]
 
 config/name="FableQuest"
-run/main_scene="uid://dcustqp0wa881"
+run/main_scene="uid://bfjtt8wwoljiv"
 config/features=PackedStringArray("4.6", "Mobile")
 config/icon="res://icon.svg"
 
