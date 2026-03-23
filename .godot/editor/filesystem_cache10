@@ -2,8 +2,11 @@
 ::res://::1774298190
 icon.svg::CompressedTexture2D::1887526850541034123::1773683353::1773683470::1::::<><><>0<>0<>a5bf7d455efbf902bdbde98f673e3023<>res://.godot/imported/icon.svg-218a8f2b3041327d8a5756f3a245f83b.ctex::
 README.md::TextFile::-1::1773683353::0::1::::<><><>0<>0<><>::
-::res://assets/::1774298599
+::res://assets/::1774299241
 background_sunset.png::CompressedTexture2D::2879524948725876835::1774298566::1774298607::1::::<><><>0<>0<>041a969d27fd59bca7cacf23f2eb97c5<>res://.godot/imported/background_sunset.png-94e3612137c1de4b5261ddc554ff962a.ctex::
+::res://assets/sfx/::1774299279
+click.mp3::AudioStreamMP3::9054989067186868550::1774299269::1774299282::1::::<><><>0<>0<>95a11874a46b92a82cb8bec4ab6fcc08<>res://.godot/imported/click.mp3-0625a102c47e756510f31025be055e4b.mp3str::
+hover_entry.mp3::AudioStreamMP3::177121002688612959::1774299225::1774299282::1::::<><><>0<>0<>9b2177955be518821051fa884624cf8f<>res://.godot/imported/hover_entry.mp3-070144b22221daaf72c814eef3ff0ad1.mp3str::
 ::res://assets/tiles_sliced/::1773683476
 desert.png::CompressedTexture2D::6944832539887785995::1773683353::1773683474::1::::<><><>0<>0<>27bac69647cbe10673c3ac3f51695ed9<>res://.godot/imported/desert.png-4b8b1786c324992785ad2e7f7b54bef9.ctex::
 forest.png::CompressedTexture2D::8066393556210173230::1773683353::1773683476::1::::<><><>0<>0<>4b9718dd70bec62ef7bee06f5181d317<>res://.godot/imported/forest.png-c5b984b20234e05d182cfdc5c6598679.ctex::
@@ -119,9 +122,9 @@ hextile.tscn::PackedScene::6086669166831880315::1773683353::0::1::::<><><>0<>0<>
 map_generator.tscn::PackedScene::5458785837051594162::1773683353::0::1::::<><><>0<>0<><>::uid://q2mnnduc3ddh::::res://scripts/mapgen.gd
 game_manager.tscn::PackedScene::8581513068524139216::1774297894::0::1::::<><><>0<>0<><>::uid://dsv4hugmgl4eq::::res://scripts/game_manager.gd
 unit.tscn::PackedScene::7576734030022054237::1773683353::0::1::::<><><>0<>0<><>::uid://detc3omu8kocj::::res://scripts/unit.gd<>uid://bq54stu7cp4wn::::res://assets/units_sliced/units_back/dragon.png
-::res://scenes/runnables/::1774298192
+::res://scenes/runnables/::1774298701
 Main.tscn::PackedScene::7342054994101545664::1774298122::0::1::::<><><>0<>0<><>::uid://dui7jcbdhwh8s::::res://scenes/game_manager.tscn
-unit_preview.tscn::PackedScene::2757133622891539777::1774298192::0::1::::<><><>0<>0<><>::uid://dui7jcbdhwh8s::::res://scenes/game_manager.tscn
+unit_preview.tscn::PackedScene::2757133622891539777::1774298701::0::1::::<><><>0<>0<><>::uid://dui7jcbdhwh8s::::res://scenes/game_manager.tscn<>uid://bha4mcu302lcl::::res://assets/background_sunset.png
 ::res://scripts/::1774297808
 character.gd::GDScript::2781947396786906660::1773683353::0::1::::<>Node2D<><>0<>0<><>::
 game_manager.gd::GDScript::8467787523036241604::1774297808::0::1::::GameManager<>Node2D<><>0<>0<><>::
