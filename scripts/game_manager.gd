@@ -8,7 +8,6 @@ var tile_size_xy_ratio: float = 0.75
 @onready var grid : Dictionary[Vector2i, HexTile] = {}
 @onready var units : Array[Unit] = []
 
-@onready var utils : Utils = UtilsGlobal
 @onready var mapGenerator : MapGenerator = MapGeneratorGlobal
 
 var tilesContainer : Node
@@ -44,7 +43,7 @@ func move_unit(from: HexTile, to: HexTile):
 	unit.juice_move(to.position)
 
 func attack_unit(from: HexTile, to: HexTile):
-	var dir = utils.get_direction(from, to)
+	var dir = Utils.get_direction(from, to)
 	from.unit.update_direction(dir)
 	from.unit.juice_attack(dir)
 	to.unit.juice_hitted(dir)

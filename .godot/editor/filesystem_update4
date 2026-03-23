@@ -1,2 +1,6 @@
 res://scenes/Main.tscn
 res://scripts/game_manager.gd
+res://scenes/runnables/unit_preview.tscn
+res://scenes/runnables/Main.tscn
+res://scripts/utils.gd
+res://scripts/user_interface.gd

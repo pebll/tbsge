@@ -6,7 +6,6 @@ var movable_tiles : Array[HexTile] = []
 var attackable_tiles : Array[HexTile] = []
 
 @onready var gamemanager : GameManager = GameManagerGlobal
-@onready var utils : Utils = UtilsGlobal
 
 func on_tile_clicked(tile: HexTile):
 	# if selected tile is movable tile
@@ -33,7 +32,7 @@ func on_tile_clicked(tile: HexTile):
 func on_tile_hover_entry(tile: HexTile):
 	if tile in movable_tiles + attackable_tiles:
 		tile.juice_go_to(6)
-		var dir = utils.get_direction(selected_tile, tile)
+		var dir = Utils.get_direction(selected_tile, tile)
 		selected_tile.unit.update_direction(dir)
 		
 func on_tile_hover_exit(tile: HexTile):
@@ -56,8 +55,8 @@ func select_tile(tile: HexTile):
 	selected_tile = tile
 	selected_tile.juice_go_to(4)
 	selected_tile.update_state("selected")
-	attackable_tiles = utils.get_attackable_tiles(tile)
-	movable_tiles = utils.get_movable_tiles(tile)
+	attackable_tiles = Utils.get_attackable_tiles(tile, gamemanager.grid)
+	movable_tiles = Utils.get_movable_tiles(tile, gamemanager.grid)
 	for t in movable_tiles:
 		t.juice_go_to(2)
 		t.update_state("movable")
