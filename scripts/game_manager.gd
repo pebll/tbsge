@@ -6,7 +6,7 @@ var tile_size: float = 135.3
 var tile_size_xy_ratio: float = 0.75
 
 @onready var grid : Dictionary[Vector2i, HexTile] = {}
-@onready var units : Array[Unit] = []
+@onready var units : Array[Legion] = []
 
 var tilesContainer : Node
 var ui : UserInterface
@@ -26,11 +26,11 @@ func spawn_unit(tile: HexTile):
 	if tile.unit or not tile.walkable:
 		print("tile not adequate for spawning")
 		return # only spawn if tile is empty
-	var unit = preload("res://scenes/unit.tscn").instantiate()
+	var unit = preload("res://scenes/legion.tscn").instantiate()
 	self.add_child(unit)
 	units.append(unit)
 	tile.unit = unit
-	unit.sprite.z_index = 100
+	#unit.sprite.z_index = 100
 	unit.position = tile.position
 
 func move_unit(from: HexTile, to: HexTile):

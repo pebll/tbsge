@@ -1,0 +1,32 @@
+[gd_scene format=3 uid="uid://j7ywjtdpker5"]
+
+[ext_resource type="Script" uid="uid://qf8l1m4iq23g" path="res://scripts/legion.gd" id="1_auw50"]
+[ext_resource type="Texture2D" uid="uid://bq54stu7cp4wn" path="res://assets/units_sliced/units_back/dragon.png" id="2_auw50"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_10c5b"]
+radius = 48.010418
+
+[node name="Legion" type="Node2D" unique_id=823189178]
+script = ExtResource("1_auw50")
+
+[node name="Units" type="Node2D" parent="." unique_id=1934969450]
+z_index = 1000
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=1152469829]
+visible = false
+scale = Vector2(0.2, 0.2)
+texture = ExtResource("2_auw50")
+offset = Vector2(4.9998407, -140.00008)
+
+[node name="Area2D" type="Area2D" parent="." unique_id=1341307370]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=850870459]
+rotation = -2.4080513
+shape = SubResource("CircleShape2D_10c5b")
+
+[node name="Shadow" type="Sprite2D" parent="." unique_id=1966979709]
+position = Vector2(0, 38.75)
+scale = Vector2(1, 78.5)
+
+[connection signal="mouse_entered" from="Area2D" to="." method="_on_mouse_entered"]
+[connection signal="mouse_exited" from="Area2D" to="." method="_on_mouse_exited"]

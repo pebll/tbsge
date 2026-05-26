@@ -1,10 +1,5 @@
-res://scenes/Main.tscn
-res://scripts/game_manager.gd
+res://scenes/legion.tscn
+res://scripts/legion.gd
+res://scripts/legion_unit.gd
+res://scenes/legion_unit.tscn
 res://scenes/runnables/unit_preview.tscn
-res://scenes/runnables/Main.tscn
-res://scripts/utils.gd
-res://scripts/user_interface.gd
-res://scripts/event_bus.gd
-res://scripts/hextile.gd
-res://scripts/mapgen.gd
-res://scripts/audio_manager.gd

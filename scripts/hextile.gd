@@ -12,7 +12,7 @@ const TERRAINS = ["MOUNTAIN", "WATER", "GRASS", "DESERT", "FOREST"]
 # gameplay
 var terrain_type: String
 var walkable : bool
-var unit : Unit
+var unit : Legion
 # juice
 var active_tween : Tween
 var jump_up : bool = false
@@ -62,7 +62,7 @@ func juice_go_to(target: float):
 	if unit:
 		unit.current_offset = Vector2(0, -target)
 		unit.active_tween = create_tween()
-		unit.active_tween.tween_property(unit.sprite, "position:y", - target, time).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+		unit.active_tween.tween_property(unit.units, "position:y", - target, time).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
 
 func update_state(state: String):
 	if state == "selected":
