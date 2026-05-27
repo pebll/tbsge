@@ -23,6 +23,7 @@ config/icon="res://icon.svg"
 
 EventBus="*uid://wps2obuyjcpy"
 AudioManager="*uid://cxvbv8c8txafc"
+UnitDefs="*res://scripts/core/unit_defs.gd"
 
 [editor]
 

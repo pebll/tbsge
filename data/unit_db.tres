@@ -1,0 +1,16 @@
+[gd_resource type="Resource" format=3 uid="uid://c6v7x3gqut6p8"]
+
+[ext_resource type="Script" path="res://scripts/resources/unit_database.gd" id="1_db"]
+[ext_resource type="Resource" path="res://data/units/axeman.tres" id="2_axeman"]
+[ext_resource type="Resource" path="res://data/units/archer.tres" id="3_archer"]
+[ext_resource type="Resource" path="res://data/units/dragon_rider.tres" id="4_dragon_rider"]
+[ext_resource type="Resource" path="res://data/units/ogre.tres" id="5_ogre"]
+[ext_resource type="Resource" path="res://data/units/mage.tres" id="6_mage"]
+[ext_resource type="Resource" path="res://data/units/flame.tres" id="7_flame"]
+[ext_resource type="Resource" path="res://data/units/necromancer.tres" id="8_necromancer"]
+[ext_resource type="Resource" path="res://data/units/treant.tres" id="9_treant"]
+
+[resource]
+script = ExtResource("1_db")
+defs = Array[Resource]([ExtResource("2_axeman"), ExtResource("3_archer"), ExtResource("4_dragon_rider"), ExtResource("5_ogre"), ExtResource("6_mage"), ExtResource("7_flame"), ExtResource("8_necromancer"), ExtResource("9_treant")])
+

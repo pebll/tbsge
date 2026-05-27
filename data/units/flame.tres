@@ -1,0 +1,13 @@
+[gd_resource type="Resource" format=3 uid="uid://c7n9p1k2q3r4s"]
+
+[ext_resource type="Script" path="res://scripts/resources/unit_definition.gd" id="1_def"]
+[ext_resource type="Texture2D" path="res://assets/units_v2/done/base_uncut_sprites/flame_front.png" id="2_icon"]
+
+[resource]
+script = ExtResource("1_def")
+id = "FLAME"
+display_name = "Flame"
+max_health = 9
+attack = 7
+icon = ExtResource("2_icon")
+

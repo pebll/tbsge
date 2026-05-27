@@ -64,7 +64,7 @@ func _render_legion(legion: Legion) -> void:
 	else:
 		legion_stats.text = ""
 
-	unit_icon.texture = _load_unit_icon(legion.unit_type)
+	unit_icon.texture = unit0.definition.icon if unit0 and unit0.definition and unit0.definition.icon else _load_unit_icon(legion.unit_type)
 
 	for c in units_list.get_children():
 		c.queue_free()
@@ -106,7 +106,7 @@ func _build_unit_row(unit_type: String, u: Unit) -> Control:
 	icon.custom_minimum_size = Vector2(78, 78)
 	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	icon.texture = _load_unit_icon(unit_type)
+	icon.texture = u.definition.icon if u.definition and u.definition.icon else _load_unit_icon(unit_type)
 	row.add_child(icon)
 
 	# Vertically center the bar without affecting its horizontal expand.
