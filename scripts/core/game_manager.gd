@@ -1,6 +1,8 @@
 class_name GameManager
 extends Node2D
 
+const CombatResolver = preload("res://scripts/core/combat_resolver.gd")
+
 @export var map_radius: int = 3
 var tile_size: float = 135.3
 var tile_size_xy_ratio: float = 0.75
@@ -97,9 +99,11 @@ func move_unit(from_coords: Vector2i, to_coords: Vector2i):
 	legion_visu.juice_move(to_visu.position)
 
 func attack_unit(from_coords: Vector2i, to_coords: Vector2i):
+	var from_tile = grid_model.get(from_coords)
+	var to_tile = grid_model.get(to_coords)
 	var from_visu = grid_visu.get(from_coords)
 	var to_visu = grid_visu.get(to_coords)
-	if not from_visu or not to_visu:
+	if not from_tile or not to_tile or not from_visu or not to_visu:
 		return
 	if not from_visu.legion_visu or not to_visu.legion_visu:
 		return
@@ -109,3 +113,28 @@ func attack_unit(from_coords: Vector2i, to_coords: Vector2i):
 	from_visu.legion_visu.update_direction(dir)
 	from_visu.legion_visu.juice_attack(dir)
 	to_visu.legion_visu.juice_hitted(dir)
+
+	# Logic-only combat: update healths and remove dead units/legions.
+	var attacker: Legion = from_tile.legion
+	var defender: Legion = to_tile.legion
+	if not attacker or not defender:
+		return
+
+	CombatResolver.resolve_combat(attacker, defender, randi())
+
+	_cleanup_dead_legion(from_coords)
+	_cleanup_dead_legion(to_coords)
+
+func _cleanup_dead_legion(coords: Vector2i) -> void:
+	var tile: Tile = grid_model.get(coords)
+	var visu: TileVisu = grid_visu.get(coords)
+	if not tile or not visu:
+		return
+	if tile.legion and tile.legion.units.size() > 0:
+		return
+	if tile.legion:
+		legions.erase(tile.legion)
+	tile.legion = null
+	if visu.legion_visu:
+		visu.legion_visu.queue_free()
+	visu.legion_visu = null

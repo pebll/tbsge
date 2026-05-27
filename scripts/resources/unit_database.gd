@@ -15,4 +15,3 @@ func _ready_cache() -> void:
 func get_def(id: String) -> UnitDefinition:
 	_ready_cache()
 	return _by_id.get(id)
-
