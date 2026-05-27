@@ -18,6 +18,10 @@ var ui : GameUI
 var mapGenerator : MapGenerator
 var tile_info_panel
 var tile_info_layer: CanvasLayer
+var combat_fx_layer: CanvasLayer
+
+const ICON_DEATHS := preload("res://assets/icons/base_icons_sprites/skull.png")
+const ICON_HP_LOST := preload("res://assets/icons/base_icons_sprites/heart.png")
 
 func _ready():
 	ui = GameUI.new(self)
@@ -29,6 +33,7 @@ func _ready():
 	mapGenerator.generate_hex_map(map_radius, tilesContainer, self.grid_visu, self.grid_model)
 
 	_setup_tile_info_ui()
+	_setup_combat_fx_ui()
 
 func _setup_tile_info_ui() -> void:
 	tile_info_layer = CanvasLayer.new()
@@ -38,6 +43,12 @@ func _setup_tile_info_ui() -> void:
 	tile_info_panel = preload("res://scenes/ui/tile_info_panel.tscn").instantiate()
 	tile_info_layer.add_child(tile_info_panel)
 	tile_info_panel.hide()
+
+func _setup_combat_fx_ui() -> void:
+	combat_fx_layer = CanvasLayer.new()
+	combat_fx_layer.name = "CombatFX"
+	combat_fx_layer.layer = 2
+	add_child(combat_fx_layer)
 
 # Todo: refactor HexTile to have a logic side?
 func spawn_unit(coords: Vector2i):
@@ -118,6 +129,10 @@ func attack_unit(from_coords: Vector2i, to_coords: Vector2i):
 	var hits: Array = result.get("hits", [])
 	var deaths: Array = result.get("deaths", [])
 
+	# Snapshot initial positions in case a legion dies and gets removed.
+	var attacker_world_pos: Vector2 = from_visu.legion_visu.global_position
+	var defender_world_pos: Vector2 = to_visu.legion_visu.global_position
+
 	# Build death lookup by hit index for immediate visual updates.
 	var deaths_by_hit: Dictionary = {}
 	for d in deaths:
@@ -172,8 +187,109 @@ func attack_unit(from_coords: Vector2i, to_coords: Vector2i):
 			lv.update_local_positions()
 			lv.tween_units_to_local_positions()
 
+	_show_combat_losses(hits, deaths, attacker, defender, attacker_world_pos, defender_world_pos)
+
 	_cleanup_dead_legion(from_coords)
 	_cleanup_dead_legion(to_coords)
+
+func _show_combat_losses(
+	hits: Array,
+	deaths: Array,
+	attacker: Legion,
+	defender: Legion,
+	attacker_world_pos: Vector2,
+	defender_world_pos: Vector2
+) -> void:
+	if not combat_fx_layer:
+		return
+
+	var hp_lost_by_legion: Dictionary = {}
+	for h in hits:
+		var def_legion: Legion = h.get("defender_legion")
+		var lost := int(round(float(h.get("hp_lost", 0.0))))
+		if def_legion and lost > 0:
+			hp_lost_by_legion[def_legion] = int(hp_lost_by_legion.get(def_legion, 0)) + lost
+
+	var deaths_by_legion: Dictionary = {}
+	for d in deaths:
+		var l: Legion = d.get("legion")
+		if l:
+			deaths_by_legion[l] = int(deaths_by_legion.get(l, 0)) + 1
+
+	_spawn_losses_popup(attacker_world_pos, int(deaths_by_legion.get(attacker, 0)), int(hp_lost_by_legion.get(attacker, 0)))
+	_spawn_losses_popup(defender_world_pos, int(deaths_by_legion.get(defender, 0)), int(hp_lost_by_legion.get(defender, 0)))
+
+func _spawn_losses_popup(world_pos: Vector2, deaths_count: int, hp_lost: int) -> void:
+	if deaths_count <= 0 and hp_lost <= 0:
+		return
+
+	var cam := get_viewport().get_camera_2d()
+	var canvas_xform := get_viewport().get_canvas_transform()
+	var screen_pos := canvas_xform * world_pos
+	if cam:
+		# Camera2D can alter canvas transform; keep this as a fallback anchor if needed.
+		screen_pos = canvas_xform * world_pos
+
+	var block := VBoxContainer.new()
+	block.add_theme_constant_override("separation", 6)
+	block.position = screen_pos + Vector2(-40, -170)
+	block.modulate = Color(1, 1, 1, 0)
+	combat_fx_layer.add_child(block)
+
+	var icon_size := Vector2(84, 84)
+	var font_size := 46
+	var outline_size := 10
+	var outline_color := Color(0.0, 0.0, 0.0, 0.95)
+
+	if hp_lost > 0:
+		var hp_row := HBoxContainer.new()
+		hp_row.add_theme_constant_override("separation", 10)
+		block.add_child(hp_row)
+
+		var heart := TextureRect.new()
+		heart.custom_minimum_size = icon_size
+		heart.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		heart.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		heart.texture = ICON_HP_LOST
+		hp_row.add_child(heart)
+
+		var hp_label := Label.new()
+		hp_label.text = "%d" % hp_lost
+		hp_label.add_theme_font_size_override("font_size", font_size)
+		hp_label.add_theme_color_override("font_color", Color(1, 1, 1))
+		hp_label.add_theme_constant_override("outline_size", outline_size)
+		hp_label.add_theme_color_override("outline_color", outline_color)
+		hp_row.add_child(hp_label)
+
+	if deaths_count > 0:
+		var deaths_row := HBoxContainer.new()
+		deaths_row.add_theme_constant_override("separation", 10)
+		block.add_child(deaths_row)
+
+		var skull := TextureRect.new()
+		skull.custom_minimum_size = icon_size
+		skull.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		skull.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		skull.texture = ICON_DEATHS
+		deaths_row.add_child(skull)
+
+		var deaths_label := Label.new()
+		deaths_label.text = "%d" % deaths_count
+		deaths_label.add_theme_font_size_override("font_size", font_size)
+		deaths_label.add_theme_color_override("font_color", Color(1, 1, 1))
+		deaths_label.add_theme_constant_override("outline_size", outline_size)
+		deaths_label.add_theme_color_override("outline_color", outline_color)
+		deaths_row.add_child(deaths_label)
+
+	var tween := block.create_tween()
+	# Fast fade-in, long slow ascent, fast fade-out late.
+	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tween.tween_property(block, "modulate:a", 1.0, 0.22)
+	tween.set_trans(Tween.TRANS_LINEAR).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(block, "position", block.position + Vector2(0, -90), 3.0)
+	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	tween.tween_property(block, "modulate:a", 0.0, 0.28)
+	tween.tween_callback(block.queue_free)
 
 func _cleanup_dead_legion(coords: Vector2i) -> void:
 	var tile: Tile = grid_model.get(coords)

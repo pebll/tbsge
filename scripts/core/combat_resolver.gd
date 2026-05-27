@@ -52,7 +52,10 @@ static func resolve_combat(attacking_legion: Legion, defending_legion: Legion, r
 		var target_unit: Unit = current_defender_legion.units[target_index]
 
 		var damage := float(attacker_unit.attack)
+		var hp_before: float = float(target_unit.current_health)
 		target_unit.current_health -= damage
+		var hp_after: float = float(target_unit.current_health)
+		var hp_lost: float = clampf(hp_before - maxf(0.0, hp_after), 0.0, hp_before)
 
 		print("Hit #%d: %s -> %s for %d (target hp %d/%d)" % [
 			hit_index,
@@ -70,6 +73,9 @@ static func resolve_combat(attacking_legion: Legion, defending_legion: Legion, r
 			"attacker": attacker_unit,
 			"target": target_unit,
 			"damage": damage,
+			"target_hp_before": hp_before,
+			"target_hp_after": hp_after,
+			"hp_lost": hp_lost,
 		})
 
 		attacked[attacker_unit] = true
