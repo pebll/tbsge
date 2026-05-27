@@ -7,11 +7,12 @@ anchors_preset = 11
 anchor_left = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -460.0
+offset_left = -540.0
 offset_top = 20.0
 offset_right = -20.0
 offset_bottom = -20.0
-size_flags_horizontal = 8
+custom_minimum_size = Vector2(520, 0)
+size_flags_horizontal = 0
 size_flags_vertical = 8
 script = ExtResource("1_8p8fn")
 
