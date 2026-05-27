@@ -26,7 +26,7 @@ static func get_movable_tiles(tile: HexTile, grid: Dictionary) -> Array[HexTile]
 	var tiles = get_surrounding_walkable_tiles(tile, grid)
 	var new_tiles : Array[HexTile] = []
 	for t in tiles:
-		if not t.unit:
+		if not t.has_unit():
 			new_tiles.append(t)
 	return new_tiles
 
@@ -34,6 +34,6 @@ static func get_attackable_tiles(tile: HexTile, grid: Dictionary) -> Array[HexTi
 	var tiles = get_surrounding_walkable_tiles(tile, grid)
 	var new_tiles : Array[HexTile] = []
 	for t in tiles:
-		if t.unit:
+		if t.has_unit():
 			new_tiles.append(t)
 	return new_tiles

@@ -14,7 +14,7 @@ var current_offset: Vector2 = Vector2(0, 0)
 var local_position: Vector2 = Vector2(0, 0)
 
 func init(unit: Unit):
-	unit = unit
+	self.unit = unit
 	
 func update_direction(direction: Vector2):
 	direction_right = direction.x >= 0

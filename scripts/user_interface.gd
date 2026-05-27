@@ -26,7 +26,7 @@ func on_tile_clicked(tile: HexTile):
 	elif tile == selected_tile:
 		deselect()
 	# if tile is another unit
-	elif tile.unit:
+	elif tile.has_unit():
 		deselect()
 		select_tile(tile)
 	# else

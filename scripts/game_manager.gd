@@ -26,20 +26,24 @@ func _ready():
 # Todo: refactor HexTile to have a logic side?
 func spawn_unit(tile: HexTile):
 	# Spawns random legion at given coords
-	if tile.unit or not tile.walkable:
+	if tile.has_unit() or not tile.walkable:
 		print("tile not adequate for spawning")
 		return # only spawn if tile is empty
 	var legion = Legion.new(UNITS[randi()%8], randi()%8+1, tile)
 	var legionVisu = preload("res://scenes/legion.tscn").instantiate()
 	# TODO: refactor this into own folder (like for the tiles)
 	self.add_child(legionVisu)
+	legions.append(legion)
 	tile.unit = legionVisu
 	legionVisu.init(legion)
+	legionVisu.z_index = tile.z_index + 1
 
 func move_unit(from: HexTile, to: HexTile):
 	var unit = from.unit
 	from.unit = null
 	to.unit = unit
+	if unit and unit.legion:
+		unit.legion.tile = to
 	unit.juice_move(to.position)
 
 func attack_unit(from: HexTile, to: HexTile):

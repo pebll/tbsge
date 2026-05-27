@@ -10,11 +10,10 @@ var legion : Legion
 
 var current_offset: Vector2 = Vector2(0, 0)
 
-# Called when the node enters the scene tree for the first time.
 func init(legion: Legion) -> void:
-	legion = legion
+	self.legion = legion
 	position = legion.tile.position
-	for unit in legion.units:
+	for unit in self.legion.units:
 		var unitVisu = preload("res://scenes/unit.tscn").instantiate()
 		unitVisu.init(unit)
 		units.add_child(unitVisu)
@@ -50,6 +49,9 @@ func update_local_positions():
 	var children = units.get_children()
 	for i in range(legion.unit_count):
 		children[i].local_position = positions[i]
+
+func get_unit_count() -> int:
+	return legion.unit_count
 
 func update_direction(direction: Vector2):
 	for unit in units.get_children():

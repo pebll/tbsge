@@ -4,7 +4,7 @@ var tile_size: float = 135.3
 var tile_size_xy_ratio: float = 0.75
 
 func _init(p_tile_size: float, p_tile_size_xy_ratio: float) -> void:
-	tile_size = tile_size
+	tile_size = p_tile_size
 	tile_size_xy_ratio = p_tile_size_xy_ratio
 
 func generate_hex_map(radius: int, parent: Node, grid: Dictionary):

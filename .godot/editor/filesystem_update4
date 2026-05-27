@@ -10,3 +10,6 @@ res://scripts/unit_visu.gd
 res://scripts/single_unit.gd
 res://scenes/legion.tscn
 res://scripts/hextile.gd
+res://scripts/mapgen.gd
+res://scripts/user_interface.gd
+res://scripts/utils.gd

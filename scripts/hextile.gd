@@ -42,6 +42,9 @@ func _ready() -> void:
 	base_y = base_sprite.position.y
 	
 	qr_label.text = "(%d,%d,%d)" % [cube_q, cube_r, cube_s]
+
+func has_unit() -> bool:
+	return unit != null
 	
 func setup(q: int, r: int):
 	cube_q = q
