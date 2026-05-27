@@ -108,19 +108,69 @@ func attack_unit(from_coords: Vector2i, to_coords: Vector2i):
 	if not from_visu.legion_visu or not to_visu.legion_visu:
 		return
 
-	var difference : Vector2 = to_visu.position - from_visu.position
-	var dir = difference.normalized()
-	from_visu.legion_visu.update_direction(dir)
-	from_visu.legion_visu.juice_attack(dir)
-	to_visu.legion_visu.juice_hitted(dir)
-
 	# Logic-only combat: update healths and remove dead units/legions.
 	var attacker: Legion = from_tile.legion
 	var defender: Legion = to_tile.legion
 	if not attacker or not defender:
 		return
 
-	CombatResolver.resolve_combat(attacker, defender, randi())
+	var result: Dictionary = CombatResolver.resolve_combat(attacker, defender, randi())
+	var hits: Array = result.get("hits", [])
+	var deaths: Array = result.get("deaths", [])
+
+	# Build death lookup by hit index for immediate visual updates.
+	var deaths_by_hit: Dictionary = {}
+	for d in deaths:
+		deaths_by_hit[d["hit_index"]] = d
+
+	# Map model legions to their visu nodes (stable even when combat alternates).
+	var legion_to_visu: Dictionary = {
+		attacker: from_visu.legion_visu,
+		defender: to_visu.legion_visu,
+	}
+
+	# Before the fight begins, make both legions face each other.
+	var a_visu: LegionVisu = legion_to_visu.get(attacker)
+	var d_visu: LegionVisu = legion_to_visu.get(defender)
+	if a_visu and d_visu:
+		var face_dir: Vector2 = (d_visu.global_position - a_visu.global_position).normalized()
+		a_visu.update_direction(face_dir)
+		d_visu.update_direction(-face_dir)
+
+	# Play sequential animations: only attacker + target animate per hit.
+	var gap_s := 0.3
+	for h in hits:
+		var atk_legion: Legion = h["attacker_legion"]
+		var def_legion: Legion = h["defender_legion"]
+		var atk_unit: Unit = h["attacker"]
+		var def_unit: Unit = h["target"]
+
+		var atk_visu: LegionVisu = legion_to_visu.get(atk_legion)
+		var def_visu: LegionVisu = legion_to_visu.get(def_legion)
+		if not atk_visu or not def_visu:
+			continue
+
+		var difference: Vector2 = def_visu.global_position - atk_visu.global_position
+		var dir := difference.normalized()
+
+		atk_visu.animate_unit_attack(atk_unit, dir)
+		def_visu.animate_unit_hitted(def_unit, dir)
+
+		# If a unit dies on this hit, remove it from the defending legion visu immediately.
+		var hit_idx: int = h["hit_index"]
+		if deaths_by_hit.has(hit_idx):
+			var d = deaths_by_hit[hit_idx]
+			if d["legion"] == def_legion:
+				def_visu.remove_unit(d["unit"])
+
+		# Wait for animation to read sequentially.
+		await get_tree().create_timer(gap_s).timeout
+
+	# Re-pack surviving units after the fight sequence.
+	for lv in legion_to_visu.values():
+		if lv:
+			lv.update_local_positions()
+			lv.tween_units_to_local_positions()
 
 	_cleanup_dead_legion(from_coords)
 	_cleanup_dead_legion(to_coords)

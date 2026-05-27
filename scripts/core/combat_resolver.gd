@@ -77,6 +77,7 @@ static func resolve_combat(attacking_legion: Legion, defending_legion: Legion, r
 		if target_unit.current_health <= 0:
 			# Dies immediately and will never attack later.
 			current_defender_legion.units.erase(target_unit)
+			current_defender_legion.unit_count = current_defender_legion.units.size()
 			deaths.append({
 				"hit_index": hit_index,
 				"legion": current_defender_legion,
