@@ -159,6 +159,8 @@ func attack_unit(from_coords: Vector2i, to_coords: Vector2i):
 		var def_legion: Legion = h["defender_legion"]
 		var atk_unit: Unit = h["attacker"]
 		var def_unit: Unit = h["target"]
+		var def_hp_before: float = float(h.get("target_hp_before", -1.0))
+		var def_hp_after: float = float(h.get("target_hp_after", -1.0))
 
 		var atk_visu: LegionVisu = legion_to_visu.get(atk_legion)
 		var def_visu: LegionVisu = legion_to_visu.get(def_legion)
@@ -169,7 +171,7 @@ func attack_unit(from_coords: Vector2i, to_coords: Vector2i):
 		var dir := difference.normalized()
 
 		atk_visu.animate_unit_attack(atk_unit, dir)
-		def_visu.animate_unit_hitted(def_unit, dir)
+		def_visu.animate_unit_hitted(def_unit, dir, def_hp_before, def_hp_after, float(def_unit.max_health))
 
 		# If a unit dies on this hit, remove it from the defending legion visu immediately.
 		var hit_idx: int = h["hit_index"]
@@ -188,9 +190,17 @@ func attack_unit(from_coords: Vector2i, to_coords: Vector2i):
 			lv.tween_units_to_local_positions()
 
 	_show_combat_losses(hits, deaths, attacker, defender, attacker_world_pos, defender_world_pos)
+	_hide_combat_hp_fx_later(legion_to_visu)
 
 	_cleanup_dead_legion(from_coords)
 	_cleanup_dead_legion(to_coords)
+
+func _hide_combat_hp_fx_later(legion_to_visu: Dictionary) -> void:
+	# Keep bars visible a bit after the fight, similar to the losses popup linger.
+	await get_tree().create_timer(3.3).timeout
+	for lv in legion_to_visu.values():
+		if lv:
+			lv.hide_all_combat_hp_fx()
 
 func _show_combat_losses(
 	hits: Array,

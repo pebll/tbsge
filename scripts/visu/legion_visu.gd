@@ -112,12 +112,14 @@ func animate_unit_attack(unit: Unit, direction: Vector2) -> void:
 	uv.update_direction(direction)
 	uv.juice_attack(direction)
 
-func animate_unit_hitted(unit: Unit, direction: Vector2) -> void:
+func animate_unit_hitted(unit: Unit, direction: Vector2, hp_before: float = -1.0, hp_after: float = -1.0, hp_max: float = -1.0) -> void:
 	var uv: UnitVisu = get_unit_visu(unit)
 	if not uv:
 		return
 	# Face the attacker while being hit.
 	uv.update_direction(-direction)
+	if hp_before >= 0.0 and hp_after >= 0.0 and hp_max > 0.0:
+		uv.show_combat_hp_chip(hp_before, hp_after, hp_max)
 	uv.juice_hitted(direction)
 
 func remove_unit(unit: Unit) -> void:
@@ -127,3 +129,8 @@ func remove_unit(unit: Unit) -> void:
 		uv.queue_free()
 	update_local_positions()
 	tween_units_to_local_positions()
+
+func hide_all_combat_hp_fx() -> void:
+	for uv in _unit_to_visu.values():
+		if uv:
+			uv.hide_combat_hp_fx()

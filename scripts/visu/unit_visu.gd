@@ -13,9 +13,125 @@ var direction_right: bool = true
 var current_offset: Vector2 = Vector2(0, 0)
 var local_position: Vector2 = Vector2(0, 0)
 
+var _hp_fx_root: Control
+var _hp_bar_chip: ProgressBar
+var _hp_bar_now: ProgressBar
+var _hp_fx_tween: Tween
+var _hp_fx_token: int = 0
+var _hp_fx_hide_tween: Tween
+
 func init(unit: Unit):
 	self.unit = unit
 	
+func _ready() -> void:
+	_build_hp_fx()
+
+func _build_hp_fx() -> void:
+	_hp_fx_root = Control.new()
+	_hp_fx_root.visible = false
+	_hp_fx_root.modulate = Color(1, 1, 1, 0)
+	_hp_fx_root.z_index = 2000
+	# Attach to the sprite so it follows per-unit hit/move "juice" motion.
+	sprite.add_child(_hp_fx_root)
+
+	# Position roughly "over the head". Sprite has an offset, so a fixed local offset works well enough.
+	_hp_fx_root.position = Vector2(-37, -148)
+	_hp_fx_root.custom_minimum_size = Vector2(74, 14)
+
+	_hp_bar_chip = ProgressBar.new()
+	_hp_bar_chip.custom_minimum_size = Vector2(74, 14)
+	_hp_bar_chip.show_percentage = false
+	_hp_bar_chip.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_hp_bar_chip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_hp_fx_root.add_child(_hp_bar_chip)
+
+	_hp_bar_now = ProgressBar.new()
+	_hp_bar_now.custom_minimum_size = Vector2(74, 14)
+	_hp_bar_now.show_percentage = false
+	_hp_bar_now.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_hp_bar_now.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_hp_bar_now.position = Vector2.ZERO
+	_hp_fx_root.add_child(_hp_bar_now)
+
+	# Style: chip bar (white), current hp bar (red).
+	var chip_bg := StyleBoxFlat.new()
+	chip_bg.bg_color = Color(0.1, 0.1, 0.1, 0.9)
+	chip_bg.border_color = Color(0, 0, 0, 1)
+	chip_bg.border_width_left = 1
+	chip_bg.border_width_right = 1
+	chip_bg.border_width_top = 1
+	chip_bg.border_width_bottom = 1
+	chip_bg.corner_radius_top_left = 5
+	chip_bg.corner_radius_top_right = 5
+	chip_bg.corner_radius_bottom_left = 5
+	chip_bg.corner_radius_bottom_right = 5
+	_hp_bar_chip.add_theme_stylebox_override("background", chip_bg)
+
+	var chip_fill := StyleBoxFlat.new()
+	chip_fill.bg_color = Color(1, 1, 1, 0.95)
+	chip_fill.corner_radius_top_left = 5
+	chip_fill.corner_radius_top_right = 5
+	chip_fill.corner_radius_bottom_left = 5
+	chip_fill.corner_radius_bottom_right = 5
+	_hp_bar_chip.add_theme_stylebox_override("fill", chip_fill)
+
+	var now_bg := StyleBoxFlat.new()
+	now_bg.bg_color = Color(0, 0, 0, 0) # transparent, chip bar provides border/bg
+	_hp_bar_now.add_theme_stylebox_override("background", now_bg)
+
+	var now_fill := StyleBoxFlat.new()
+	now_fill.bg_color = Color(0.65, 0.12, 0.10, 1)
+	now_fill.corner_radius_top_left = 5
+	now_fill.corner_radius_top_right = 5
+	now_fill.corner_radius_bottom_left = 5
+	now_fill.corner_radius_bottom_right = 5
+	_hp_bar_now.add_theme_stylebox_override("fill", now_fill)
+
+func show_combat_hp_chip(hp_before: float, hp_after: float, hp_max: float) -> void:
+	if not _hp_fx_root or not _hp_bar_chip or not _hp_bar_now:
+		return
+
+	_hp_fx_token += 1
+	if _hp_fx_tween and _hp_fx_tween.is_running():
+		_hp_fx_tween.kill()
+	if _hp_fx_hide_tween and _hp_fx_hide_tween.is_running():
+		_hp_fx_hide_tween.kill()
+
+	var max_v := maxf(1.0, hp_max)
+	_hp_bar_chip.min_value = 0
+	_hp_bar_chip.max_value = max_v
+	_hp_bar_now.min_value = 0
+	_hp_bar_now.max_value = max_v
+
+	_hp_fx_root.visible = true
+	_hp_fx_root.modulate = Color(1, 1, 1, 0)
+
+	# Front bar: drop quickly to the new HP.
+	_hp_bar_now.value = clampf(hp_before, 0.0, max_v)
+	_hp_bar_chip.value = clampf(hp_before, 0.0, max_v)
+
+	_hp_fx_tween = create_tween()
+	_hp_fx_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_hp_fx_tween.tween_property(_hp_fx_root, "modulate:a", 1.0, 0.12)
+	_hp_fx_tween.tween_property(_hp_bar_now, "value", clampf(hp_after, 0.0, max_v), 0.12)
+	# Chip bar lags behind, then eases down.
+	_hp_fx_tween.tween_interval(0.22)
+	_hp_fx_tween.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_hp_fx_tween.tween_property(_hp_bar_chip, "value", clampf(hp_after, 0.0, max_v), 0.65)
+
+func hide_combat_hp_fx() -> void:
+	if not _hp_fx_root:
+		return
+	if _hp_fx_hide_tween and _hp_fx_hide_tween.is_running():
+		_hp_fx_hide_tween.kill()
+	_hp_fx_hide_tween = create_tween()
+	_hp_fx_hide_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	_hp_fx_hide_tween.tween_property(_hp_fx_root, "modulate:a", 0.0, 0.22)
+	_hp_fx_hide_tween.tween_callback(func ():
+		if _hp_fx_root:
+			_hp_fx_root.visible = false
+	)
+
 func update_direction(direction: Vector2):
 	direction_right = direction.x >= 0
 	direction_front = direction.y >= 0
