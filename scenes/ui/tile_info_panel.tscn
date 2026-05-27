@@ -7,7 +7,7 @@ anchors_preset = 11
 anchor_left = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -380.0
+offset_left = -460.0
 offset_top = 20.0
 offset_right = -20.0
 offset_bottom = -20.0
@@ -24,8 +24,9 @@ theme_override_constants/separation = 12
 [node name="Title" type="Label" parent="VBox" unique_id=1464564206]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 34
 text = "Tile Info"
+visible = false
 
 [node name="LegionBlock" type="VBoxContainer" parent="VBox" unique_id=179913789]
 unique_name_in_owner = true
@@ -39,7 +40,7 @@ theme_override_constants/separation = 12
 
 [node name="UnitIcon" type="TextureRect" parent="VBox/LegionBlock/LegionHeader" unique_id=106450623]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(84, 84)
+custom_minimum_size = Vector2(110, 110)
 layout_mode = 2
 expand_mode = 1
 stretch_mode = 6
@@ -52,21 +53,24 @@ theme_override_constants/separation = 6
 [node name="LegionName" type="Label" parent="VBox/LegionBlock/LegionHeader/LegionHeaderText" unique_id=1062907617]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 30
 text = "LEGION"
 
 [node name="LegionStats" type="Label" parent="VBox/LegionBlock/LegionHeader/LegionHeaderText" unique_id=233492469]
 unique_name_in_owner = true
 layout_mode = 2
+theme_override_font_sizes/font_size = 22
 text = "ATK 0   HP 0"
 
 [node name="UnitsTitle" type="Label" parent="VBox/LegionBlock" unique_id=565873330]
+unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 18
+theme_override_font_sizes/font_size = 26
 text = "Units"
+visible = false
 
 [node name="UnitsScroll" type="ScrollContainer" parent="VBox/LegionBlock" unique_id=904662046]
-custom_minimum_size = Vector2(0, 200)
+custom_minimum_size = Vector2(0, 260)
 layout_mode = 2
 size_flags_vertical = 3
 
