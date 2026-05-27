@@ -6,11 +6,11 @@
 [node name="UnitPreview" type="Node2D" unique_id=2032121888]
 
 [node name="Camera2D" type="Camera2D" parent="." unique_id=479630036]
-zoom = Vector2(2.735, 2.735)
+zoom = Vector2(2.58, 2.58)
 
 [node name="Background" type="Sprite2D" parent="Camera2D" unique_id=731660998]
 z_index = -1000
-scale = Vector2(0.24080141, 0.24080144)
+scale = Vector2(0.6219443, 0.6219444)
 texture = ExtResource("1_rkf7y")
 
 [node name="GameManager" parent="." unique_id=1748821921 instance=ExtResource("1_jyyb0")]

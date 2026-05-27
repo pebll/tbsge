@@ -7,9 +7,15 @@ var has_selected: bool = false
 var movable_coords : Array[Vector2i] = []
 var attackable_coords : Array[Vector2i] = []
 
+var _hover_coords: Vector2i
+var _is_hovering: bool = false
+var _hover_inspect_token: int = 0
+const HOVER_INSPECT_DELAY_S := 0.3
+
 func _init(gamemanager_ : GameManager) -> void:
 	gamemanager = gamemanager_
 	EventBus.tile_clicked.connect(on_tile_clicked)
+	EventBus.tile_right_clicked.connect(on_tile_right_clicked)
 	EventBus.tile_hover_entered.connect(on_tile_hover_entry)
 	EventBus.tile_hover_exited.connect(on_tile_hover_exit)
 	
@@ -39,9 +45,28 @@ func on_tile_clicked(coords: Vector2i):
 	else:
 		deselect()
 		gamemanager.spawn_unit(coords)
-
+		
+func on_tile_right_clicked(coords: Vector2i) -> void:
+	# Show instantly on right click (no selection highlight).
+	_is_hovering = true
+	_hover_coords = coords
+	_hover_inspect_token += 1 # cancel any pending delayed hover show
+	gamemanager.inspect_tile(coords)
 		
 func on_tile_hover_entry(coords: Vector2i):
+	# Delayed hover-to-inspect: only show if still hovered after delay.
+	_is_hovering = true
+	_hover_coords = coords
+	_hover_inspect_token += 1
+	var token := _hover_inspect_token
+	var timer := gamemanager.get_tree().create_timer(HOVER_INSPECT_DELAY_S)
+	timer.timeout.connect(func():
+		if token != _hover_inspect_token:
+			return
+		if not _is_hovering or _hover_coords != coords:
+			return
+		gamemanager.inspect_tile(coords)
+	)
 	if coords in movable_coords + attackable_coords:
 		AudioManager.play_sfx("tile_hover")
 		var tile_visu: TileVisu = gamemanager.grid_visu.get(coords)
@@ -55,6 +80,11 @@ func on_tile_hover_entry(coords: Vector2i):
 				selected_visu.legion_visu.update_direction(dir)
 		
 func on_tile_hover_exit(coords: Vector2i):
+	# Leaving hover hides the panel and cancels pending delayed show.
+	if _is_hovering and _hover_coords == coords:
+		_is_hovering = false
+		_hover_inspect_token += 1
+		gamemanager.clear_inspect()
 	if coords in movable_coords + attackable_coords:
 		var tile_visu: TileVisu = gamemanager.grid_visu.get(coords)
 		if tile_visu:

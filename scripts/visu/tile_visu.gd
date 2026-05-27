@@ -15,6 +15,8 @@ var legion_visu: LegionVisu = null
 var active_tween: Tween
 var base_y: float
 
+var _gameplay_state: String = ""
+
 func init(p_tile: Tile) -> void:
 	tile = p_tile
 	# This can be called before the node enters the tree (e.g. when the parent is added deferred),
@@ -38,7 +40,10 @@ func _on_mouse_exited():
 
 func _on_clicked(_viewport, event, _shape_idx):
 	if event is InputEventMouseButton and event.pressed:
-		EventBus.tile_clicked.emit(tile.coords)
+		if event.button_index == MOUSE_BUTTON_RIGHT:
+			EventBus.tile_right_clicked.emit(tile.coords)
+		elif event.button_index == MOUSE_BUTTON_LEFT:
+			EventBus.tile_clicked.emit(tile.coords)
 
 func juice_go_to(target: float):
 	var time = 0.8
@@ -50,11 +55,17 @@ func juice_go_to(target: float):
 		legion_visu.active_tween.tween_property(legion_visu.units, "position:y", -target, time).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
 
 func update_state(state: String):
-	if state == "selected":
+	_gameplay_state = state
+	_apply_state()
+
+func _apply_state() -> void:
+	if not base_sprite:
+		return
+	if _gameplay_state == "selected":
 		base_sprite.self_modulate = color_selected
-	elif state == "attackable":
+	elif _gameplay_state == "attackable":
 		base_sprite.self_modulate = color_attackable
-	elif state == "movable":
+	elif _gameplay_state == "movable":
 		base_sprite.self_modulate = color_movable
 	else:
 		base_sprite.self_modulate = Color.WHITE

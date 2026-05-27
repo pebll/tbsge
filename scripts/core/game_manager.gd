@@ -14,6 +14,8 @@ const UNITS = ["AXEMAN", "ARCHER", "DRAGON_RIDER", "OGRE", "MAGE", "FLAME", "NEC
 var tilesContainer : Node
 var ui : GameUI
 var mapGenerator : MapGenerator
+var tile_info_panel
+var tile_info_layer: CanvasLayer
 
 func _ready():
 	ui = GameUI.new(self)
@@ -23,6 +25,17 @@ func _ready():
 	tilesContainer.name = "Tiles" 
 	get_tree().root.add_child.call_deferred(tilesContainer)
 	mapGenerator.generate_hex_map(map_radius, tilesContainer, self.grid_visu, self.grid_model)
+
+	_setup_tile_info_ui()
+
+func _setup_tile_info_ui() -> void:
+	tile_info_layer = CanvasLayer.new()
+	tile_info_layer.name = "UI"
+	add_child(tile_info_layer)
+
+	tile_info_panel = preload("res://scenes/ui/tile_info_panel.tscn").instantiate()
+	tile_info_layer.add_child(tile_info_panel)
+	tile_info_panel.hide()
 
 # Todo: refactor HexTile to have a logic side?
 func spawn_unit(coords: Vector2i):
@@ -45,6 +58,20 @@ func spawn_unit(coords: Vector2i):
 	legionVisu.init(legion)
 	legionVisu.position = tile_visu.position
 	legionVisu.z_index = tile_visu.z_index + 1
+
+func inspect_tile(coords: Vector2i) -> void:
+	if not tile_info_panel:
+		return
+	var tile: Tile = grid_model.get(coords)
+	if not tile or not tile.has_legion():
+		tile_info_panel.hide()
+		return
+	tile_info_panel.show_tile(tile)
+	tile_info_panel.show()
+
+func clear_inspect() -> void:
+	if tile_info_panel:
+		tile_info_panel.hide()
 
 func move_unit(from_coords: Vector2i, to_coords: Vector2i):
 	var from_tile = grid_model.get(from_coords)
