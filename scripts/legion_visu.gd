@@ -12,7 +12,7 @@ var current_offset: Vector2 = Vector2(0, 0)
 
 func init(legion: Legion) -> void:
 	self.legion = legion
-	position = legion.tile.position
+	# position is set by GameManager from tile visual
 	for unit in self.legion.units:
 		var unitVisu = preload("res://scenes/unit.tscn").instantiate()
 		unitVisu.init(unit)

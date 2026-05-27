@@ -1,5 +1,5 @@
 extends Node
 
-signal tile_clicked(tile: HexTile)
-signal tile_hover_entered(tile: HexTile)
-signal tile_hover_exited(tile: HexTile)
+signal tile_clicked(coords: Vector2i)
+signal tile_hover_entered(coords: Vector2i)
+signal tile_hover_exited(coords: Vector2i)
