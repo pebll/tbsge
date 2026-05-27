@@ -70,7 +70,7 @@ func spawn_unit(coords: Vector2i):
 	tile_visu.legion_visu = legionVisu
 	legionVisu.init(legion)
 	legionVisu.position = tile_visu.position
-	legionVisu.z_index = tile_visu.z_index + 1
+	# Let Y-sort / internal unit z-indices handle draw order.
 
 func inspect_tile(coords: Vector2i) -> void:
 	if not tile_info_panel:
@@ -171,14 +171,19 @@ func attack_unit(from_coords: Vector2i, to_coords: Vector2i):
 		var dir := difference.normalized()
 
 		atk_visu.animate_unit_attack(atk_unit, dir)
-		def_visu.animate_unit_hitted(def_unit, dir, def_hp_before, def_hp_after, float(def_unit.max_health))
 
 		# If a unit dies on this hit, remove it from the defending legion visu immediately.
 		var hit_idx: int = h["hit_index"]
+		var died_on_hit := false
 		if deaths_by_hit.has(hit_idx):
 			var d = deaths_by_hit[hit_idx]
-			if d["legion"] == def_legion:
-				def_visu.remove_unit(d["unit"])
+			if d.get("legion") == def_legion and d.get("unit") == def_unit:
+				died_on_hit = true
+				def_visu.animate_unit_death(def_unit, dir)
+
+		# Only play the regular hit feedback if the unit survived this hit.
+		if not died_on_hit:
+			def_visu.animate_unit_hitted(def_unit, dir, def_hp_before, def_hp_after, float(def_unit.max_health))
 
 		# Wait for animation to read sequentially.
 		await get_tree().create_timer(gap_s).timeout

@@ -20,17 +20,53 @@ var _hp_fx_tween: Tween
 var _hp_fx_token: int = 0
 var _hp_fx_hide_tween: Tween
 
+const FLASH_SHADER := preload("res://assets/shaders/sprite_white_flash.gdshader")
+const BASE_SPRITE_SCALE := Vector2(0.2, 0.2)
+
+var _flash_mat: ShaderMaterial
+var _flash_tween: Tween
+
 func init(unit: Unit):
 	self.unit = unit
 	
 func _ready() -> void:
+	_setup_flash_shader()
 	_build_hp_fx()
+
+func _setup_flash_shader() -> void:
+	_flash_mat = ShaderMaterial.new()
+	_flash_mat.shader = FLASH_SHADER
+	_flash_mat.set_shader_parameter("flash_amount", 0.0)
+	sprite.material = _flash_mat
+
+func _get_base_scale() -> Vector2:
+	return BASE_SPRITE_SCALE
+
+func _play_white_flash(duration: float) -> void:
+	if not _flash_mat:
+		return
+	if _flash_tween and _flash_tween.is_running():
+		_flash_tween.kill()
+	_flash_mat.set_shader_parameter("flash_amount", 1.0)
+	_flash_tween = create_tween()
+	_flash_tween.tween_method(_set_flash_amount, 1.0, 0.0, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+
+func _set_flash_amount(amount: float) -> void:
+	if _flash_mat:
+		_flash_mat.set_shader_parameter("flash_amount", amount)
+
+func set_facing(direction: Vector2) -> void:
+	# Like update_direction(), but without the little "juice_direct" nudge.
+	direction_right = direction.x >= 0
+	direction_front = direction.y >= 0
+	update_sprite()
 
 func _build_hp_fx() -> void:
 	_hp_fx_root = Control.new()
 	_hp_fx_root.visible = false
 	_hp_fx_root.modulate = Color(1, 1, 1, 0)
-	_hp_fx_root.z_index = 2000
+	# Needs to render above tiles/units; keep below CANVAS_ITEM_Z_MAX.
+	_hp_fx_root.z_index = 3500
 	# Attach to the sprite so it follows per-unit hit/move "juice" motion.
 	sprite.add_child(_hp_fx_root)
 
@@ -119,11 +155,19 @@ func show_combat_hp_chip(hp_before: float, hp_after: float, hp_max: float) -> vo
 	_hp_fx_tween.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	_hp_fx_tween.tween_property(_hp_bar_chip, "value", clampf(hp_after, 0.0, max_v), 0.65)
 
-func hide_combat_hp_fx() -> void:
+func hide_combat_hp_fx(instant: bool = false) -> void:
 	if not _hp_fx_root:
 		return
+	if _hp_fx_tween and _hp_fx_tween.is_running():
+		_hp_fx_tween.kill()
 	if _hp_fx_hide_tween and _hp_fx_hide_tween.is_running():
 		_hp_fx_hide_tween.kill()
+
+	if instant:
+		_hp_fx_root.modulate.a = 0.0
+		_hp_fx_root.visible = false
+		return
+
 	_hp_fx_hide_tween = create_tween()
 	_hp_fx_hide_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 	_hp_fx_hide_tween.tween_property(_hp_fx_root, "modulate:a", 0.0, 0.22)
@@ -149,7 +193,7 @@ func update_sprite():
 	sprite.position = local_position
 
 func start_idle_animation():
-	var base_scale = 0.2
+	var base_scale := BASE_SPRITE_SCALE.x
 	var stretch_percentage = 0.02
 	var scale_high = base_scale*(1+stretch_percentage)
 	var scale_low = base_scale*(1-stretch_percentage)
@@ -175,19 +219,97 @@ func juice_attack(direction: Vector2):
 	active_tween.tween_property(sprite, "position", current_offset + local_position, attack_time).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_IN_OUT)
 	active_tween.parallel().tween_property(sprite, "rotation", 0, attack_time).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_IN_OUT)
 	
-func juice_hitted(direction: Vector2):
-	print("I AM HIT")
-	var target_pos = direction * 10
-	var target_rot = 0.1 * direction.x
-	var attack_time = 0.2
-	# TODO: some kind of state machine for switch animation states
+func juice_hitted(_direction: Vector2) -> void:
+	if active_tween and active_tween.is_running():
+		active_tween.kill()
+	if idle_tween and idle_tween.is_running():
+		idle_tween.kill()
+
+	_play_white_flash(0.55)
+
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	var base_scale := _get_base_scale()
+	var squish_angle := rng.randf_range(0.0, TAU)
+	var fat := rng.randf_range(1.35, 1.65)
+	var thin := rng.randf_range(0.55, 0.72)
+	var squish_scale := Vector2(base_scale.x * fat, base_scale.y * thin)
+
 	active_tween = create_tween()
-	active_tween.tween_property(sprite, "position", current_offset + target_pos + local_position, attack_time).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
-	active_tween.parallel().tween_property(sprite, "rotation", target_rot, attack_time).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
-	active_tween.parallel().tween_property(sprite, "self_modulate", Color.ORANGE_RED, attack_time).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
-	active_tween.tween_property(sprite, "position", current_offset + local_position, attack_time).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_IN_OUT)
-	active_tween.parallel().tween_property(sprite, "rotation", 0, attack_time).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_IN_OUT)
-	active_tween.parallel().tween_property(sprite, "self_modulate", Color.WHITE, attack_time).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_IN_OUT)
+	active_tween.tween_property(sprite, "rotation", squish_angle, 0.05)
+	active_tween.parallel().tween_property(sprite, "scale", squish_scale, 0.07).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	active_tween.tween_property(sprite, "scale", base_scale, 0.28).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+	active_tween.parallel().tween_property(sprite, "rotation", 0.0, 0.28).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	active_tween.tween_callback(start_idle_animation)
+
+func juice_die(direction: Vector2) -> Tween:
+	if idle_tween and idle_tween.is_running():
+		idle_tween.kill()
+	if active_tween and active_tween.is_running():
+		active_tween.kill()
+	if move_tween and move_tween.is_running():
+		move_tween.kill()
+	if _flash_tween and _flash_tween.is_running():
+		_flash_tween.kill()
+
+	# Death should replace hit animation, but still flashes white.
+	_play_white_flash(0.45)
+
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+
+	var dir := direction
+	if dir.length_squared() < 0.0001:
+		dir = Vector2.RIGHT
+	dir = dir.normalized()
+
+	var base_pos: Vector2 = sprite.position
+	var base_scale := _get_base_scale()
+	# Fly farther away from the impact.
+	var knock_a := dir * rng.randf_range(34.0, 48.0) + Vector2(0, rng.randf_range(8.0, 14.0))
+	var knock_b := knock_a + Vector2(rng.randf_range(-18.0, 18.0), rng.randf_range(22.0, 36.0))
+
+	# More inertia: big initial spin + damped wobble after.
+	# Spin direction should oppose the impact direction for readability.
+	var impact_sign := 1.0 if dir.x >= 0.0 else -1.0
+	var spin_a := -impact_sign * rng.randf_range(2.2, 3.4)
+	if rng.randf() < 0.25:
+		spin_a *= -1.0 # occasional variation
+	var spin_b := spin_a + (-impact_sign * rng.randf_range(0.9, 1.6))
+	var spin_c := spin_b * 0.55
+	var spin_d := spin_c * 0.45
+
+	# ~50% height squish, widened to read as impact flatten.
+	var mega_squish := Vector2(
+		base_scale.x * rng.randf_range(1.35, 1.55),
+		base_scale.y * rng.randf_range(0.45, 0.55)
+	)
+	# Keep the squish; don't "reset" scale at the end.
+
+	active_tween = create_tween()
+	active_tween.set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	active_tween.tween_property(sprite, "position", base_pos + knock_a, 0.16)
+	active_tween.parallel().tween_property(sprite, "rotation", spin_a, 0.22)
+	active_tween.parallel().tween_property(sprite, "scale", mega_squish, 0.14)
+
+	# Main fall / tumble — fade starts here (not at the end).
+	active_tween.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	active_tween.tween_property(sprite, "position", base_pos + knock_b, 0.36)
+	active_tween.parallel().tween_property(sprite, "rotation", spin_b, 0.36)
+	active_tween.parallel().tween_property(
+		sprite, "scale", mega_squish * Vector2(rng.randf_range(0.85, 1.05), rng.randf_range(0.9, 1.15)), 0.28
+	)
+	active_tween.parallel().tween_property(sprite, "modulate:a", 0.0, 0.34)
+
+	# Short ragdoll wobble while already fading out.
+	active_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	active_tween.tween_property(sprite, "rotation", spin_c, 0.14)
+	active_tween.parallel().tween_property(
+		sprite, "position", base_pos + knock_b + Vector2(rng.randf_range(-4.0, 4.0), rng.randf_range(2.0, 6.0)), 0.14
+	)
+	active_tween.parallel().tween_property(sprite, "rotation", spin_d, 0.1)
+
+	return active_tween
 
 func juice_squish():
 	if active_tween and active_tween.is_running():
