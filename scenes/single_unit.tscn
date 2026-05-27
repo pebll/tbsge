@@ -1,0 +1,30 @@
+[gd_scene format=3 uid="uid://df7hx5dby2ks0"]
+
+[ext_resource type="Script" uid="uid://detc3omu8kocj" path="res://scripts/single_unit.gd" id="1_k673f"]
+[ext_resource type="Texture2D" uid="uid://bq54stu7cp4wn" path="res://assets/units_sliced/units_back/dragon.png" id="2_k673f"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_10c5b"]
+radius = 48.010418
+
+[node name="Unit" type="Node2D" unique_id=184709622]
+script = ExtResource("1_k673f")
+unit_type = "dragon"
+direction_front = false
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=2110085925]
+scale = Vector2(0.2, 0.2)
+texture = ExtResource("2_k673f")
+offset = Vector2(4.9998407, -140.00008)
+
+[node name="Area2D" type="Area2D" parent="." unique_id=1169123333]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=661100828]
+rotation = -2.4080513
+shape = SubResource("CircleShape2D_10c5b")
+
+[node name="Shadow" type="Sprite2D" parent="." unique_id=656196383]
+position = Vector2(0, 38.75)
+scale = Vector2(1, 78.5)
+
+[connection signal="mouse_entered" from="Area2D" to="." method="_on_mouse_entered"]
+[connection signal="mouse_exited" from="Area2D" to="." method="_on_mouse_exited"]

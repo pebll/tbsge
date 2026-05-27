@@ -1,28 +1,26 @@
-[gd_scene format=3 uid="uid://df7hx5dby2ks0"]
+[gd_scene format=3 uid="uid://ku1b82qof1e6"]
 
-[ext_resource type="Script" uid="uid://detc3omu8kocj" path="res://scripts/unit.gd" id="1_k673f"]
-[ext_resource type="Texture2D" uid="uid://bq54stu7cp4wn" path="res://assets/units_sliced/units_back/dragon.png" id="2_k673f"]
+[ext_resource type="Script" uid="uid://cem13lgxq3dl1" path="res://scripts/unit_visu.gd" id="1_k673f"]
+[ext_resource type="Texture2D" uid="uid://codft6p08m7ia" path="res://assets/units_v2/done/base_uncut_sprites/flame_front.png" id="2_1jvru"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_10c5b"]
-radius = 48.010418
+radius = 26.24881
 
-[node name="Unit" type="Node2D"]
+[node name="LegionUnit" type="Node2D" unique_id=1441347477]
 script = ExtResource("1_k673f")
-unit_type = "dragon"
-direction_front = false
 
-[node name="Sprite2D" type="Sprite2D" parent="."]
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=577617749]
 scale = Vector2(0.2, 0.2)
-texture = ExtResource("2_k673f")
-offset = Vector2(4.9998407, -140.00008)
+texture = ExtResource("2_1jvru")
+offset = Vector2(5, -42.575)
 
-[node name="Area2D" type="Area2D" parent="."]
+[node name="Area2D" type="Area2D" parent="." unique_id=1259893278]
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=1789833785]
 rotation = -2.4080513
 shape = SubResource("CircleShape2D_10c5b")
 
-[node name="Shadow" type="Sprite2D" parent="."]
+[node name="Shadow" type="Sprite2D" parent="." unique_id=57980933]
 position = Vector2(0, 38.75)
 scale = Vector2(1, 78.5)
 

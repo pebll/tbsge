@@ -1,12 +1,9 @@
-class_name LegionUnit
+class_name UnitVisu
 extends Node2D
 
-
-# Define the terrain types as an enum for clarity and type safety.
-const UNITS = ["AXEMAN", "ARCHER", "DRAGON_RIDER", "OGRE", "MAGE", "FLAME", "NECROMANCER", "TREANT"]
-@export var unit_type: String = "ARCHER"
-@export var direction_front: bool = true
-@export var direction_right: bool = true
+var unit : Unit
+var direction_front: bool = true
+var direction_right: bool = true
 
 @onready var sprite: Sprite2D = $Sprite2D
 @onready var idle_tween : Tween
@@ -16,6 +13,9 @@ const UNITS = ["AXEMAN", "ARCHER", "DRAGON_RIDER", "OGRE", "MAGE", "FLAME", "NEC
 var current_offset: Vector2 = Vector2(0, 0)
 var local_position: Vector2 = Vector2(0, 0)
 
+func init(unit: Unit):
+	unit = unit
+	
 func update_direction(direction: Vector2):
 	direction_right = direction.x >= 0
 	direction_front = direction.y >= 0
@@ -24,8 +24,7 @@ func update_direction(direction: Vector2):
 	
 func update_sprite():
 	var face_direction = "front" # (back does not exist yet) ##if direction_front else "back"
-	print("loading " + "res://assets/units_v2/done/base_uncut_sprites/" + unit_type.to_lower() + "_" + face_direction + ".png")
-	var new_texture = load("res://assets/units_v2/done/base_uncut_sprites/" + unit_type.to_lower() + "_" + face_direction + ".png")
+	var new_texture = load("res://assets/units_v2/done/base_uncut_sprites/" + unit.unit_type.to_lower() + "_" + face_direction + ".png")
 	var new_flip_h = !direction_right ##direction_front == direction_right
 	#if new_texture != sprite.texture or sprite.flip_h != new_flip_h:
 	#juice_squish()

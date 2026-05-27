@@ -1,5 +1,12 @@
-res://scenes/legion.tscn
-res://scripts/legion.gd
-res://scripts/legion_unit.gd
-res://scenes/legion_unit.tscn
 res://scenes/runnables/unit_preview.tscn
+res://scripts/legion_unit.gd
+res://scripts/unit.gd
+res://scenes/unit.tscn
+res://scenes/hextile.tscn
+res://scripts/legion.gd
+res://scripts/game_manager.gd
+res://scripts/legion_visu.gd
+res://scripts/unit_visu.gd
+res://scripts/single_unit.gd
+res://scenes/legion.tscn
+res://scripts/hextile.gd

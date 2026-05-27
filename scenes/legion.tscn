@@ -1,13 +1,13 @@
 [gd_scene format=3 uid="uid://j7ywjtdpker5"]
 
-[ext_resource type="Script" uid="uid://qf8l1m4iq23g" path="res://scripts/legion.gd" id="1_auw50"]
+[ext_resource type="Script" uid="uid://cm8n8udpyouju" path="res://scripts/legion_visu.gd" id="1_swhq2"]
 [ext_resource type="Texture2D" uid="uid://bq54stu7cp4wn" path="res://assets/units_sliced/units_back/dragon.png" id="2_auw50"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_10c5b"]
 radius = 48.010418
 
 [node name="Legion" type="Node2D" unique_id=823189178]
-script = ExtResource("1_auw50")
+script = ExtResource("1_swhq2")
 
 [node name="Units" type="Node2D" parent="." unique_id=1934969450]
 z_index = 1000

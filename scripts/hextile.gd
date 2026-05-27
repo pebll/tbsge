@@ -12,7 +12,7 @@ const TERRAINS = ["MOUNTAIN", "WATER", "GRASS", "DESERT", "FOREST"]
 # gameplay
 var terrain_type: String
 var walkable : bool
-var unit : Legion
+var unit : LegionVisu
 # juice
 var active_tween : Tween
 var jump_up : bool = false

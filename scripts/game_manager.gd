@@ -4,9 +4,11 @@ extends Node2D
 @export var map_radius: int = 3
 var tile_size: float = 135.3
 var tile_size_xy_ratio: float = 0.75
+const UNITS = ["AXEMAN", "ARCHER", "DRAGON_RIDER", "OGRE", "MAGE", "FLAME", "NECROMANCER", "TREANT"]
+
 
 @onready var grid : Dictionary[Vector2i, HexTile] = {}
-@onready var units : Array[Legion] = []
+@onready var legions : Array[Legion] = []
 
 var tilesContainer : Node
 var ui : UserInterface
@@ -20,18 +22,19 @@ func _ready():
 	tilesContainer.name = "Tiles" 
 	get_tree().root.add_child.call_deferred(tilesContainer)
 	mapGenerator.generate_hex_map(map_radius, tilesContainer, self.grid)
-	
+
+# Todo: refactor HexTile to have a logic side?
 func spawn_unit(tile: HexTile):
-	# Spawns random unit at given coords
+	# Spawns random legion at given coords
 	if tile.unit or not tile.walkable:
 		print("tile not adequate for spawning")
 		return # only spawn if tile is empty
-	var unit = preload("res://scenes/legion.tscn").instantiate()
-	self.add_child(unit)
-	units.append(unit)
-	tile.unit = unit
-	#unit.sprite.z_index = 100
-	unit.position = tile.position
+	var legion = Legion.new(UNITS[randi()%8], randi()%8+1, tile)
+	var legionVisu = preload("res://scenes/legion.tscn").instantiate()
+	# TODO: refactor this into own folder (like for the tiles)
+	self.add_child(legionVisu)
+	tile.unit = legionVisu
+	legionVisu.init(legion)
 
 func move_unit(from: HexTile, to: HexTile):
 	var unit = from.unit
