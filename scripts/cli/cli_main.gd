@@ -2,7 +2,8 @@ extends SceneTree
 
 # Minimal headless entry point.
 # Run with:
-#   godot --headless --quit --script res://scripts/cli_main.gd
+#   flatpak run org.godotengine.Godot -- --path . --headless --display-driver headless \
+#     --audio-driver Dummy --script res://scripts/cli/cli_main.gd
 #
 # This intentionally avoids any Node2D/scene instantiation and only uses logic models.
 

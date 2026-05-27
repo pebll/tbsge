@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://df7hx5dby2ks0"]
 
-[ext_resource type="Script" uid="uid://detc3omu8kocj" path="res://scripts/single_unit.gd" id="1_k673f"]
+[ext_resource type="Script" uid="uid://du8vmfdu62plv" path="res://scripts/visu/single_unit.gd" id="1_k673f"]
 [ext_resource type="Texture2D" uid="uid://bq54stu7cp4wn" path="res://assets/units_sliced/units_back/dragon.png" id="2_k673f"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_10c5b"]

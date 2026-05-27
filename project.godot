@@ -21,8 +21,8 @@ config/icon="res://icon.svg"
 
 [autoload]
 
-EventBus="*uid://clv0mgnobyc36"
-AudioManager="*uid://bbmr43uf2yxyf"
+EventBus="*uid://wps2obuyjcpy"
+AudioManager="*uid://cxvbv8c8txafc"
 
 [editor]
 

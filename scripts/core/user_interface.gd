@@ -1,4 +1,4 @@
-class_name UserInterface
+class_name GameUI
 
 var gamemanager : GameManager
 

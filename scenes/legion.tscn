@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://j7ywjtdpker5"]
 
-[ext_resource type="Script" uid="uid://cm8n8udpyouju" path="res://scripts/legion_visu.gd" id="1_swhq2"]
+[ext_resource type="Script" uid="uid://0uimkruwg8su" path="res://scripts/visu/legion_visu.gd" id="1_swhq2"]
 [ext_resource type="Texture2D" uid="uid://bq54stu7cp4wn" path="res://assets/units_sliced/units_back/dragon.png" id="2_auw50"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_10c5b"]

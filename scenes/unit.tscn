@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://ku1b82qof1e6"]
 
-[ext_resource type="Script" uid="uid://cem13lgxq3dl1" path="res://scripts/unit_visu.gd" id="1_k673f"]
+[ext_resource type="Script" uid="uid://dx8n0txkcempv" path="res://scripts/visu/unit_visu.gd" id="1_k673f"]
 [ext_resource type="Texture2D" uid="uid://codft6p08m7ia" path="res://assets/units_v2/done/base_uncut_sprites/flame_front.png" id="2_1jvru"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_10c5b"]

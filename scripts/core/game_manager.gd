@@ -12,11 +12,11 @@ const UNITS = ["AXEMAN", "ARCHER", "DRAGON_RIDER", "OGRE", "MAGE", "FLAME", "NEC
 @onready var legions : Array[Legion] = []
 
 var tilesContainer : Node
-var ui : UserInterface
+var ui : GameUI
 var mapGenerator : MapGenerator
 
 func _ready():
-	ui = UserInterface.new(self)
+	ui = GameUI.new(self)
 	mapGenerator = MapGenerator.new(tile_size, tile_size_xy_ratio)
 	# TODO: fix this when refactor mapgenerator
 	tilesContainer = Node.new()
