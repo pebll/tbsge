@@ -5,7 +5,12 @@ extends PanelContainer
 @onready var legion_block: VBoxContainer = %LegionBlock
 @onready var unit_icon: TextureRect = %UnitIcon
 @onready var legion_name: Label = %LegionName
-@onready var legion_stats: Label = %LegionStats
+@onready var attack_icon: TextureRect = %AttackIcon
+@onready var attack_value: Label = %AttackValue
+@onready var health_icon: TextureRect = %HealthIcon
+@onready var health_value: Label = %HealthValue
+@onready var unit_count_icon: TextureRect = %UnitCountIcon
+@onready var unit_count_value: Label = %UnitCountValue
 @onready var units_list: VBoxContainer = %UnitsList
 
 const COLOR_BG := Color(0.91, 0.86, 0.78) # beige
@@ -17,6 +22,10 @@ const COLOR_BLOCK_BG := Color(0.93, 0.89, 0.82)
 
 const BORDER_THICK := 4
 const RADIUS := 16
+
+const ICON_ATTACK := preload("res://assets/icons/base_icons_sprites/sword.png")
+const ICON_HEALTH := preload("res://assets/icons/base_icons_sprites/heart.png")
+const ICON_UNIT_COUNT := preload("res://assets/icons/base_icons_sprites/torso.png")
 
 func _ready() -> void:
 	_apply_style()
@@ -41,7 +50,13 @@ func _apply_style() -> void:
 	add_theme_stylebox_override("panel", sb)
 
 	legion_name.add_theme_color_override("font_color", COLOR_TEXT)
-	legion_stats.add_theme_color_override("font_color", COLOR_TEXT)
+	attack_value.add_theme_color_override("font_color", COLOR_TEXT)
+	health_value.add_theme_color_override("font_color", COLOR_TEXT)
+	unit_count_value.add_theme_color_override("font_color", COLOR_TEXT)
+
+	attack_icon.texture = ICON_ATTACK
+	health_icon.texture = ICON_HEALTH
+	unit_count_icon.texture = ICON_UNIT_COUNT
 
 func _set_empty_state() -> void:
 	legion_block.hide()
@@ -60,9 +75,13 @@ func _render_legion(legion: Legion) -> void:
 
 	var unit0: Unit = legion.units[0] if legion.units.size() > 0 else null
 	if unit0:
-		legion_stats.text = "ATK %d   HP %d" % [int(unit0.attack), int(unit0.max_health)]
+		attack_value.text = "%d" % int(unit0.attack)
+		health_value.text = "%d" % int(unit0.max_health)
 	else:
-		legion_stats.text = ""
+		attack_value.text = ""
+		health_value.text = ""
+
+	unit_count_value.text = "%d" % legion.units.size()
 
 	unit_icon.texture = unit0.definition.icon if unit0 and unit0.definition and unit0.definition.icon else _load_unit_icon(legion.unit_type)
 
@@ -157,7 +176,7 @@ func _build_unit_row(unit_type: String, u: Unit) -> Control:
 	bar_vbox.add_child(spacer_bottom)
 
 	var hp := Label.new()
-	hp.text = "%d/%d" % [int(u.current_health), int(u.max_health)]
+	hp.text = "%d/%d HP" % [int(u.current_health), int(u.max_health)]
 	hp.add_theme_color_override("font_color", COLOR_TEXT)
 	hp.add_theme_font_size_override("font_size", 22)
 	hp.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
