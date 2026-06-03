@@ -2,12 +2,13 @@ class_name GameManager
 extends Node2D
 
 const CombatResolver = preload("res://scripts/core/combat_resolver.gd")
+const TurnManagerRes = preload("res://scripts/core/turn_manager.gd")
 
 @export var map_radius: int = 3
 var tile_size: float = 135.3
 var tile_size_xy_ratio: float = 0.75
 const UNITS = ["AXEMAN", "ARCHER", "DRAGON_RIDER", "OGRE", "MAGE", "FLAME", "NECROMANCER", "TREANT"]
-const TEAM_IDS := ["GREEN", "BLUE"]
+const TEAM_IDS: Array[String] = ["GREEN", "BLUE"]
 
 @onready var grid_visu : Dictionary[Vector2i, TileVisu] = {}
 @onready var grid_model : Dictionary[Vector2i, Tile] = {}
@@ -19,6 +20,8 @@ var mapGenerator : MapGenerator
 var tile_info_panel
 var tile_info_layer: CanvasLayer
 var combat_fx_layer: CanvasLayer
+var turn_hud: TurnHud
+var turn_manager: TurnManager
 
 const ICON_DEATHS := preload("res://assets/icons/base_icons_sprites/skull.png")
 const ICON_HP_LOST := preload("res://assets/icons/base_icons_sprites/heart.png")
@@ -32,8 +35,59 @@ func _ready():
 	get_tree().root.add_child.call_deferred(tilesContainer)
 	mapGenerator.generate_hex_map(map_radius, tilesContainer, self.grid_visu, self.grid_model)
 
+	turn_manager = TurnManagerRes.new(TEAM_IDS)
+	turn_manager.start_match(TEAM_IDS[0])
 	_setup_tile_info_ui()
 	_setup_combat_fx_ui()
+	_setup_turn_hud()
+	EventBus.legion_ap_changed.connect(_on_legion_ap_changed)
+
+func _input(event: InputEvent) -> void:
+	if not event is InputEventKey:
+		return
+	var key_event := event as InputEventKey
+	if not key_event.pressed or key_event.echo:
+		return
+	if key_event.keycode == KEY_TAB or key_event.physical_keycode == KEY_TAB:
+		ui.cycle_legion_tab()
+		get_viewport().set_input_as_handled()
+	elif key_event.keycode == KEY_SPACE or key_event.physical_keycode == KEY_SPACE:
+		ui.pass_current_legion()
+		get_viewport().set_input_as_handled()
+
+func can_act_legion(legion: Legion) -> bool:
+	return legion != null and turn_manager.is_legion_active(legion) and legion.has_ap()
+
+func can_select_legion_at(coords: Vector2i) -> bool:
+	var tile: Tile = grid_model.get(coords)
+	if not tile or not tile.has_legion():
+		return false
+	return can_act_legion(tile.legion)
+
+func end_team_turn() -> void:
+	ui.deselect()
+	var next_team: String = turn_manager.end_team_turn(legions)
+	if turn_hud:
+		turn_hud.show_active_team(next_team)
+	EventBus.turn_changed.emit(next_team)
+
+func _notify_legion_ap_changed(legion: Legion) -> void:
+	EventBus.legion_ap_changed.emit(legion)
+
+func _on_legion_ap_changed(legion: Legion) -> void:
+	if not tile_info_panel or not tile_info_panel.visible:
+		return
+	var tile: Tile = grid_model.get(legion.tile_coords)
+	if tile and tile.has_legion():
+		tile_info_panel.show_tile(tile)
+
+func _setup_turn_hud() -> void:
+	if not tile_info_layer:
+		return
+	turn_hud = preload("res://scenes/ui/turn_hud.tscn").instantiate()
+	tile_info_layer.add_child(turn_hud)
+	turn_hud.show_active_team(turn_manager.active_team_id)
+	turn_hud.next_turn_pressed.connect(end_team_turn)
 
 func _setup_tile_info_ui() -> void:
 	tile_info_layer = CanvasLayer.new()
@@ -61,8 +115,9 @@ func spawn_unit(coords: Vector2i):
 	if tile.has_legion() or not tile.walkable:
 		print("tile not adequate for spawning")
 		return # only spawn if tile is empty
-	var team_id: String = TEAM_IDS[randi() % TEAM_IDS.size()]
+	var team_id: String = turn_manager.active_team_id
 	var legion = Legion.new(UNITS[randi() % 8], randi() % 8 + 1, coords, team_id)
+	legion.refresh_ap()
 	var legionVisu = preload("res://scenes/legion.tscn").instantiate()
 	# TODO: refactor this into own folder (like for the tiles)
 	self.add_child(legionVisu)
@@ -71,6 +126,7 @@ func spawn_unit(coords: Vector2i):
 	tile_visu.legion_visu = legionVisu
 	legionVisu.init(legion)
 	legionVisu.position = tile_visu.position
+	_notify_legion_ap_changed(legion)
 	# Let Y-sort / internal unit z-indices handle draw order.
 
 func inspect_tile(coords: Vector2i) -> void:
@@ -100,6 +156,9 @@ func move_unit(from_coords: Vector2i, to_coords: Vector2i):
 		return
 
 	var legion: Legion = from_tile.legion
+	if not can_act_legion(legion) or not legion.can_afford(1):
+		return
+
 	var legion_visu: LegionVisu = from_visu.legion_visu
 
 	from_tile.legion = null
@@ -107,8 +166,10 @@ func move_unit(from_coords: Vector2i, to_coords: Vector2i):
 	to_tile.legion = legion
 	to_visu.legion_visu = legion_visu
 	legion.tile_coords = to_coords
+	legion.spend_ap(1)
 
 	legion_visu.juice_move(to_visu.position)
+	_notify_legion_ap_changed(legion)
 
 func swap_legions(from_coords: Vector2i, to_coords: Vector2i) -> void:
 	var from_tile: Tile = grid_model.get(from_coords)
@@ -124,6 +185,8 @@ func swap_legions(from_coords: Vector2i, to_coords: Vector2i) -> void:
 
 	var legion_a: Legion = from_tile.legion
 	var legion_b: Legion = to_tile.legion
+	if not can_act_legion(legion_a) or not legion_a.can_afford(1) or not legion_b.can_afford(1):
+		return
 	var visu_a: LegionVisu = from_visu.legion_visu
 	var visu_b: LegionVisu = to_visu.legion_visu
 	if not visu_a or not visu_b:
@@ -139,6 +202,10 @@ func swap_legions(from_coords: Vector2i, to_coords: Vector2i) -> void:
 
 	visu_a.juice_move(to_visu.position)
 	visu_b.juice_move(from_visu.position)
+	legion_a.spend_ap(1)
+	legion_b.spend_ap(1)
+	_notify_legion_ap_changed(legion_a)
+	_notify_legion_ap_changed(legion_b)
 
 func attack_unit(from_coords: Vector2i, to_coords: Vector2i):
 	var from_tile = grid_model.get(from_coords)
@@ -157,6 +224,11 @@ func attack_unit(from_coords: Vector2i, to_coords: Vector2i):
 		return
 	if attacker.team_id == defender.team_id:
 		return
+	if not can_act_legion(attacker) or not attacker.has_ap():
+		return
+
+	attacker.spend_all_ap()
+	_notify_legion_ap_changed(attacker)
 
 	var result: Dictionary = CombatResolver.resolve_combat(attacker, defender, randi())
 	var hits: Array = result.get("hits", [])

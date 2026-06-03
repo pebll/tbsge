@@ -23,10 +23,10 @@ func on_tile_clicked(coords: Vector2i):
 	# if selected tile is movable tile
 	if coords in movable_coords:
 		gamemanager.move_unit(selected_coords, coords)
-		deselect()
+		_after_legion_action(coords)
 	elif coords in swappable_coords:
 		gamemanager.swap_legions(selected_coords, coords)
-		deselect()
+		_after_legion_action(coords)
 	elif coords in attackable_coords:
 		gamemanager.attack_unit(selected_coords, coords)
 		# keep old behavior: deselect after animation finishes
@@ -42,7 +42,8 @@ func on_tile_clicked(coords: Vector2i):
 	# if tile is another unit
 	elif gamemanager.grid_model.get(coords) and gamemanager.grid_model[coords].has_legion():
 		deselect()
-		select_tile(coords)
+		if gamemanager.can_select_legion_at(coords):
+			select_tile(coords)
 	# else
 	else:
 		deselect()
@@ -101,27 +102,63 @@ func deselect():
 	attackable_coords = []
 	swappable_coords = []
 	
+func cycle_legion_tab() -> void:
+	var coords: Vector2i = gamemanager.turn_manager.tab_next(_legions_for_turn())
+	if coords == TurnManager.INVALID_COORDS:
+		return
+	deselect()
+	select_tile(coords)
+
+func pass_current_legion() -> void:
+	if has_selected:
+		gamemanager.turn_manager.wait_legion(selected_coords)
+		deselect()
+	cycle_legion_tab()
+
+func _legions_for_turn() -> Array[Legion]:
+	var out: Array[Legion] = []
+	for tile in gamemanager.grid_model.values():
+		if tile and tile.has_legion():
+			out.append(tile.legion)
+	return out
+
+func _after_legion_action(legion_coords: Vector2i) -> void:
+	var tile: Tile = gamemanager.grid_model.get(legion_coords)
+	if tile and tile.legion and gamemanager.can_act_legion(tile.legion):
+		select_tile(legion_coords)
+	else:
+		deselect()
+
 func select_tile(coords: Vector2i):
+	var selected_tile: Tile = gamemanager.grid_model.get(coords)
+	if not selected_tile or not selected_tile.has_legion():
+		return
+	if not gamemanager.can_act_legion(selected_tile.legion):
+		return
+
 	selected_coords = coords
 	has_selected = true
-	var selected_tile = gamemanager.grid_model.get(coords)
 	var selected_tile_visu: TileVisu = gamemanager.grid_visu.get(coords)
 	if selected_tile_visu:
 		selected_tile_visu.juice_go_to(4)
 		selected_tile_visu.update_state("selected")
 
-	if selected_tile:
-		attackable_coords = []
+	var legion: Legion = selected_tile.legion
+	attackable_coords = []
+	if legion.has_ap():
 		for t in Utils.get_attackable_tiles(selected_tile, gamemanager.grid_model):
 			attackable_coords.append(t.coords)
 
-		movable_coords = []
+	movable_coords = []
+	if legion.can_afford(1):
 		for t in Utils.get_movable_tiles(selected_tile, gamemanager.grid_model):
 			movable_coords.append(t.coords)
 
-		swappable_coords = []
+	swappable_coords = []
+	if legion.can_afford(1):
 		for t in Utils.get_swappable_tiles(selected_tile, gamemanager.grid_model):
-			swappable_coords.append(t.coords)
+			if t.legion.can_afford(1):
+				swappable_coords.append(t.coords)
 
 	for c in movable_coords:
 		var t: TileVisu = gamemanager.grid_visu.get(c)

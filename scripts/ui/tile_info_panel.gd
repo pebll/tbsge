@@ -14,6 +14,8 @@ extends PanelContainer
 @onready var health_value: Label = %HealthValue
 @onready var unit_count_icon: TextureRect = %UnitCountIcon
 @onready var unit_count_value: Label = %UnitCountValue
+@onready var ap_icon: TextureRect = %ApIcon
+@onready var ap_value: Label = %ApValue
 @onready var units_list: VBoxContainer = %UnitsList
 
 const COLOR_BG := Color(0.91, 0.86, 0.78) # beige
@@ -29,6 +31,7 @@ const RADIUS := 16
 const ICON_ATTACK := preload("res://assets/icons/base_icons_sprites/sword.png")
 const ICON_HEALTH := preload("res://assets/icons/base_icons_sprites/heart.png")
 const ICON_UNIT_COUNT := preload("res://assets/icons/base_icons_sprites/torso.png")
+const ICON_AP := preload("res://assets/icons/base_icons_sprites/boot.png")
 
 func _ready() -> void:
 	_apply_style()
@@ -56,10 +59,12 @@ func _apply_style() -> void:
 	attack_value.add_theme_color_override("font_color", COLOR_TEXT)
 	health_value.add_theme_color_override("font_color", COLOR_TEXT)
 	unit_count_value.add_theme_color_override("font_color", COLOR_TEXT)
+	ap_value.add_theme_color_override("font_color", COLOR_TEXT)
 
 	attack_icon.texture = ICON_ATTACK
 	health_icon.texture = ICON_HEALTH
 	unit_count_icon.texture = ICON_UNIT_COUNT
+	ap_icon.texture = ICON_AP
 
 func _set_empty_state() -> void:
 	legion_block.hide()
@@ -86,6 +91,7 @@ func _render_legion(legion: Legion) -> void:
 		health_value.text = ""
 
 	unit_count_value.text = "%d" % legion.units.size()
+	ap_value.text = "%d/%d" % [legion.current_ap, legion.max_ap]
 
 	unit_icon.texture = unit0.definition.icon if unit0 and unit0.definition and unit0.definition.icon else _load_unit_icon(legion.unit_type)
 

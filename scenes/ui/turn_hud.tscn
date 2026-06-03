@@ -1,0 +1,40 @@
+[gd_scene format=3 uid="uid://bturnhud7k2m1"]
+
+[ext_resource type="Script" path="res://scripts/ui/turn_hud.gd" id="1_turn"]
+
+[node name="TurnHud" type="PanelContainer"]
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -220.0
+offset_top = 16.0
+offset_right = 220.0
+offset_bottom = 160.0
+grow_horizontal = 2
+script = ExtResource("1_turn")
+
+[node name="VBox" type="VBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="TurnTeamHeader" type="PanelContainer" parent="VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="TurnTeamLabel" type="Label" parent="VBox/TurnTeamHeader"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "Green's turn"
+horizontal_alignment = 1
+
+[node name="NextTurnButton" type="Button" parent="VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Next turn"
+
+[node name="TurnTeamFooter" type="PanelContainer" parent="VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 8)

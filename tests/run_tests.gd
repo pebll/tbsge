@@ -12,6 +12,8 @@ func _initialize() -> void:
 		"res://tests/test_spawning.gd",
 		"res://tests/test_moving.gd",
 		"res://tests/test_combat_logic.gd",
+		"res://tests/test_legion_ap.gd",
+		"res://tests/test_turn_manager.gd",
 	]
 
 	for path in tests:

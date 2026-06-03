@@ -124,6 +124,23 @@ layout_mode = 2
 theme_override_font_sizes/font_size = 32
 text = "0"
 
+[node name="ApStat" type="HBoxContainer" parent="VBox/LegionBlock/LegionHeader/LegionHeaderText/LegionStats" unique_id=3847193100]
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="ApIcon" type="TextureRect" parent="VBox/LegionBlock/LegionHeader/LegionHeaderText/LegionStats/ApStat" unique_id=3847193101]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(72, 72)
+layout_mode = 2
+expand_mode = 1
+stretch_mode = 6
+
+[node name="ApValue" type="Label" parent="VBox/LegionBlock/LegionHeader/LegionHeaderText/LegionStats/ApStat" unique_id=3847193102]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "2"
+
 [node name="UnitsTitle" type="Label" parent="VBox/LegionBlock" unique_id=565873330]
 unique_name_in_owner = true
 layout_mode = 2
