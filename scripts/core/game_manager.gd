@@ -9,7 +9,6 @@ var tile_size_xy_ratio: float = 0.75
 const UNITS = ["AXEMAN", "ARCHER", "DRAGON_RIDER", "OGRE", "MAGE", "FLAME", "NECROMANCER", "TREANT"]
 const TEAM_IDS := ["GREEN", "BLUE"]
 
-
 @onready var grid_visu : Dictionary[Vector2i, TileVisu] = {}
 @onready var grid_model : Dictionary[Vector2i, Tile] = {}
 @onready var legions : Array[Legion] = []
@@ -174,21 +173,21 @@ func attack_unit(from_coords: Vector2i, to_coords: Vector2i):
 
 		atk_visu.animate_unit_attack(atk_unit, dir)
 
+		# If a unit dies on this hit, remove it from the defending legion visu immediately.
 		var hit_idx: int = h["hit_index"]
 		var died_on_hit := false
 		if deaths_by_hit.has(hit_idx):
 			var d = deaths_by_hit[hit_idx]
-			if d.get("unit") == def_unit:
+			if d.get("legion") == def_legion and d.get("unit") == def_unit:
 				died_on_hit = true
-				var death_visu: LegionVisu = legion_to_visu.get(d.get("legion"))
-				if death_visu:
-					await death_visu.animate_unit_death(def_unit, dir)
-				else:
-					await get_tree().create_timer(gap_s).timeout
+				def_visu.animate_unit_death(def_unit, dir)
 
+		# Only play the regular hit feedback if the unit survived this hit.
 		if not died_on_hit:
 			def_visu.animate_unit_hitted(def_unit, dir, def_hp_before, def_hp_after, float(def_unit.max_health))
-			await get_tree().create_timer(gap_s).timeout
+
+		# Wait for animation to read sequentially.
+		await get_tree().create_timer(gap_s).timeout
 
 	# Re-pack surviving units after the fight sequence.
 	for lv in legion_to_visu.values():
@@ -199,8 +198,8 @@ func attack_unit(from_coords: Vector2i, to_coords: Vector2i):
 	_show_combat_losses(hits, deaths, attacker, defender, attacker_world_pos, defender_world_pos)
 	_hide_combat_hp_fx_later(legion_to_visu)
 
-	await _cleanup_dead_legion(from_coords)
-	await _cleanup_dead_legion(to_coords)
+	_cleanup_dead_legion(from_coords)
+	_cleanup_dead_legion(to_coords)
 
 func _hide_combat_hp_fx_later(legion_to_visu: Dictionary) -> void:
 	# Keep bars visible a bit after the fight, similar to the losses popup linger.
@@ -319,8 +318,5 @@ func _cleanup_dead_legion(coords: Vector2i) -> void:
 		legions.erase(tile.legion)
 	tile.legion = null
 	if visu.legion_visu:
-		var lv: LegionVisu = visu.legion_visu
-		if lv.banner and lv.banner.visible:
-			await lv.animate_banner_vanish()
-		lv.queue_free()
+		visu.legion_visu.queue_free()
 	visu.legion_visu = null

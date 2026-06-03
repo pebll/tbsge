@@ -26,10 +26,9 @@ const BASE_SPRITE_SCALE := Vector2(0.2, 0.2)
 var _flash_mat: ShaderMaterial
 var _flash_tween: Tween
 
-func init(unit: Unit) -> void:
+func init(unit: Unit):
 	self.unit = unit
-	_ensure_sprite_colors()
-
+	
 func _ready() -> void:
 	_setup_flash_shader()
 	_build_hp_fx()
@@ -39,13 +38,6 @@ func _setup_flash_shader() -> void:
 	_flash_mat.shader = FLASH_SHADER
 	_flash_mat.set_shader_parameter("flash_amount", 0.0)
 	sprite.material = _flash_mat
-	_ensure_sprite_colors()
-
-func _ensure_sprite_colors() -> void:
-	modulate = Color.WHITE
-	if sprite:
-		sprite.modulate = Color.WHITE
-		sprite.self_modulate = Color.WHITE
 
 func _get_base_scale() -> Vector2:
 	return BASE_SPRITE_SCALE
@@ -199,10 +191,8 @@ func update_sprite():
 	sprite.texture = new_texture
 	sprite.flip_h = new_flip_h
 	sprite.position = local_position
-	_ensure_sprite_colors()
 
 func start_idle_animation():
-	_ensure_sprite_colors()
 	var base_scale := BASE_SPRITE_SCALE.x
 	var stretch_percentage = 0.02
 	var scale_high = base_scale*(1+stretch_percentage)
@@ -235,7 +225,6 @@ func juice_hitted(_direction: Vector2) -> void:
 	if idle_tween and idle_tween.is_running():
 		idle_tween.kill()
 
-	_ensure_sprite_colors()
 	_play_white_flash(0.55)
 
 	var rng := RandomNumberGenerator.new()
@@ -263,8 +252,11 @@ func juice_die(direction: Vector2) -> Tween:
 	if _flash_tween and _flash_tween.is_running():
 		_flash_tween.kill()
 
-	_ensure_sprite_colors()
-	_play_white_flash(0.18)
+	# Death should replace hit animation, but still flashes white.
+	_play_white_flash(0.45)
+
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
 
 	var dir := direction
 	if dir.length_squared() < 0.0001:
@@ -273,14 +265,49 @@ func juice_die(direction: Vector2) -> Tween:
 
 	var base_pos: Vector2 = sprite.position
 	var base_scale := _get_base_scale()
+	# Fly farther away from the impact.
+	var knock_a := dir * rng.randf_range(34.0, 48.0) + Vector2(0, rng.randf_range(8.0, 14.0))
+	var knock_b := knock_a + Vector2(rng.randf_range(-18.0, 18.0), rng.randf_range(22.0, 36.0))
+
+	# More inertia: big initial spin + damped wobble after.
+	# Spin direction should oppose the impact direction for readability.
+	var impact_sign := 1.0 if dir.x >= 0.0 else -1.0
+	var spin_a := -impact_sign * rng.randf_range(2.2, 3.4)
+	if rng.randf() < 0.25:
+		spin_a *= -1.0 # occasional variation
+	var spin_b := spin_a + (-impact_sign * rng.randf_range(0.9, 1.6))
+	var spin_c := spin_b * 0.55
+	var spin_d := spin_c * 0.45
+
+	# ~50% height squish, widened to read as impact flatten.
+	var mega_squish := Vector2(
+		base_scale.x * rng.randf_range(1.35, 1.55),
+		base_scale.y * rng.randf_range(0.45, 0.55)
+	)
+	# Keep the squish; don't "reset" scale at the end.
 
 	active_tween = create_tween()
-	active_tween.tween_property(sprite, "position", base_pos + dir * 10.0, 0.1).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
-	active_tween.parallel().tween_property(sprite, "rotation", -dir.x * 0.25, 0.1)
-	active_tween.parallel().tween_property(sprite, "scale", base_scale * Vector2(1.08, 0.88), 0.08)
-	active_tween.tween_property(sprite, "scale", Vector2.ZERO, 0.38).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-	active_tween.parallel().tween_property(sprite, "position", base_pos + dir * 20.0 + Vector2(0, 6), 0.38).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-	active_tween.parallel().tween_property(sprite, "rotation", -dir.x * 0.5, 0.38)
+	active_tween.set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	active_tween.tween_property(sprite, "position", base_pos + knock_a, 0.16)
+	active_tween.parallel().tween_property(sprite, "rotation", spin_a, 0.22)
+	active_tween.parallel().tween_property(sprite, "scale", mega_squish, 0.14)
+
+	# Main fall / tumble — fade starts here (not at the end).
+	active_tween.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	active_tween.tween_property(sprite, "position", base_pos + knock_b, 0.36)
+	active_tween.parallel().tween_property(sprite, "rotation", spin_b, 0.36)
+	active_tween.parallel().tween_property(
+		sprite, "scale", mega_squish * Vector2(rng.randf_range(0.85, 1.05), rng.randf_range(0.9, 1.15)), 0.28
+	)
+	active_tween.parallel().tween_property(sprite, "modulate:a", 0.0, 0.34)
+
+	# Short ragdoll wobble while already fading out.
+	active_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	active_tween.tween_property(sprite, "rotation", spin_c, 0.14)
+	active_tween.parallel().tween_property(
+		sprite, "position", base_pos + knock_b + Vector2(rng.randf_range(-4.0, 4.0), rng.randf_range(2.0, 6.0)), 0.14
+	)
+	active_tween.parallel().tween_property(sprite, "rotation", spin_d, 0.1)
 
 	return active_tween
 
