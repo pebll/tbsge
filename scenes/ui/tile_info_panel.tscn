@@ -48,14 +48,22 @@ horizontal_alignment = 1
 
 [node name="LegionHeader" type="HBoxContainer" parent="VBox/LegionBlock" unique_id=991898504]
 layout_mode = 2
+alignment = 1
 theme_override_constants/separation = 12
 
-[node name="UnitIcon" type="TextureRect" parent="VBox/LegionBlock/LegionHeader" unique_id=106450623]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(110, 110)
+[node name="UnitIconFrame" type="CenterContainer" parent="VBox/LegionBlock/LegionHeader" unique_id=3847193200]
+custom_minimum_size = Vector2(120, 168)
 layout_mode = 2
+size_flags_vertical = 0
+
+[node name="UnitIcon" type="TextureRect" parent="VBox/LegionBlock/LegionHeader/UnitIconFrame" unique_id=106450623]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(110, 150)
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
 expand_mode = 1
-stretch_mode = 6
+stretch_mode = 5
 
 [node name="LegionHeaderText" type="VBoxContainer" parent="VBox/LegionBlock/LegionHeader" unique_id=1263681954]
 layout_mode = 2
@@ -124,18 +132,18 @@ layout_mode = 2
 theme_override_font_sizes/font_size = 32
 text = "0"
 
-[node name="ApStat" type="HBoxContainer" parent="VBox/LegionBlock/LegionHeader/LegionHeaderText/LegionStats" unique_id=3847193100]
+[node name="ApStat" type="HBoxContainer" parent="VBox/LegionBlock/LegionHeader/LegionHeaderText" unique_id=3847193100]
 layout_mode = 2
 theme_override_constants/separation = 2
 
-[node name="ApIcon" type="TextureRect" parent="VBox/LegionBlock/LegionHeader/LegionHeaderText/LegionStats/ApStat" unique_id=3847193101]
+[node name="ApIcon" type="TextureRect" parent="VBox/LegionBlock/LegionHeader/LegionHeaderText/ApStat" unique_id=3847193101]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(72, 72)
+custom_minimum_size = Vector2(56, 56)
 layout_mode = 2
 expand_mode = 1
-stretch_mode = 6
+stretch_mode = 5
 
-[node name="ApValue" type="Label" parent="VBox/LegionBlock/LegionHeader/LegionHeaderText/LegionStats/ApStat" unique_id=3847193102]
+[node name="ApValue" type="Label" parent="VBox/LegionBlock/LegionHeader/LegionHeaderText/ApStat" unique_id=3847193102]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 32

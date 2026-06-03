@@ -66,6 +66,17 @@ func _apply_style() -> void:
 	unit_count_icon.texture = ICON_UNIT_COUNT
 	ap_icon.texture = ICON_AP
 
+	_configure_stat_icon(unit_icon, Vector2(110, 150))
+	_configure_stat_icon(attack_icon)
+	_configure_stat_icon(health_icon)
+	_configure_stat_icon(unit_count_icon)
+	_configure_stat_icon(ap_icon, Vector2(56, 56))
+
+func _configure_stat_icon(icon: TextureRect, min_size: Vector2 = Vector2(72, 72)) -> void:
+	icon.custom_minimum_size = min_size
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+
 func _set_empty_state() -> void:
 	legion_block.hide()
 
