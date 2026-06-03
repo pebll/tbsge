@@ -3,6 +3,9 @@ extends PanelContainer
 
 @onready var title_label: Label = %Title
 @onready var legion_block: VBoxContainer = %LegionBlock
+@onready var team_header: PanelContainer = %TeamHeader
+@onready var team_name_label: Label = %TeamName
+@onready var team_footer: PanelContainer = %TeamFooter
 @onready var unit_icon: TextureRect = %UnitIcon
 @onready var legion_name: Label = %LegionName
 @onready var attack_icon: TextureRect = %AttackIcon
@@ -70,6 +73,7 @@ func show_tile(tile: Tile) -> void:
 	_render_legion(tile.legion)
 
 func _render_legion(legion: Legion) -> void:
+	_apply_team_accent(legion.team_id)
 	legion_block.show()
 	legion_name.text = "%s LEGION" % legion.unit_type
 
@@ -185,9 +189,46 @@ func _build_unit_row(unit_type: String, u: Unit) -> Control:
 
 	return wrapper
 
+func _team_accent_stylebox(color: Color) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = color
+	sb.corner_radius_top_left = RADIUS
+	sb.corner_radius_top_right = RADIUS
+	sb.corner_radius_bottom_left = RADIUS
+	sb.corner_radius_bottom_right = RADIUS
+	return sb
+
+func _contrasting_text_color(bg: Color) -> Color:
+	return Color.WHITE if bg.get_luminance() < 0.45 else COLOR_TEXT
+
+func _apply_team_accent(team_id: String) -> void:
+	var team_res: Resource = TeamDefs.get_def(team_id)
+	var accent: Color = COLOR_BORDER
+	var label_text: String = team_id
+	if team_res is TeamDefinition:
+		var team: TeamDefinition = team_res
+		accent = team.color
+		label_text = team.display_name
+
+	team_name_label.text = label_text
+	team_name_label.add_theme_color_override("font_color", _contrasting_text_color(accent))
+
+	var header_sb := _team_accent_stylebox(accent)
+	header_sb.content_margin_left = 14
+	header_sb.content_margin_right = 14
+	header_sb.content_margin_top = 10
+	header_sb.content_margin_bottom = 10
+	team_header.add_theme_stylebox_override("panel", header_sb)
+
+	var footer_sb := _team_accent_stylebox(accent)
+	footer_sb.corner_radius_top_left = 8
+	footer_sb.corner_radius_top_right = 8
+	footer_sb.corner_radius_bottom_left = 8
+	footer_sb.corner_radius_bottom_right = 8
+	team_footer.add_theme_stylebox_override("panel", footer_sb)
+
 func _load_unit_icon(unit_type: String) -> Texture2D:
 	# Keep consistent with `UnitVisu.update_sprite()` path pattern.
 	var path := "res://assets/units_v2/done/base_uncut_sprites/%s_front.png" % unit_type.to_lower()
 	var tex := load(path)
 	return tex if tex is Texture2D else null
-
