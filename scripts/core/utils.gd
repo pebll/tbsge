@@ -36,9 +36,23 @@ static func get_movable_tiles(tile: Tile, grid: Dictionary) -> Array[Tile]:
 	return new_tiles
 
 static func get_attackable_tiles(tile: Tile, grid: Dictionary) -> Array[Tile]:
+	if not tile.has_legion():
+		return []
+	var team_id: String = tile.legion.team_id
 	var tiles = get_surrounding_walkable_tiles(tile, grid)
-	var new_tiles : Array[Tile] = []
+	var new_tiles: Array[Tile] = []
 	for t in tiles:
-		if t.has_legion():
+		if t.has_legion() and t.legion.team_id != team_id:
+			new_tiles.append(t)
+	return new_tiles
+
+static func get_swappable_tiles(tile: Tile, grid: Dictionary) -> Array[Tile]:
+	if not tile.has_legion():
+		return []
+	var team_id: String = tile.legion.team_id
+	var tiles = get_surrounding_walkable_tiles(tile, grid)
+	var new_tiles: Array[Tile] = []
+	for t in tiles:
+		if t.has_legion() and t.legion.team_id == team_id:
 			new_tiles.append(t)
 	return new_tiles

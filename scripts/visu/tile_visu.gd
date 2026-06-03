@@ -8,6 +8,7 @@ var qr_label: Label
 @export var color_movable: Color = Color.GREEN
 @export var color_selected: Color = Color.YELLOW
 @export var color_attackable: Color = Color.RED
+@export var color_swappable: Color = Color(0.35, 0.65, 0.95)
 
 var tile: Tile
 var legion_visu: LegionVisu = null
@@ -65,6 +66,8 @@ func _apply_state() -> void:
 		base_sprite.self_modulate = color_selected
 	elif _gameplay_state == "attackable":
 		base_sprite.self_modulate = color_attackable
+	elif _gameplay_state == "swappable":
+		base_sprite.self_modulate = color_swappable
 	elif _gameplay_state == "movable":
 		base_sprite.self_modulate = color_movable
 	else:

@@ -110,6 +110,36 @@ func move_unit(from_coords: Vector2i, to_coords: Vector2i):
 
 	legion_visu.juice_move(to_visu.position)
 
+func swap_legions(from_coords: Vector2i, to_coords: Vector2i) -> void:
+	var from_tile: Tile = grid_model.get(from_coords)
+	var to_tile: Tile = grid_model.get(to_coords)
+	var from_visu: TileVisu = grid_visu.get(from_coords)
+	var to_visu: TileVisu = grid_visu.get(to_coords)
+	if not from_tile or not to_tile or not from_visu or not to_visu:
+		return
+	if not from_tile.legion or not to_tile.legion:
+		return
+	if from_tile.legion.team_id != to_tile.legion.team_id:
+		return
+
+	var legion_a: Legion = from_tile.legion
+	var legion_b: Legion = to_tile.legion
+	var visu_a: LegionVisu = from_visu.legion_visu
+	var visu_b: LegionVisu = to_visu.legion_visu
+	if not visu_a or not visu_b:
+		return
+
+	from_tile.legion = legion_b
+	from_visu.legion_visu = visu_b
+	to_tile.legion = legion_a
+	to_visu.legion_visu = visu_a
+
+	legion_a.tile_coords = to_coords
+	legion_b.tile_coords = from_coords
+
+	visu_a.juice_move(to_visu.position)
+	visu_b.juice_move(from_visu.position)
+
 func attack_unit(from_coords: Vector2i, to_coords: Vector2i):
 	var from_tile = grid_model.get(from_coords)
 	var to_tile = grid_model.get(to_coords)
@@ -124,6 +154,8 @@ func attack_unit(from_coords: Vector2i, to_coords: Vector2i):
 	var attacker: Legion = from_tile.legion
 	var defender: Legion = to_tile.legion
 	if not attacker or not defender:
+		return
+	if attacker.team_id == defender.team_id:
 		return
 
 	var result: Dictionary = CombatResolver.resolve_combat(attacker, defender, randi())

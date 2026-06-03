@@ -16,6 +16,7 @@ font_color = Color(0, 0, 0, 1)
 script = ExtResource("1_mqk3g")
 color_movable = Color(0.27186605, 0.7461282, 0.323308, 1)
 color_attackable = Color(0.96862745, 0.2784314, 0.20392157, 1)
+color_swappable = Color(0.35, 0.65, 0.95, 1)
 
 [node name="base_sprite" type="Sprite2D" parent="." unique_id=1010674093]
 position = Vector2(1.0000076, -3.0000005)
