@@ -22,7 +22,7 @@ func _initialize() -> void:
 	# Spawn one legion in the center if possible (no gameplay changes, just data wiring)
 	var center = Vector2i(0, 0)
 	if grid_model.has(center) and grid_model[center].walkable:
-		var legion = Legion.new("ARCHER", 4, center)
+		var legion = Legion.new("ARCHER", 4, center, "BLUE")
 		grid_model[center].legion = legion
 
 	quit()

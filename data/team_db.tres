@@ -1,0 +1,9 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/team_database.gd" id="1_db"]
+[ext_resource type="Resource" path="res://data/teams/green.tres" id="2_green"]
+[ext_resource type="Resource" path="res://data/teams/blue.tres" id="3_blue"]
+
+[resource]
+script = ExtResource("1_db")
+defs = Array[Resource]([ExtResource("2_green"), ExtResource("3_blue")])

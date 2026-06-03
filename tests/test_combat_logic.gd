@@ -13,7 +13,7 @@ func run(_tree: SceneTree) -> bool:
 	return true
 
 func _mk_legion(unit_type: String, count: int, hp: int, atk: int) -> Legion:
-	var l := Legion.new(unit_type, count, Vector2i.ZERO)
+	var l := Legion.new(unit_type, count, Vector2i.ZERO, "GREEN")
 	for u in l.units:
 		u.max_health = hp
 		u.current_health = hp

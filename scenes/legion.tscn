@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://0uimkruwg8su" path="res://scripts/visu/legion_visu.gd" id="1_swhq2"]
 [ext_resource type="Texture2D" uid="uid://bq54stu7cp4wn" path="res://assets/units_sliced/units_back/dragon.png" id="2_auw50"]
+[ext_resource type="Texture2D" uid="uid://barqbm86a200e" path="res://assets/banners_sprites/banners_0_0.png" id="3_banner"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_10c5b"]
 radius = 48.010418
@@ -11,6 +12,13 @@ script = ExtResource("1_swhq2")
 
 [node name="Units" type="Node2D" parent="." unique_id=1934969450]
 z_index = 1000
+
+[node name="Banner" type="Sprite2D" parent="." unique_id=-1447774245]
+z_index = 900
+position = Vector2(0, -14.999996)
+scale = Vector2(0.09, 0.09)
+texture = ExtResource("3_banner")
+offset = Vector2(-11.111113, -411.11115)
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=1152469829]
 visible = false
