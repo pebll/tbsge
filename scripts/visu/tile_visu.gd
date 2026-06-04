@@ -17,6 +17,8 @@ var active_tween: Tween
 var base_y: float
 
 var _gameplay_state: String = ""
+var _gameplay_lift: float = 0.0
+var _hover_boost: bool = false
 
 func init(p_tile: Tile) -> void:
 	tile = p_tile
@@ -46,8 +48,28 @@ func _on_clicked(_viewport, event, _shape_idx):
 		elif event.button_index == MOUSE_BUTTON_LEFT:
 			EventBus.tile_clicked.emit(tile.coords)
 
-func juice_go_to(target: float):
-	var time = 0.8
+func set_gameplay_overlay(state: String, lift: float) -> void:
+	_gameplay_state = state
+	_gameplay_lift = lift
+	_apply_state()
+	_sync_lift()
+
+func set_hover_boost(enabled: bool) -> void:
+	_hover_boost = enabled
+	_sync_lift()
+
+func _sync_lift() -> void:
+	var target := _gameplay_lift
+	if _hover_boost and _gameplay_lift > 0.0:
+		target = 6.0
+	juice_go_to(target)
+
+func juice_go_to(target: float) -> void:
+	if active_tween and active_tween.is_running():
+		active_tween.kill()
+	if legion_visu and legion_visu.active_tween and legion_visu.active_tween.is_running():
+		legion_visu.active_tween.kill()
+	var time := 0.8
 	active_tween = create_tween()
 	active_tween.tween_property(base_sprite, "position:y", base_y - target, time).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
 	if legion_visu:
@@ -55,9 +77,8 @@ func juice_go_to(target: float):
 		legion_visu.active_tween = create_tween()
 		legion_visu.active_tween.tween_property(legion_visu.units, "position:y", -target, time).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
 
-func update_state(state: String):
-	_gameplay_state = state
-	_apply_state()
+func update_state(state: String) -> void:
+	set_gameplay_overlay(state, _gameplay_lift)
 
 func _apply_state() -> void:
 	if not base_sprite:

@@ -22,11 +22,18 @@ var tile_info_layer: CanvasLayer
 var combat_fx_layer: CanvasLayer
 var turn_hud: TurnHud
 var turn_manager: TurnManager
+var input: GameInput
 
 const ICON_DEATHS := preload("res://assets/icons/base_icons_sprites/skull.png")
 const ICON_HP_LOST := preload("res://assets/icons/base_icons_sprites/heart.png")
 
+## Combat pacing (seconds). Timers are used between hits — tween.finished is unreliable when tweens get killed/replaced.
+const COMBAT_HIT_BEAT := 0.4
+const COMBAT_DEATH_BEAT := 0.6
+const COMBAT_REPOSITION_BEAT := 0.45
+
 func _ready():
+	input = GameInput.new(self)
 	ui = GameUI.new(self)
 	mapGenerator = MapGenerator.new(tile_size, tile_size_xy_ratio)
 	# TODO: fix this when refactor mapgenerator
@@ -43,6 +50,8 @@ func _ready():
 	EventBus.legion_ap_changed.connect(_on_legion_ap_changed)
 
 func _input(event: InputEvent) -> void:
+	if input.is_locked():
+		return
 	if not event is InputEventKey:
 		return
 	var key_event := event as InputEventKey
@@ -158,8 +167,14 @@ func move_unit(from_coords: Vector2i, to_coords: Vector2i):
 	var legion: Legion = from_tile.legion
 	if not can_act_legion(legion) or not legion.can_afford(1):
 		return
+	if input.is_locked():
+		return
 
 	var legion_visu: LegionVisu = from_visu.legion_visu
+	if not legion_visu:
+		return
+
+	input.begin_action()
 
 	from_tile.legion = null
 	from_visu.legion_visu = null
@@ -168,8 +183,12 @@ func move_unit(from_coords: Vector2i, to_coords: Vector2i):
 	legion.tile_coords = to_coords
 	legion.spend_ap(1)
 
-	legion_visu.juice_move(to_visu.position)
+	var move_tween: Tween = legion_visu.juice_move(to_visu.position)
 	_notify_legion_ap_changed(legion)
+	_finish_action_after_tweens([move_tween], func() -> void:
+		ui.refresh_after_action(to_coords)
+		input.end_action()
+	)
 
 func swap_legions(from_coords: Vector2i, to_coords: Vector2i) -> void:
 	var from_tile: Tile = grid_model.get(from_coords)
@@ -187,10 +206,15 @@ func swap_legions(from_coords: Vector2i, to_coords: Vector2i) -> void:
 	var legion_b: Legion = to_tile.legion
 	if not can_act_legion(legion_a) or not legion_a.can_afford(1) or not legion_b.can_afford(1):
 		return
+	if input.is_locked():
+		return
+
 	var visu_a: LegionVisu = from_visu.legion_visu
 	var visu_b: LegionVisu = to_visu.legion_visu
 	if not visu_a or not visu_b:
 		return
+
+	input.begin_action()
 
 	from_tile.legion = legion_b
 	from_visu.legion_visu = visu_b
@@ -200,14 +224,36 @@ func swap_legions(from_coords: Vector2i, to_coords: Vector2i) -> void:
 	legion_a.tile_coords = to_coords
 	legion_b.tile_coords = from_coords
 
-	visu_a.juice_move(to_visu.position)
-	visu_b.juice_move(from_visu.position)
+	var tween_a: Tween = visu_a.juice_move(to_visu.position)
+	var tween_b: Tween = visu_b.juice_move(from_visu.position)
 	legion_a.spend_ap(1)
 	legion_b.spend_ap(1)
 	_notify_legion_ap_changed(legion_a)
 	_notify_legion_ap_changed(legion_b)
+	_finish_action_after_tweens([tween_a, tween_b], func() -> void:
+		ui.refresh_after_action(to_coords)
+		input.end_action()
+	)
 
-func attack_unit(from_coords: Vector2i, to_coords: Vector2i):
+func _finish_action_after_tweens(tweens: Array, on_done: Callable) -> void:
+	for tween in tweens:
+		if tween != null and is_instance_valid(tween):
+			await tween.finished
+	if on_done.is_valid():
+		on_done.call()
+
+func _combat_beat(seconds: float) -> void:
+	await get_tree().create_timer(seconds).timeout
+
+func _restart_legion_idle_animations(legion_to_visu: Dictionary) -> void:
+	for lv in legion_to_visu.values():
+		if lv and is_instance_valid(lv):
+			lv.start_idle_animation()
+
+func attack_unit(from_coords: Vector2i, to_coords: Vector2i) -> void:
+	_play_combat(from_coords, to_coords)
+
+func _play_combat(from_coords: Vector2i, to_coords: Vector2i) -> void:
 	var from_tile = grid_model.get(from_coords)
 	var to_tile = grid_model.get(to_coords)
 	var from_visu = grid_visu.get(from_coords)
@@ -226,7 +272,10 @@ func attack_unit(from_coords: Vector2i, to_coords: Vector2i):
 		return
 	if not can_act_legion(attacker) or not attacker.has_ap():
 		return
+	if input.is_locked():
+		return
 
+	input.begin_action()
 	attacker.spend_all_ap()
 	_notify_legion_ap_changed(attacker)
 
@@ -258,7 +307,6 @@ func attack_unit(from_coords: Vector2i, to_coords: Vector2i):
 		d_visu.update_direction(-face_dir)
 
 	# Play sequential animations: only attacker + target animate per hit.
-	var gap_s := 0.3
 	for h in hits:
 		var atk_legion: Legion = h["attacker_legion"]
 		var def_legion: Legion = h["defender_legion"]
@@ -277,7 +325,6 @@ func attack_unit(from_coords: Vector2i, to_coords: Vector2i):
 
 		atk_visu.animate_unit_attack(atk_unit, dir)
 
-		# If a unit dies on this hit, remove it from the defending legion visu immediately.
 		var hit_idx: int = h["hit_index"]
 		var died_on_hit := false
 		if deaths_by_hit.has(hit_idx):
@@ -286,24 +333,29 @@ func attack_unit(from_coords: Vector2i, to_coords: Vector2i):
 				died_on_hit = true
 				def_visu.animate_unit_death(def_unit, dir)
 
-		# Only play the regular hit feedback if the unit survived this hit.
 		if not died_on_hit:
-			def_visu.animate_unit_hitted(def_unit, dir, def_hp_before, def_hp_after, float(def_unit.max_health))
+			def_visu.animate_unit_hitted(
+				def_unit, dir, def_hp_before, def_hp_after, float(def_unit.max_health)
+			)
 
-		# Wait for animation to read sequentially.
-		await get_tree().create_timer(gap_s).timeout
+		var beat := COMBAT_DEATH_BEAT if died_on_hit else COMBAT_HIT_BEAT
+		await _combat_beat(beat)
 
-	# Re-pack surviving units after the fight sequence.
 	for lv in legion_to_visu.values():
 		if lv:
 			lv.update_local_positions()
 			lv.tween_units_to_local_positions()
+	await _combat_beat(COMBAT_REPOSITION_BEAT)
+	_restart_legion_idle_animations(legion_to_visu)
 
 	_show_combat_losses(hits, deaths, attacker, defender, attacker_world_pos, defender_world_pos)
 	_hide_combat_hp_fx_later(legion_to_visu)
 
 	_cleanup_dead_legion(from_coords)
 	_cleanup_dead_legion(to_coords)
+
+	ui.deselect()
+	input.end_action()
 
 func _hide_combat_hp_fx_later(legion_to_visu: Dictionary) -> void:
 	# Keep bars visible a bit after the fight, similar to the losses popup linger.

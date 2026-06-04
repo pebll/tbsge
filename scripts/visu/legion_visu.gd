@@ -89,9 +89,13 @@ func refresh_unit_sprites() -> void:
 	for u in units.get_children():
 		u.update_sprite()
 
-func tween_units_to_local_positions() -> void:
+func tween_units_to_local_positions() -> Array[Tween]:
+	var tweens: Array[Tween] = []
 	for u in units.get_children():
-		u.juice_move(Vector2.ZERO)
+		var t: Tween = u.juice_move(Vector2.ZERO)
+		if t:
+			tweens.append(t)
+	return tweens
 
 func get_unit_count() -> int:
 	return legion.unit_count
@@ -104,7 +108,7 @@ func start_idle_animation() -> void:
 	for unit in units.get_children():
 		unit.start_idle_animation()
 
-func juice_move(target_pos: Vector2) -> void:
+func juice_move(target_pos: Vector2) -> Tween:
 	var move_time := 0.4
 	update_local_positions()
 	move_tween = create_tween()
@@ -112,6 +116,7 @@ func juice_move(target_pos: Vector2) -> void:
 	move_tween.tween_property(self, "position", target_pos, move_time).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
 	for unit in units.get_children():
 		unit.juice_move(target_pos)
+	return move_tween
 
 func juice_attack(direction: Vector2) -> void:
 	for unit in units.get_children():
@@ -136,26 +141,27 @@ func juice_direct_reset() -> void:
 func get_unit_visu(unit: Unit) -> UnitVisu:
 	return _unit_to_visu.get(unit)
 
-func animate_unit_attack(unit: Unit, direction: Vector2) -> void:
+func animate_unit_attack(unit: Unit, direction: Vector2) -> Tween:
 	var uv: UnitVisu = get_unit_visu(unit)
 	if not uv:
-		return
+		return null
 	uv.update_direction(direction)
-	uv.juice_attack(direction)
+	return uv.juice_attack(direction)
 
-func animate_unit_hitted(unit: Unit, direction: Vector2, hp_before: float = -1.0, hp_after: float = -1.0, hp_max: float = -1.0) -> void:
+func animate_unit_hitted(unit: Unit, direction: Vector2, hp_before: float = -1.0, hp_after: float = -1.0, hp_max: float = -1.0) -> Tween:
 	var uv: UnitVisu = get_unit_visu(unit)
 	if not uv:
-		return
+		return null
 	uv.update_direction(-direction)
 	if hp_before >= 0.0 and hp_after >= 0.0 and hp_max > 0.0:
 		uv.show_combat_hp_chip(hp_before, hp_after, hp_max)
-	uv.juice_hitted(direction)
+	return uv.juice_hitted(direction)
 
-func animate_unit_death(unit: Unit, direction: Vector2) -> void:
+func animate_unit_death(unit: Unit, direction: Vector2) -> Array[Tween]:
+	var tweens: Array[Tween] = []
 	var uv: UnitVisu = _unit_to_visu.get(unit)
 	if not uv:
-		return
+		return tweens
 
 	uv.hide_combat_hp_fx(true)
 	_unit_to_visu.erase(unit)
@@ -163,14 +169,17 @@ func animate_unit_death(unit: Unit, direction: Vector2) -> void:
 		units.remove_child(uv)
 		corpses.add_child(uv)
 	update_local_positions()
-	tween_units_to_local_positions()
+	tweens.append_array(tween_units_to_local_positions())
 
 	uv.set_facing(-direction)
 	var t := uv.juice_die(direction)
 	if t:
-		await t.finished
-	if is_instance_valid(uv):
-		uv.queue_free()
+		t.finished.connect(func() -> void:
+			if is_instance_valid(uv):
+				uv.queue_free()
+		, CONNECT_ONE_SHOT)
+		tweens.append(t)
+	return tweens
 
 func remove_unit(unit: Unit) -> void:
 	var uv: UnitVisu = _unit_to_visu.get(unit)

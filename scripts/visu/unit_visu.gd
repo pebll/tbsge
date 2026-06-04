@@ -192,7 +192,10 @@ func update_sprite():
 	sprite.flip_h = new_flip_h
 	sprite.position = local_position
 
-func start_idle_animation():
+func start_idle_animation() -> void:
+	if idle_tween and idle_tween.is_running():
+		idle_tween.kill()
+	sprite.scale = _get_base_scale()
 	var base_scale := BASE_SPRITE_SCALE.x
 	var stretch_percentage = 0.02
 	var scale_high = base_scale*(1+stretch_percentage)
@@ -202,14 +205,16 @@ func start_idle_animation():
 	idle_tween.tween_property(sprite, "scale", Vector2(scale_low, scale_high), loop_time)
 	idle_tween.tween_property(sprite, "scale", Vector2(scale_high, scale_low), loop_time)
 
-func juice_move(target_pos: Vector2):
+func juice_move(_target_pos: Vector2) -> Tween:
 	var move_time = 0.4
 	move_tween = create_tween()
 	active_tween = create_tween()
 	move_tween.tween_property(sprite, "position", local_position, move_time).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
 	active_tween.tween_property(sprite, "rotation", 0, move_time).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
-		
-func juice_attack(direction: Vector2):
+	return move_tween
+
+func juice_attack(direction: Vector2) -> Tween:
+	_stop_motion_tweens()
 	var target_pos = direction * 30
 	var target_rot = 0.3 * direction.x
 	var attack_time = 0.2
@@ -218,12 +223,19 @@ func juice_attack(direction: Vector2):
 	active_tween.parallel().tween_property(sprite, "rotation", target_rot, attack_time).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
 	active_tween.tween_property(sprite, "position", current_offset + local_position, attack_time).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_IN_OUT)
 	active_tween.parallel().tween_property(sprite, "rotation", 0, attack_time).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_IN_OUT)
-	
-func juice_hitted(_direction: Vector2) -> void:
+	active_tween.tween_callback(start_idle_animation)
+	return active_tween
+
+func _stop_motion_tweens() -> void:
 	if active_tween and active_tween.is_running():
 		active_tween.kill()
 	if idle_tween and idle_tween.is_running():
 		idle_tween.kill()
+	if move_tween and move_tween.is_running():
+		move_tween.kill()
+
+func juice_hitted(_direction: Vector2) -> Tween:
+	_stop_motion_tweens()
 
 	_play_white_flash(0.55)
 
@@ -241,6 +253,7 @@ func juice_hitted(_direction: Vector2) -> void:
 	active_tween.tween_property(sprite, "scale", base_scale, 0.28).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
 	active_tween.parallel().tween_property(sprite, "rotation", 0.0, 0.28).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	active_tween.tween_callback(start_idle_animation)
+	return active_tween
 
 func juice_die(direction: Vector2) -> Tween:
 	if idle_tween and idle_tween.is_running():
