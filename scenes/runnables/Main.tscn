@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://dcustqp0wa881"]
 
 [ext_resource type="PackedScene" uid="uid://dui7jcbdhwh8s" path="res://scenes/game_manager.tscn" id="1_pe13b"]
+[ext_resource type="Script" path="res://scripts/core/strategy_camera.gd" id="2_cam"]
 
 [node name="Main" type="Node2D" unique_id=1909808696]
 y_sort_enabled = true
@@ -8,5 +9,6 @@ y_sort_enabled = true
 [node name="Camera2D" type="Camera2D" parent="." unique_id=462650787]
 y_sort_enabled = true
 position = Vector2(3, -10)
+script = ExtResource("2_cam")
 
 [node name="GameManager" parent="." unique_id=1748821921 instance=ExtResource("1_pe13b")]
