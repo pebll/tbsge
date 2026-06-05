@@ -9,6 +9,7 @@ func _initialize() -> void:
 
 	var tests := [
 		"res://tests/test_terrain_generation.gd",
+		"res://tests/test_menu_streaming.gd",
 		"res://tests/test_spawning.gd",
 		"res://tests/test_moving.gd",
 		"res://tests/test_combat_logic.gd",
