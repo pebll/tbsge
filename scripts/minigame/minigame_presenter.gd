@@ -6,8 +6,12 @@ const TILE_SIZE_XY_RATIO := 0.75
 const LEGION_SCENE := preload("res://scenes/legion.tscn")
 const HEX_TILE_SCENE := preload("res://scenes/hextile.tscn")
 
+const LIFT_DEPLOY := 2.0
+const LIFT_SELECTED := 4.0
+
 var grid_visu: Dictionary = {}
 var legion_to_visu: Dictionary = {}
+var draft_preview_legions: Array = []
 var tiles_container: Node
 
 func _ready() -> void:
@@ -28,7 +32,42 @@ func build_map(session: MinigameSession) -> void:
 		hex_tile.init(tile)
 		grid_visu[coords] = hex_tile
 
+func paint_deploy_zones(
+	deploy_slots: Array,
+	occupied_coords: Array,
+	selected_coords: Vector2i
+) -> void:
+	clear_deploy_overlays()
+	for coords in deploy_slots:
+		var visu: TileVisu = grid_visu.get(coords)
+		if not visu:
+			continue
+		if coords == selected_coords:
+			visu.set_gameplay_overlay("selected", LIFT_SELECTED)
+		elif coords in occupied_coords:
+			visu.set_gameplay_overlay("deployed", LIFT_DEPLOY)
+		else:
+			visu.set_gameplay_overlay("deployable", LIFT_DEPLOY)
+
+func clear_deploy_overlays() -> void:
+	for visu in grid_visu.values():
+		if visu:
+			visu.set_gameplay_overlay("", 0.0)
+
+func sync_draft_previews(placements: Array, team_id: String) -> void:
+	_clear_draft_previews()
+	for p in placements:
+		var coords: Vector2i = p.get("coords", Vector2i.ZERO)
+		var unit_type: String = String(p.get("unit_type", ""))
+		var unit_count: int = int(p.get("unit_count", 0))
+		if unit_type.is_empty() or unit_count < 1:
+			continue
+		var legion := Legion.new(unit_type, unit_count, coords, team_id)
+		draft_preview_legions.append(legion)
+		_spawn_legion_visu(legion)
+
 func sync_legions(session: MinigameSession) -> void:
+	_clear_draft_previews()
 	for legion in session.legions:
 		if legion.units.is_empty():
 			_remove_legion_visu(legion)
@@ -37,23 +76,40 @@ func sync_legions(session: MinigameSession) -> void:
 			continue
 		_spawn_legion_visu(legion)
 
-func highlight_deploy_slots(slots: Array, color: Color) -> void:
-	clear_highlights()
-	for coords in slots:
-		var visu: TileVisu = grid_visu.get(coords)
-		if visu:
-			visu.modulate = color
-
-func clear_highlights() -> void:
-	for visu in grid_visu.values():
-		if visu:
-			visu.modulate = Color.WHITE
-
 func tile_visu_at(coords: Vector2i) -> TileVisu:
 	return grid_visu.get(coords)
 
 func get_legion_visu(legion: Legion) -> LegionVisu:
-	return legion_to_visu.get(legion)
+	if legion_to_visu.has(legion):
+		return legion_to_visu[legion]
+	for tile_visu in grid_visu.values():
+		if tile_visu and tile_visu.legion_visu and tile_visu.legion_visu.legion == legion:
+			legion_to_visu[legion] = tile_visu.legion_visu
+			return tile_visu.legion_visu
+	return null
+
+func rewire_legion_tile(legion: Legion, from_coords: Vector2i, to_coords: Vector2i) -> void:
+	var visu: LegionVisu = get_legion_visu(legion)
+	if not visu:
+		return
+	var from_tile: TileVisu = grid_visu.get(from_coords)
+	var to_tile: TileVisu = grid_visu.get(to_coords)
+	if from_tile and from_tile.legion_visu == visu:
+		from_tile.legion_visu = null
+	if to_tile:
+		to_tile.legion_visu = visu
+
+func cleanup_dead_legion_at(coords: Vector2i, session: MinigameSession) -> void:
+	var tile: Tile = session.grid.get(coords)
+	var tile_visu: TileVisu = grid_visu.get(coords)
+	if not tile or not tile_visu:
+		return
+	if tile.legion and tile.legion.units.size() > 0:
+		return
+	if tile.legion:
+		_remove_legion_visu(tile.legion)
+	tile.legion = null
+	tile_visu.legion_visu = null
 
 func tween_legion_move(legion: Legion, to_coords: Vector2i) -> Tween:
 	var visu: LegionVisu = legion_to_visu.get(legion)
@@ -99,7 +155,13 @@ func _remove_legion_visu(legion: Legion) -> void:
 	if tile_visu and tile_visu.legion_visu == visu:
 		tile_visu.legion_visu = null
 
+func _clear_draft_previews() -> void:
+	for legion in draft_preview_legions:
+		_remove_legion_visu(legion)
+	draft_preview_legions.clear()
+
 func _clear_map() -> void:
+	_clear_draft_previews()
 	for child in tiles_container.get_children():
 		child.queue_free()
 	grid_visu.clear()

@@ -17,8 +17,16 @@ func run(_tree: SceneTree) -> bool:
 func _load_config():
 	return load("res://data/minigame/duel_r3.tres") as MinigameConfig
 
-func _test_budget_and_validation() -> bool:
+func _prepare_session() -> MinigameSession:
 	var session := MinigameSession.new(_load_config())
+	for tile in session.grid.values():
+		tile.terrain_type = "GRASS"
+		tile.walkable = true
+	session.refresh_deploy_slots()
+	return session
+
+func _test_budget_and_validation() -> bool:
+	var session := _prepare_session()
 	var slots: Array = session.get_deploy_slots("GREEN")
 	if slots.is_empty():
 		push_error("Expected GREEN deploy slots")
@@ -65,7 +73,7 @@ func _test_budget_and_validation() -> bool:
 	return true
 
 func _test_hidden_opponent_draft() -> bool:
-	var session := MinigameSession.new(_load_config())
+	var session := _prepare_session()
 	var green_slots: Array = session.get_deploy_slots("GREEN")
 	session.apply({
 		"type": "draft_set_legion",
@@ -86,7 +94,7 @@ func _test_hidden_opponent_draft() -> bool:
 	return true
 
 func _test_both_ready_starts_battle() -> bool:
-	var session := MinigameSession.new(_load_config())
+	var session := _prepare_session()
 	var green_slots: Array = session.get_deploy_slots("GREEN")
 	var blue_slots: Array = session.get_deploy_slots("BLUE")
 

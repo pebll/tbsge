@@ -16,6 +16,14 @@ func run(_tree: SceneTree) -> bool:
 func _load_config():
 	return load("res://data/minigame/duel_r3.tres") as MinigameConfig
 
+func _prepare_session() -> MinigameSession:
+	var session := MinigameSession.new(_load_config())
+	for tile in session.grid.values():
+		tile.terrain_type = "GRASS"
+		tile.walkable = true
+	session.refresh_deploy_slots()
+	return session
+
 func _start_battle(session: MinigameSession) -> void:
 	var green_slots: Array = session.get_deploy_slots("GREEN")
 	var blue_slots: Array = session.get_deploy_slots("BLUE")
@@ -37,7 +45,7 @@ func _start_battle(session: MinigameSession) -> void:
 	session.apply({"type": "draft_ready", "team": "BLUE"})
 
 func _test_move_and_turns() -> bool:
-	var session := MinigameSession.new(_load_config())
+	var session := _prepare_session()
 	_start_battle(session)
 	if session.turn_manager.active_team_id != "GREEN":
 		push_error("GREEN should move first")
@@ -69,7 +77,7 @@ func _test_move_and_turns() -> bool:
 	return true
 
 func _test_surrender() -> bool:
-	var session := MinigameSession.new(_load_config())
+	var session := _prepare_session()
 	_start_battle(session)
 	var result := session.apply({"type": "surrender", "team": "GREEN"})
 	if not result["ok"]:
@@ -84,7 +92,7 @@ func _test_surrender() -> bool:
 	return true
 
 func _test_victory_by_elimination() -> bool:
-	var session := MinigameSession.new(_load_config())
+	var session := _prepare_session()
 	var green_slots: Array = session.get_deploy_slots("GREEN")
 	var blue_slots: Array = session.get_deploy_slots("BLUE")
 	session.apply({

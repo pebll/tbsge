@@ -12,10 +12,15 @@ var movable_coords: Array[Vector2i] = []
 var attackable_coords: Array[Vector2i] = []
 var swappable_coords: Array[Vector2i] = []
 var _overlay_coords: Array[Vector2i] = []
+var _info_tile_coords: Vector2i
+var _info_visible_for_tile: bool = false
 
 func _init(p_root: MinigameRoot) -> void:
 	root = p_root
 	EventBus.tile_clicked.connect(_on_tile_clicked)
+	EventBus.tile_right_clicked.connect(_on_tile_right_clicked)
+	EventBus.tile_hover_entered.connect(_on_tile_hover_entered)
+	EventBus.tile_hover_exited.connect(_on_tile_hover_exited)
 
 func can_accept_command() -> bool:
 	return not root.input_locked
@@ -27,6 +32,39 @@ func _on_tile_clicked(coords: Vector2i) -> void:
 		return
 	AudioManager.play_sfx("tile_click")
 	_dispatch_click(coords)
+
+func _on_tile_right_clicked(coords: Vector2i) -> void:
+	if root.session.phase != MinigameSession.Phase.BATTLE:
+		return
+	_info_tile_coords = coords
+	_info_visible_for_tile = true
+	root.inspect_tile(coords)
+
+func _on_tile_hover_entered(coords: Vector2i) -> void:
+	if not coords in _overlay_coords:
+		return
+	AudioManager.play_sfx("tile_hover")
+	var tile_visu := root.presenter.tile_visu_at(coords)
+	if tile_visu:
+		tile_visu.set_hover_boost(true)
+	if has_selected:
+		var selected_visu := root.presenter.tile_visu_at(selected_coords)
+		if selected_visu and selected_visu.legion_visu and tile_visu:
+			var dir := (tile_visu.position - selected_visu.position).normalized()
+			selected_visu.legion_visu.update_direction(dir)
+
+func _on_tile_hover_exited(coords: Vector2i) -> void:
+	if _info_visible_for_tile and coords == _info_tile_coords:
+		_info_visible_for_tile = false
+		root.clear_inspect()
+	if coords in _overlay_coords:
+		var tile_visu := root.presenter.tile_visu_at(coords)
+		if tile_visu:
+			tile_visu.set_hover_boost(false)
+	if has_selected:
+		var selected_visu := root.presenter.tile_visu_at(selected_coords)
+		if selected_visu and selected_visu.legion_visu:
+			selected_visu.legion_visu.juice_direct_reset()
 
 func _dispatch_click(coords: Vector2i) -> void:
 	if coords in movable_coords:

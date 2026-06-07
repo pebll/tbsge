@@ -85,8 +85,15 @@ func show_tile(tile: Tile) -> void:
 		_set_empty_state()
 		hide()
 		return
+	show_legion(tile.legion)
 
-	_render_legion(tile.legion)
+func show_legion(legion: Legion) -> void:
+	if legion == null or legion.units.is_empty():
+		_set_empty_state()
+		hide()
+		return
+	_render_legion(legion)
+	show()
 
 func _render_legion(legion: Legion) -> void:
 	_apply_team_accent(legion.team_id)

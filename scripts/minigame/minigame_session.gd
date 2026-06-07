@@ -28,11 +28,13 @@ func _init(p_config) -> void:
 	_rng.seed = 1337
 	for team_id in config.team_ids:
 		drafts[team_id] = DraftStateScript.new(team_id, config.budget)
-		deploy_slots[team_id] = MinigameRulesScript.deploy_zone_coords(
-			config.map_radius,
-			team_id,
-			config.deploy_slot_count,
-			config.team_ids
+		deploy_slots[team_id] = _walkable_deploy_slots(
+			MinigameRulesScript.deploy_zone_coords(
+				config.map_radius,
+				team_id,
+				config.deploy_slot_count,
+				config.team_ids
+			)
 		)
 	if not config.team_ids.is_empty():
 		active_draft_team = config.team_ids[0]
@@ -77,6 +79,17 @@ func get_view_state(for_team: String) -> Dictionary:
 	elif phase == Phase.BATTLE or phase == Phase.ENDED:
 		out["legions"] = _serialize_legions(for_team)
 	return out
+
+func refresh_deploy_slots() -> void:
+	for team_id in config.team_ids:
+		deploy_slots[team_id] = _walkable_deploy_slots(
+			MinigameRulesScript.deploy_zone_coords(
+				config.map_radius,
+				team_id,
+				config.deploy_slot_count,
+				config.team_ids
+			)
+		)
 
 func get_deploy_slots(team_id: String) -> Array[Vector2i]:
 	var slots: Array[Vector2i] = []
@@ -137,7 +150,7 @@ func _draft_set_legion(cmd: Dictionary) -> Dictionary:
 
 	var slots: Array = deploy_slots.get(team_id, [])
 	var err: String = MinigameRulesScript.validate_draft_placement(
-		team_id, coords, unit_type, unit_count, draft, slots, config.max_legion_fill
+		team_id, coords, unit_type, unit_count, draft, slots, config.max_legion_fill, grid
 	)
 	if not err.is_empty():
 		return _fail(err)
@@ -300,6 +313,13 @@ func _battle_end_turn() -> Dictionary:
 		return _fail("Not in battle")
 	var next_team: String = turn_manager.end_team_turn(_typed_legions())
 	return _ok(["turn_changed"], {"active_team": next_team})
+
+func _walkable_deploy_slots(zone_coords: Array) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for coords in zone_coords:
+		if MinigameRulesScript.is_walkable_deploy_slot(grid, coords):
+			out.append(coords)
+	return out
 
 func _typed_legions() -> Array[Legion]:
 	var out: Array[Legion] = []
