@@ -9,5 +9,7 @@ id = "ARCHER"
 display_name = "Archer"
 max_health = 10
 attack = 4
+size = 1.5
+price = 3
 icon = ExtResource("2_icon")
 

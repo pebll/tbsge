@@ -9,5 +9,7 @@ id = "FLAME"
 display_name = "Flame"
 max_health = 9
 attack = 7
+size = 1.5
+price = 5
 icon = ExtResource("2_icon")
 

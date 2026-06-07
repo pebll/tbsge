@@ -9,5 +9,7 @@ id = "OGRE"
 display_name = "Ogre"
 max_health = 24
 attack = 8
+size = 2.5
+price = 10
 icon = ExtResource("2_icon")
 

@@ -1,0 +1,13 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/minigame/minigame_config.gd" id="1_cfg"]
+
+[resource]
+script = ExtResource("1_cfg")
+id = "duel_r3"
+display_name = "Duel (Radius 3)"
+map_radius = 3
+budget = 50
+deploy_slot_count = 7
+team_ids = Array[String](["GREEN", "BLUE"])
+max_legion_fill = 12.0

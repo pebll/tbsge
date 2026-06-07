@@ -9,5 +9,7 @@ id = "TREANT"
 display_name = "Treant"
 max_health = 20
 attack = 4
+size = 2.0
+price = 6
 icon = ExtResource("2_icon")
 

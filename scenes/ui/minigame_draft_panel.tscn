@@ -1,0 +1,80 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/minigame_draft_panel.gd" id="1_draft"]
+
+[node name="MinigameDraftPanel" type="PanelContainer"]
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -360.0
+offset_top = -280.0
+offset_right = -16.0
+offset_bottom = 280.0
+grow_vertical = 2
+script = ExtResource("1_draft")
+
+[node name="VBox" type="VBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="TeamLabel" type="Label" parent="VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 26
+text = "Army Setup"
+horizontal_alignment = 1
+
+[node name="BudgetLabel" type="Label" parent="VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Gold: 0 / 0"
+horizontal_alignment = 1
+
+[node name="UnitGrid" type="GridContainer" parent="VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/h_separation = 6
+theme_override_constants/v_separation = 6
+columns = 2
+
+[node name="CountRow" type="HBoxContainer" parent="VBox"]
+layout_mode = 2
+alignment = 1
+
+[node name="MinusButton" type="Button" parent="VBox/CountRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = " - "
+
+[node name="CountLabel" type="Label" parent="VBox/CountRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Units: 4 / 8"
+
+[node name="PlusButton" type="Button" parent="VBox/CountRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = " + "
+
+[node name="InfoLabel" type="Label" parent="VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Cost: 0 gold"
+horizontal_alignment = 1
+
+[node name="ReadyButton" type="Button" parent="VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Ready"
+
+[node name="ClearButton" type="Button" parent="VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Clear selected slot"

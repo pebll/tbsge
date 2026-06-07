@@ -1,6 +1,6 @@
 extends Control
 
-const DEV_TEST_SCENE := "res://scenes/runnables/unit_preview.tscn"
+const DEV_TEST_SCENE := "res://scenes/runnables/dev_test_menu.tscn"
 
 const COLOR_BG := Color(0.91, 0.86, 0.78)
 const COLOR_BORDER := Color(0.78, 0.70, 0.58)
