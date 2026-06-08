@@ -20,8 +20,8 @@ func _test_pricing_and_sizes() -> bool:
 	if MinigameRules.max_units_in_legion("GOBLIN") != 12:
 		push_error("GOBLIN max units expected 12")
 		return false
-	if MinigameRules.max_units_in_legion("SCORPION_RIDER") != 4:
-		push_error("SCORPION_RIDER max units expected 4")
+	if MinigameRules.max_units_in_legion("SCORPION_RIDER") != 6:
+		push_error("SCORPION_RIDER max units expected 6")
 		return false
 	if MinigameRules.legion_cost("GOBLIN", 4) != 12:
 		push_error("4 goblins should cost 12 gold")

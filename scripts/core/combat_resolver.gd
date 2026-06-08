@@ -1,6 +1,8 @@
 class_name CombatResolver
 extends RefCounted
 
+static var quiet: bool = false
+
 static func _pick_next_attacker(legion: Legion, attacked: Dictionary) -> Unit:
 	if legion == null:
 		return null
@@ -72,7 +74,8 @@ static func resolve_combat(attacking_legion: Legion, defending_legion: Legion, r
 			int(max(0.0, target_unit.current_health)),
 			int(target_unit.max_health),
 		]
-		print(hit_log)
+		if not quiet:
+			print(hit_log)
 
 		hits.append({
 			"hit_index": hit_index,

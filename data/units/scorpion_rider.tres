@@ -7,10 +7,10 @@
 script = ExtResource("1_def")
 id = "SCORPION_RIDER"
 display_name = "Scorpion Rider"
-max_health = 16
-attack = 7
+max_health = 18
+attack = 8
 ap = 3
 image_size = 1.08
-size = 2.5
-price = 8
+size = 2.0
+price = 7
 icon = ExtResource("2_icon")
