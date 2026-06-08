@@ -1,6 +1,13 @@
 class_name TileInfoPanel
 extends PanelContainer
 
+signal draft_count_increase_pressed
+signal draft_count_decrease_pressed
+signal draft_change_type_pressed
+signal draft_clear_slot_pressed
+
+const MinigameRulesScript = preload("res://scripts/minigame/minigame_rules.gd")
+
 @onready var title_label: Label = %Title
 @onready var legion_block: VBoxContainer = %LegionBlock
 @onready var team_header: PanelContainer = %TeamHeader
@@ -14,9 +21,22 @@ extends PanelContainer
 @onready var health_value: Label = %HealthValue
 @onready var unit_count_icon: TextureRect = %UnitCountIcon
 @onready var unit_count_value: Label = %UnitCountValue
+@onready var ap_stat: HBoxContainer = %ApStat
 @onready var ap_icon: TextureRect = %ApIcon
 @onready var ap_value: Label = %ApValue
 @onready var units_list: VBoxContainer = %UnitsList
+@onready var draft_controls: VBoxContainer = %DraftControls
+@onready var minus_button: Button = %MinusButton
+@onready var plus_button: Button = %PlusButton
+@onready var count_value: Label = %CountValue
+@onready var cost_value: Label = %CostValue
+@onready var change_type_button: Button = %ChangeTypeButton
+@onready var clear_button: Button = %ClearButton
+
+var _draft_mode: bool = false
+var _draft_unit_type: String = ""
+var _draft_unit_count: int = 0
+var _remaining_budget: int = 0
 
 const COLOR_BG := Color(0.91, 0.86, 0.78) # beige
 const COLOR_BORDER := Color(0.78, 0.70, 0.58)
@@ -35,7 +55,13 @@ const ICON_AP := preload("res://assets/icons/base_icons_sprites/boot.png")
 
 func _ready() -> void:
 	_apply_style()
+	_style_draft_buttons()
+	minus_button.pressed.connect(func(): draft_count_decrease_pressed.emit())
+	plus_button.pressed.connect(func(): draft_count_increase_pressed.emit())
+	change_type_button.pressed.connect(func(): draft_change_type_pressed.emit())
+	clear_button.pressed.connect(func(): draft_clear_slot_pressed.emit())
 	_set_empty_state()
+	set_draft_mode(false)
 
 func _apply_style() -> void:
 	var sb := StyleBoxFlat.new()
@@ -92,8 +118,90 @@ func show_legion(legion: Legion) -> void:
 		_set_empty_state()
 		hide()
 		return
+	set_draft_mode(false)
 	_render_legion(legion)
 	show()
+
+func set_draft_mode(enabled: bool) -> void:
+	_draft_mode = enabled
+	draft_controls.visible = enabled
+	ap_stat.visible = not enabled
+
+func show_draft_legion(
+	legion: Legion,
+	remaining_budget: int,
+	_coords: Vector2i,
+	placement_count: int = -1
+) -> void:
+	if legion == null or legion.units.is_empty():
+		_set_empty_state()
+		hide()
+		return
+	_draft_unit_type = legion.unit_type
+	_draft_unit_count = placement_count if placement_count >= 0 else legion.unit_count
+	_remaining_budget = remaining_budget
+	set_draft_mode(true)
+	_render_legion(legion)
+	_refresh_draft_controls()
+	show()
+
+func show_draft_message(text: String) -> void:
+	if _draft_mode:
+		cost_value.text = text
+
+func _refresh_draft_controls() -> void:
+	var max_count := MinigameRulesScript.max_units_in_legion(_draft_unit_type)
+	var cost := MinigameRulesScript.legion_cost(_draft_unit_type, _draft_unit_count)
+	var fill := MinigameRulesScript.legion_fill(_draft_unit_type, _draft_unit_count)
+	count_value.text = "%d / %d" % [_draft_unit_count, max_count]
+	cost_value.text = "Legion cost: %d gold  •  Size %.1f / 12" % [cost, fill]
+	minus_button.disabled = _draft_unit_count <= 1
+	plus_button.disabled = not _can_add_draft_unit()
+
+func _can_add_draft_unit() -> bool:
+	var max_count := MinigameRulesScript.max_units_in_legion(_draft_unit_type)
+	if _draft_unit_count >= max_count:
+		return false
+	return MinigameRulesScript.unit_price(_draft_unit_type) <= _remaining_budget
+
+func _style_draft_buttons() -> void:
+	for btn in [minus_button, plus_button]:
+		btn.custom_minimum_size = Vector2(64, 64)
+		btn.add_theme_font_size_override("font_size", 36)
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = COLOR_BLOCK_BG
+		sb.border_color = COLOR_BORDER
+		sb.border_width_left = BORDER_THICK
+		sb.border_width_right = BORDER_THICK
+		sb.border_width_top = BORDER_THICK
+		sb.border_width_bottom = BORDER_THICK
+		sb.corner_radius_top_left = RADIUS
+		sb.corner_radius_top_right = RADIUS
+		sb.corner_radius_bottom_left = RADIUS
+		sb.corner_radius_bottom_right = RADIUS
+		btn.add_theme_stylebox_override("normal", sb)
+		btn.add_theme_stylebox_override("hover", sb)
+		btn.add_theme_stylebox_override("pressed", sb)
+		btn.add_theme_color_override("font_color", COLOR_TEXT)
+	for btn in [change_type_button, clear_button]:
+		btn.add_theme_font_size_override("font_size", 20)
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = COLOR_BLOCK_BG
+		sb.border_color = COLOR_BORDER
+		sb.border_width_left = BORDER_THICK
+		sb.border_width_right = BORDER_THICK
+		sb.border_width_top = BORDER_THICK
+		sb.border_width_bottom = BORDER_THICK
+		sb.corner_radius_top_left = RADIUS
+		sb.corner_radius_top_right = RADIUS
+		sb.corner_radius_bottom_left = RADIUS
+		sb.corner_radius_bottom_right = RADIUS
+		sb.content_margin_top = 10
+		sb.content_margin_bottom = 10
+		btn.add_theme_stylebox_override("normal", sb)
+		btn.add_theme_stylebox_override("hover", sb)
+		btn.add_theme_stylebox_override("pressed", sb)
+		btn.add_theme_color_override("font_color", COLOR_TEXT)
 
 func _render_legion(legion: Legion) -> void:
 	_apply_team_accent(legion.team_id)

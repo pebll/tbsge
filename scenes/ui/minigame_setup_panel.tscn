@@ -2,167 +2,68 @@
 
 [ext_resource type="Script" path="res://scripts/ui/minigame_setup_panel.gd" id="1_setup"]
 
-[node name="MinigameSetupPanel" type="PanelContainer"]
-anchors_preset = 11
-anchor_left = 1.0
+[node name="MinigameSetupPanel" type="Control"]
+layout_mode = 3
+anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -540.0
-offset_top = 20.0
-offset_right = -20.0
-offset_bottom = -20.0
-custom_minimum_size = Vector2(520, 0)
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
 script = ExtResource("1_setup")
 
-[node name="VBox" type="VBoxContainer" parent="."]
-layout_mode = 2
-theme_override_constants/separation = 12
+[node name="GoldPanel" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -180.0
+offset_top = 16.0
+offset_right = 180.0
+offset_bottom = 88.0
+grow_horizontal = 2
 
-[node name="TeamHeader" type="PanelContainer" parent="VBox"]
+[node name="GoldVBox" type="VBoxContainer" parent="GoldPanel"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="TeamLabel" type="Label" parent="GoldPanel/GoldVBox"]
 unique_name_in_owner = true
 layout_mode = 2
-
-[node name="TeamLabel" type="Label" parent="VBox/TeamHeader"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_font_sizes/font_size = 26
+theme_override_font_sizes/font_size = 20
 text = "Army Setup"
 horizontal_alignment = 1
 
-[node name="GoldRow" type="HBoxContainer" parent="VBox"]
+[node name="GoldRow" type="HBoxContainer" parent="GoldPanel/GoldVBox"]
 layout_mode = 2
 alignment = 1
 theme_override_constants/separation = 8
 
-[node name="GoldValue" type="Label" parent="VBox/GoldRow"]
+[node name="GoldValue" type="Label" parent="GoldPanel/GoldVBox/GoldRow"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 48
+theme_override_font_sizes/font_size = 40
 text = "50"
 
-[node name="GoldTotal" type="Label" parent="VBox/GoldRow"]
+[node name="GoldTotal" type="Label" parent="GoldPanel/GoldVBox/GoldRow"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 22
 text = "/ 50 gold left"
 vertical_alignment = 2
 
-[node name="HintLabel" type="Label" parent="VBox"]
+[node name="ReadyButton" type="Button" parent="."]
 unique_name_in_owner = true
-layout_mode = 2
-theme_override_font_sizes/font_size = 20
-text = "Click an empty highlighted tile to place a legion."
-autowrap_mode = 3
-horizontal_alignment = 1
-
-[node name="SlotLabel" type="Label" parent="VBox"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_font_sizes/font_size = 22
-text = "No slot selected"
-horizontal_alignment = 1
-
-[node name="PreviewBlock" type="VBoxContainer" parent="VBox"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 10
-
-[node name="LegionHeader" type="HBoxContainer" parent="VBox/PreviewBlock"]
-layout_mode = 2
-alignment = 1
-theme_override_constants/separation = 12
-
-[node name="UnitIcon" type="TextureRect" parent="VBox/PreviewBlock/LegionHeader"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(110, 150)
-layout_mode = 2
-
-[node name="LegionHeaderText" type="VBoxContainer" parent="VBox/PreviewBlock/LegionHeader"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 4
-
-[node name="UnitName" type="Label" parent="VBox/PreviewBlock/LegionHeader/LegionHeaderText"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_font_sizes/font_size = 28
-text = "Archer"
-
-[node name="StatsRow" type="HBoxContainer" parent="VBox/PreviewBlock/LegionHeader/LegionHeaderText"]
-layout_mode = 2
-theme_override_constants/separation = 12
-
-[node name="AttackValue" type="Label" parent="VBox/PreviewBlock/LegionHeader/LegionHeaderText/StatsRow"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_font_sizes/font_size = 22
-text = "4 ATK"
-
-[node name="HealthValue" type="Label" parent="VBox/PreviewBlock/LegionHeader/LegionHeaderText/StatsRow"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_font_sizes/font_size = 22
-text = "10 HP"
-
-[node name="PriceValue" type="Label" parent="VBox/PreviewBlock/LegionHeader/LegionHeaderText/StatsRow"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_font_sizes/font_size = 22
-text = "3g each"
-
-[node name="SizeValue" type="Label" parent="VBox/PreviewBlock/LegionHeader/LegionHeaderText/StatsRow"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_font_sizes/font_size = 22
-text = "1.5 size"
-
-[node name="CountRow" type="HBoxContainer" parent="VBox/PreviewBlock"]
-layout_mode = 2
-alignment = 1
-theme_override_constants/separation = 16
-
-[node name="MinusButton" type="Button" parent="VBox/PreviewBlock/CountRow"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "-"
-
-[node name="CountValue" type="Label" parent="VBox/PreviewBlock/CountRow"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_font_sizes/font_size = 36
-text = "4 / 8"
-vertical_alignment = 1
-
-[node name="PlusButton" type="Button" parent="VBox/PreviewBlock/CountRow"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "+"
-
-[node name="CostValue" type="Label" parent="VBox/PreviewBlock"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_font_sizes/font_size = 20
-text = "Legion cost: 12 gold"
-horizontal_alignment = 1
-
-[node name="UnitsPreview" type="VBoxContainer" parent="VBox/PreviewBlock"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 6
-
-[node name="ChangeTypeButton" type="Button" parent="VBox/PreviewBlock"]
-unique_name_in_owner = true
-layout_mode = 2
-
-[node name="ClearButton" type="Button" parent="VBox/PreviewBlock"]
-unique_name_in_owner = true
-layout_mode = 2
-
-[node name="ReadyButton" type="Button" parent="VBox"]
-unique_name_in_owner = true
-layout_mode = 2
-
-[node name="TeamFooter" type="PanelContainer" parent="VBox"]
-unique_name_in_owner = true
-layout_mode = 2
-custom_minimum_size = Vector2(0, 10)
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -180.0
+offset_top = -96.0
+offset_right = 180.0
+offset_bottom = -24.0
+grow_horizontal = 2
+grow_vertical = 0

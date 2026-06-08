@@ -8,10 +8,12 @@ const HEX_TILE_SCENE := preload("res://scenes/hextile.tscn")
 
 const LIFT_DEPLOY := 2.0
 const LIFT_SELECTED := 4.0
-
+const MinigameRulesScript = preload("res://scripts/minigame/minigame_rules.gd")
 var grid_visu: Dictionary = {}
 var legion_to_visu: Dictionary = {}
-var draft_preview_legions: Array = []
+var _draft_preview_by_coords: Dictionary = {}
+var _draft_formation_seeds: Dictionary = {}
+var _draft_price_tags: Dictionary = {}
 var tiles_container: Node
 
 func _ready() -> void:
@@ -55,16 +57,27 @@ func clear_deploy_overlays() -> void:
 			visu.set_gameplay_overlay("", 0.0)
 
 func sync_draft_previews(placements: Array, team_id: String) -> void:
-	_clear_draft_previews()
+	var desired: Dictionary = {}
 	for p in placements:
 		var coords: Vector2i = p.get("coords", Vector2i.ZERO)
 		var unit_type: String = String(p.get("unit_type", ""))
 		var unit_count: int = int(p.get("unit_count", 0))
 		if unit_type.is_empty() or unit_count < 1:
 			continue
-		var legion := Legion.new(unit_type, unit_count, coords, team_id)
-		draft_preview_legions.append(legion)
-		_spawn_legion_visu(legion)
+		desired[coords] = {"unit_type": unit_type, "unit_count": unit_count}
+
+	for coords in _draft_preview_by_coords.keys().duplicate():
+		if not desired.has(coords):
+			_remove_draft_preview_at(coords)
+
+	for coords in desired.keys():
+		var data: Dictionary = desired[coords]
+		var unit_type: String = String(data.get("unit_type", ""))
+		var unit_count: int = int(data.get("unit_count", 0))
+		if _draft_preview_by_coords.has(coords):
+			_update_draft_preview_at(coords, unit_type, unit_count, team_id)
+		else:
+			_spawn_draft_preview_at(coords, unit_type, unit_count, team_id)
 
 func sync_legions(session: MinigameSession) -> void:
 	_clear_draft_previews()
@@ -78,6 +91,9 @@ func sync_legions(session: MinigameSession) -> void:
 
 func tile_visu_at(coords: Vector2i) -> TileVisu:
 	return grid_visu.get(coords)
+
+func get_draft_preview_legion_at(coords: Vector2i) -> Legion:
+	return _draft_preview_by_coords.get(coords)
 
 func get_legion_visu(legion: Legion) -> LegionVisu:
 	if legion_to_visu.has(legion):
@@ -135,7 +151,7 @@ func remove_dead_legions(session: MinigameSession) -> void:
 		if legion not in session.legions or legion.units.is_empty():
 			_remove_legion_visu(legion)
 
-func _spawn_legion_visu(legion: Legion) -> void:
+func _spawn_legion_visu(legion: Legion, formation_seed: int = -1) -> void:
 	var tile_visu: TileVisu = grid_visu.get(legion.tile_coords)
 	if not tile_visu:
 		return
@@ -143,10 +159,61 @@ func _spawn_legion_visu(legion: Legion) -> void:
 	add_child(legion_visu)
 	legion_to_visu[legion] = legion_visu
 	tile_visu.legion_visu = legion_visu
-	legion_visu.init(legion)
+	legion_visu.init(legion, formation_seed)
 	legion_visu.position = tile_visu.position
 
+func _spawn_draft_preview_at(
+	coords: Vector2i,
+	unit_type: String,
+	unit_count: int,
+	team_id: String,
+	formation_seed: int = -1
+) -> void:
+	var legion := Legion.new(unit_type, unit_count, coords, team_id)
+	var seed := formation_seed if formation_seed >= 0 else randi()
+	_draft_formation_seeds[coords] = seed
+	_draft_preview_by_coords[coords] = legion
+	_spawn_legion_visu(legion, seed)
+	_attach_price_tag(legion)
+
+func _update_draft_preview_at(coords: Vector2i, unit_type: String, unit_count: int, team_id: String) -> void:
+	var legion: Legion = _draft_preview_by_coords.get(coords)
+	if legion == null:
+		_spawn_draft_preview_at(coords, unit_type, unit_count, team_id)
+		return
+	var tile_visu: TileVisu = grid_visu.get(coords)
+	var visu: LegionVisu = tile_visu.legion_visu if tile_visu else null
+	if visu == null:
+		_remove_draft_preview_at(coords)
+		_spawn_draft_preview_at(coords, unit_type, unit_count, team_id)
+		return
+	if legion.unit_type != unit_type:
+		var seed: int = int(_draft_formation_seeds.get(coords, randi()))
+		_remove_draft_preview_at(coords)
+		_spawn_draft_preview_at(coords, unit_type, unit_count, team_id, seed)
+		return
+	if (
+		legion.unit_type == unit_type
+		and legion.unit_count == unit_count
+		and legion.units.size() == unit_count
+		and visu.units.get_child_count() == unit_count
+	):
+		return
+	visu.set_unit_count(unit_count)
+	_update_price_tag(legion)
+
+func _remove_draft_preview_at(coords: Vector2i) -> void:
+	var legion: Legion = _draft_preview_by_coords.get(coords)
+	if legion:
+		_remove_legion_visu(legion)
+	_draft_preview_by_coords.erase(coords)
+	_draft_formation_seeds.erase(coords)
+
+func _update_price_tag(legion: Legion) -> void:
+	_attach_price_tag(legion)
+
 func _remove_legion_visu(legion: Legion) -> void:
+	_remove_price_tag(legion)
 	var visu: LegionVisu = legion_to_visu.get(legion)
 	if visu:
 		visu.queue_free()
@@ -156,9 +223,26 @@ func _remove_legion_visu(legion: Legion) -> void:
 		tile_visu.legion_visu = null
 
 func _clear_draft_previews() -> void:
-	for legion in draft_preview_legions:
-		_remove_legion_visu(legion)
-	draft_preview_legions.clear()
+	for coords in _draft_preview_by_coords.keys().duplicate():
+		_remove_draft_preview_at(coords)
+	_draft_price_tags.clear()
+
+func _attach_price_tag(legion: Legion) -> void:
+	var visu: LegionVisu = legion_to_visu.get(legion)
+	if not visu:
+		return
+	_remove_price_tag(legion)
+	var tag := DraftLegionPriceTag.new()
+	var cost := MinigameRulesScript.legion_cost(legion.unit_type, legion.units.size())
+	tag.set_cost(cost)
+	visu.add_child(tag)
+	_draft_price_tags[legion] = tag
+
+func _remove_price_tag(legion: Legion) -> void:
+	var tag = _draft_price_tags.get(legion)
+	if tag and is_instance_valid(tag):
+		tag.queue_free()
+	_draft_price_tags.erase(legion)
 
 func _clear_map() -> void:
 	_clear_draft_previews()

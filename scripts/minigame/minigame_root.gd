@@ -72,10 +72,6 @@ func _setup_ui() -> void:
 
 	_setup_panel = preload("res://scenes/ui/minigame_setup_panel.tscn").instantiate()
 	_ui_layer.add_child(_setup_panel)
-	_setup_panel.count_increase_pressed.connect(_on_count_increase)
-	_setup_panel.count_decrease_pressed.connect(_on_count_decrease)
-	_setup_panel.clear_slot_pressed.connect(_on_clear_slot)
-	_setup_panel.change_type_pressed.connect(_on_change_type)
 	_setup_panel.ready_pressed.connect(_on_draft_ready)
 
 	_unit_picker = preload("res://scenes/ui/minigame_unit_picker.tscn").instantiate()
@@ -91,6 +87,10 @@ func _setup_ui() -> void:
 	_tile_info_panel = preload("res://scenes/ui/tile_info_panel.tscn").instantiate()
 	_ui_layer.add_child(_tile_info_panel)
 	_tile_info_panel.hide()
+	_tile_info_panel.draft_count_increase_pressed.connect(_on_count_increase)
+	_tile_info_panel.draft_count_decrease_pressed.connect(_on_count_decrease)
+	_tile_info_panel.draft_clear_slot_pressed.connect(_on_clear_slot)
+	_tile_info_panel.draft_change_type_pressed.connect(_on_change_type)
 
 	_combat_fx_layer = CanvasLayer.new()
 	_combat_fx_layer.name = "CombatFX"
@@ -129,16 +129,11 @@ func _refresh_draft_view() -> void:
 	if _selected_deploy_coords != INVALID_COORDS:
 		var placement := _find_placement(draft, _selected_deploy_coords)
 		if placement:
-			_setup_panel.show_slot_preview(
-				_selected_deploy_coords,
-				String(placement.get("unit_type", "")),
-				int(placement.get("unit_count", 1)),
-				int(draft.get("remaining_budget", 0))
-			)
+			_show_draft_tile_info(_selected_deploy_coords)
 		else:
-			_setup_panel.show_idle_state()
+			_tile_info_panel.hide()
 	else:
-		_setup_panel.show_idle_state()
+		_tile_info_panel.hide()
 
 func _find_placement(draft: Dictionary, coords: Vector2i) -> Dictionary:
 	for p in draft.get("placements", []):
@@ -161,18 +156,44 @@ func inspect_tile(coords: Vector2i) -> void:
 		_tile_info_panel.show_tile(tile)
 		return
 	if session.phase == MinigameSession.Phase.DRAFT:
+		_selected_deploy_coords = coords
 		var draft: Dictionary = session.get_view_state(_viewing_team).get("draft", {})
 		var placement := _find_placement(draft, coords)
 		if not placement.is_empty():
-			var legion := Legion.new(
-				String(placement.get("unit_type", "")),
-				int(placement.get("unit_count", 1)),
-				coords,
-				_viewing_team
+			_show_draft_tile_info(coords)
+			presenter.paint_deploy_zones(
+				session.get_deploy_slots(_viewing_team),
+				_collect_occupied_coords(draft),
+				_selected_deploy_coords
 			)
-			_tile_info_panel.show_legion(legion)
 			return
 	_tile_info_panel.hide()
+
+func _collect_occupied_coords(draft: Dictionary) -> Array:
+	var occupied: Array = []
+	for p in draft.get("placements", []):
+		occupied.append(p.get("coords", Vector2i.ZERO))
+	return occupied
+
+func _show_draft_tile_info(coords: Vector2i) -> void:
+	var draft: Dictionary = session.get_view_state(_viewing_team).get("draft", {})
+	var placement := _find_placement(draft, coords)
+	if placement.is_empty():
+		_tile_info_panel.hide()
+		return
+	var unit_count := int(placement.get("unit_count", 1))
+	var legion := Legion.new(
+		String(placement.get("unit_type", "")),
+		unit_count,
+		coords,
+		_viewing_team
+	)
+	_tile_info_panel.show_draft_legion(
+		legion,
+		int(draft.get("remaining_budget", 0)),
+		coords,
+		unit_count
+	)
 
 func clear_inspect() -> void:
 	if _tile_info_panel:
@@ -205,8 +226,10 @@ func _on_draft_tile_clicked(coords: Vector2i) -> void:
 
 	_selected_deploy_coords = coords
 	if _slot_is_occupied(coords):
+		_show_draft_tile_info(coords)
 		_refresh_draft_view()
 	else:
+		_tile_info_panel.hide()
 		_picker_for_change_type = false
 		_unit_picker.open_for_slot(coords)
 
@@ -282,7 +305,8 @@ func _on_clear_slot() -> void:
 		_refresh_draft_view()
 
 func _show_error_toast(message: String) -> void:
-	_setup_panel.show_message(message)
+	if _tile_info_panel and _tile_info_panel.visible:
+		_tile_info_panel.show_draft_message(message)
 
 func _on_draft_ready() -> void:
 	var result := session.apply({"type": "draft_ready", "team": _viewing_team})
@@ -318,6 +342,8 @@ func _begin_battle() -> void:
 	EventBus.tile_clicked.disconnect(_on_draft_tile_clicked)
 	EventBus.tile_right_clicked.disconnect(_on_tile_right_clicked)
 	_setup_panel.hide()
+	_tile_info_panel.set_draft_mode(false)
+	_tile_info_panel.hide()
 	_unit_picker.hide()
 	_pass_overlay.hide()
 	presenter.clear_deploy_overlays()

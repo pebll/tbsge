@@ -133,6 +133,7 @@ theme_override_font_sizes/font_size = 32
 text = "0"
 
 [node name="ApStat" type="HBoxContainer" parent="VBox/LegionBlock/LegionHeader/LegionHeaderText" unique_id=3847193100]
+unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 2
 
@@ -166,6 +167,50 @@ unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 8
+
+[node name="DraftControls" type="VBoxContainer" parent="VBox/LegionBlock"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="CountRow" type="HBoxContainer" parent="VBox/LegionBlock/DraftControls"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 16
+
+[node name="MinusButton" type="Button" parent="VBox/LegionBlock/DraftControls/CountRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "−"
+
+[node name="CountValue" type="Label" parent="VBox/LegionBlock/DraftControls/CountRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "4 / 8"
+vertical_alignment = 1
+
+[node name="PlusButton" type="Button" parent="VBox/LegionBlock/DraftControls/CountRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "+"
+
+[node name="CostValue" type="Label" parent="VBox/LegionBlock/DraftControls"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Legion cost: 12 gold"
+horizontal_alignment = 1
+
+[node name="ChangeTypeButton" type="Button" parent="VBox/LegionBlock/DraftControls"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Change unit type"
+
+[node name="ClearButton" type="Button" parent="VBox/LegionBlock/DraftControls"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Remove legion"
 
 [node name="TeamFooter" type="PanelContainer" parent="VBox/LegionBlock" unique_id=2847193053]
 unique_name_in_owner = true

@@ -20,10 +20,10 @@ var corpses: Node2D
 var current_offset: Vector2 = Vector2(0, 0)
 var _formation_seed: int = 0
 
-func init(p_legion: Legion) -> void:
+func init(p_legion: Legion, formation_seed: int = -1) -> void:
 	legion = p_legion
 	_unit_to_visu.clear()
-	_formation_seed = randi()
+	_formation_seed = formation_seed if formation_seed >= 0 else randi()
 	if corpses == null:
 		corpses = Node2D.new()
 		corpses.name = "Corpses"
@@ -34,9 +34,8 @@ func init(p_legion: Legion) -> void:
 		unit_visu.init(unit)
 		units.add_child(unit_visu)
 		_unit_to_visu[unit] = unit_visu
-	update_local_positions()
+	_apply_unit_layout()
 	for child in units.get_children():
-		child.update_sprite()
 		child.start_idle_animation()
 	_apply_team_banner()
 
@@ -58,6 +57,40 @@ func _stable_jitter(i: int, amount: float) -> Vector2:
 	var rx := (fposmod(sx, 1.0) * 2.0 - 1.0) * amount
 	var ry := (fposmod(sy, 1.0) * 2.0 - 1.0) * amount
 	return Vector2(rx, ry)
+
+func set_unit_count(new_count: int) -> void:
+	if legion == null:
+		return
+	if (
+		legion.unit_count == new_count
+		and legion.units.size() == new_count
+		and units.get_child_count() == new_count
+	):
+		return
+	var unit_type := legion.unit_type
+	while legion.units.size() < new_count:
+		var unit := Unit.new(unit_type)
+		legion.units.append(unit)
+		var unit_visu: UnitVisu = preload("res://scenes/unit.tscn").instantiate()
+		unit_visu.init(unit)
+		units.add_child(unit_visu)
+		_unit_to_visu[unit] = unit_visu
+	while legion.units.size() > new_count:
+		var removed: Unit = legion.units.pop_back()
+		var unit_visu: UnitVisu = _unit_to_visu.get(removed)
+		if unit_visu:
+			_unit_to_visu.erase(removed)
+			units.remove_child(unit_visu)
+			unit_visu.free()
+	legion.unit_count = new_count
+	_apply_unit_layout()
+	for child in units.get_children():
+		child.start_idle_animation()
+
+func _apply_unit_layout() -> void:
+	update_local_positions()
+	for child in units.get_children():
+		child.update_sprite()
 
 func update_local_positions() -> void:
 	var children := units.get_children()
