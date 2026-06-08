@@ -9,7 +9,7 @@ var config: SandboxConfigScript
 func _init(p_config: SandboxConfigScript) -> void:
 	config = p_config
 	super._init(config.team_ids)
-	grid = MapBuilderScript.build_grid(config.map_radius)
+	grid = MapBuilderScript.build_grid(config.map_radius, -1, config.team_ids)
 	if not team_ids.is_empty():
 		turn_manager.start_match(team_ids[0])
 

@@ -66,4 +66,19 @@ func _test_deploy_zones() -> bool:
 	if green.size() != expected_green:
 		push_error("GREEN zone should include full width (%d), got %d" % [expected_green, green.size()])
 		return false
+
+	var green_back := MinigameRules.deploy_back_row_coords(3, "GREEN", teams)
+	for c in green_back:
+		if c.y != -3:
+			push_error("GREEN back row should be southernmost r=-3, got %s" % c)
+			return false
+	if green_back.size() != expected_green / 2:
+		push_error("GREEN back row width mismatch: got %d" % green_back.size())
+		return false
+
+	var blue_back := MinigameRules.deploy_back_row_coords(3, "BLUE", teams)
+	for c in blue_back:
+		if c.y != 3:
+			push_error("BLUE back row should be northernmost r=3, got %s" % c)
+			return false
 	return true

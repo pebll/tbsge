@@ -77,6 +77,43 @@ static func deploy_zone_coords(
 	)
 	return _filter_walkable(out)
 
+static func deploy_back_row_coords(
+	radius: int,
+	team_id: String,
+	team_ids: Array[String]
+) -> Array[Vector2i]:
+	var by_r: Dictionary = {}
+	for q in range(-radius, radius + 1):
+		for r in range(-radius, radius + 1):
+			var s := -r - q
+			if abs(s) > radius:
+				continue
+			var coords := Vector2i(q, r)
+			if not by_r.has(r):
+				by_r[r] = []
+			(by_r[r] as Array).append(coords)
+
+	var r_values: Array = by_r.keys()
+	r_values.sort()
+	if r_values.is_empty() or team_ids.is_empty():
+		return []
+
+	var back_r: int
+	if team_id == team_ids[0]:
+		back_r = r_values[0]
+	elif team_ids.size() > 1 and team_id == team_ids[1]:
+		back_r = r_values[r_values.size() - 1]
+	else:
+		return []
+
+	var out: Array[Vector2i] = []
+	for coords in by_r[back_r]:
+		out.append(coords)
+	out.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		return a.x < b.x
+	)
+	return out
+
 static func _filter_walkable(coords_list: Array[Vector2i]) -> Array[Vector2i]:
 	var out: Array[Vector2i] = []
 	for coords in coords_list:
