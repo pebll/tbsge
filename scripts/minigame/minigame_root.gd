@@ -9,14 +9,21 @@ const INVALID_COORDS := Vector2i(2147483646, 2147483646)
 const AttackNearestEnemyBehavior = preload("res://scripts/ai/behaviors/attack_nearest_enemy.gd")
 const AiDrafter = preload("res://scripts/ai/ai_drafter.gd")
 const ActionPlaybackScript = preload("res://scripts/battle/action_playback.gd")
+const BattleContextScript = preload("res://scripts/battle/battle_context.gd")
+const BattleUIAdapterScript = preload("res://scripts/ui/battle_ui_adapter.gd")
+const BattleActionRunnerScript = preload("res://scripts/battle/battle_action_runner.gd")
+const MinigameSessionScript = preload("res://scripts/minigame/minigame_session.gd")
+const MinigamePresenterScript = preload("res://scripts/minigame/minigame_presenter.gd")
 
 const AI_LEGION_DELAY := 0.5
 
 @export var config_path: String = CONFIG_PATH
 
-var session: MinigameSession
-var presenter: MinigamePresenter
-var battle_ui: MinigameBattleUI
+var session
+var presenter: MinigamePresenterScript
+var battle_context: BattleContextScript
+var battle_ui: BattleUIAdapterScript
+var action_runner: BattleActionRunnerScript
 var input_locked: bool = false
 var _ai_running: bool = false
 
@@ -31,7 +38,7 @@ var _pass_overlay: PanelContainer
 var _status_label: Label
 var _game_over_panel: GameOverPanel
 var _selected_deploy_coords: Vector2i = INVALID_COORDS
-var _viewing_team: String = "GREEN"
+var _viewing_team: String = ""
 var _picker_for_change_type: bool = false
 
 @onready var _camera: Camera2D = $Camera2D
@@ -41,9 +48,11 @@ func _ready() -> void:
 	if config == null:
 		push_error("Failed to load minigame config: %s" % config_path)
 		return
-	session = MinigameSession.new(config)
+	session = MinigameSessionScript.new(config)
 	presenter = $MinigamePresenter
-	battle_ui = MinigameBattleUI.new(self)
+	_setup_battle_context()
+	battle_ui = BattleUIAdapterScript.new(battle_context)
+	action_runner = BattleActionRunnerScript.new()
 	_setup_ui()
 	presenter.build_map(session)
 	_viewing_team = session.config.team_ids[0]
@@ -59,7 +68,7 @@ func _exit_tree() -> void:
 func _input(event: InputEvent) -> void:
 	if input_locked or _ai_running or _unit_picker.visible:
 		return
-	if session.phase != MinigameSession.Phase.BATTLE:
+	if session.phase != MinigameSessionScript.Phase.BATTLE:
 		return
 	if not event is InputEventKey:
 		return
@@ -140,7 +149,7 @@ func _setup_ui() -> void:
 	_game_over_panel.main_menu_pressed.connect(_on_game_over_main_menu)
 
 func _refresh_draft_view() -> void:
-	var view := session.get_view_state(_viewing_team)
+	var view: Dictionary = session.get_view_state(_viewing_team)
 	var draft: Dictionary = view.get("draft", {})
 	_setup_panel.show_for_team(_viewing_team, draft)
 
@@ -181,7 +190,7 @@ func inspect_tile(coords: Vector2i) -> void:
 	if tile and tile.has_legion():
 		_tile_info_panel.show_tile(tile)
 		return
-	if session.phase == MinigameSession.Phase.DRAFT:
+	if session.phase == MinigameSessionScript.Phase.DRAFT:
 		_selected_deploy_coords = coords
 		var draft: Dictionary = session.get_view_state(_viewing_team).get("draft", {})
 		var placement := _find_placement(draft, coords)
@@ -233,7 +242,7 @@ func _on_legion_ap_changed(legion: Legion) -> void:
 		_tile_info_panel.show_tile(tile)
 
 func _on_tile_right_clicked(coords: Vector2i) -> void:
-	if session.phase == MinigameSession.Phase.DRAFT:
+	if session.phase == MinigameSessionScript.Phase.DRAFT:
 		if input_locked or _overlay_blocking_input() or _unit_picker.visible:
 			return
 		if session.active_draft_team != _viewing_team:
@@ -241,7 +250,7 @@ func _on_tile_right_clicked(coords: Vector2i) -> void:
 		inspect_tile(coords)
 
 func _on_draft_tile_clicked(coords: Vector2i) -> void:
-	if session.phase != MinigameSession.Phase.DRAFT:
+	if session.phase != MinigameSessionScript.Phase.DRAFT:
 		return
 	if input_locked or _overlay_blocking_input() or _unit_picker.visible:
 		return
@@ -305,7 +314,7 @@ func _on_count_decrease() -> void:
 	_apply_placement(unit_type, count)
 
 func _apply_placement(unit_type: String, unit_count: int) -> void:
-	var result := session.apply({
+	var result: Dictionary = session.apply({
 		"type": "draft_set_legion",
 		"team": _viewing_team,
 		"coords": _selected_deploy_coords,
@@ -321,7 +330,7 @@ func _apply_placement(unit_type: String, unit_count: int) -> void:
 func _on_clear_slot() -> void:
 	if _selected_deploy_coords == INVALID_COORDS:
 		return
-	var result := session.apply({
+	var result: Dictionary = session.apply({
 		"type": "draft_clear_slot",
 		"team": _viewing_team,
 		"coords": _selected_deploy_coords,
@@ -335,26 +344,26 @@ func _show_error_toast(message: String) -> void:
 		_tile_info_panel.show_draft_message(message)
 
 func _on_draft_ready() -> void:
-	var result := session.apply({"type": "draft_ready", "team": _viewing_team})
+	var result: Dictionary = session.apply({"type": "draft_ready", "team": _viewing_team})
 	if not result["ok"]:
 		_show_error_toast(result["error"])
 		return
-	if session.phase == MinigameSession.Phase.BATTLE:
+	if session.phase == MinigameSessionScript.Phase.BATTLE:
 		_begin_battle()
 		_maybe_start_ai_turn()
 		return
 	if _is_ai_team(session.active_draft_team):
 		_apply_ai_draft(session.active_draft_team)
-		if session.phase == MinigameSession.Phase.BATTLE:
+		if session.phase == MinigameSessionScript.Phase.BATTLE:
 			_begin_battle()
 			_maybe_start_ai_turn()
 		return
 	_show_pass_overlay()
 
 func _show_pass_overlay() -> void:
-	var next_team := session.active_draft_team
+	var next_team: String = session.active_draft_team
 	var team_res: Resource = TeamDefs.get_def(next_team)
-	var name := next_team
+	var name: String = next_team
 	if team_res is TeamDefinition:
 		name = (team_res as TeamDefinition).display_name
 	_status_label.text = "Pass device to %s" % name
@@ -391,13 +400,13 @@ func _apply_ai_draft(team_id: String) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
 	for cmd in AiDrafter.build_draft_commands(session, team_id, rng):
-		var draft_result := session.apply(cmd)
+		var draft_result: Dictionary = session.apply(cmd)
 		if not draft_result["ok"]:
 			push_error("AI draft failed: %s" % draft_result["error"])
 			return
 
 func _maybe_start_ai_turn() -> void:
-	if session.phase != MinigameSession.Phase.BATTLE:
+	if session.phase != MinigameSessionScript.Phase.BATTLE:
 		return
 	if not _is_ai_team(session.turn_manager.active_team_id):
 		return
@@ -413,7 +422,7 @@ func _run_ai_turn_async() -> void:
 	input_locked = true
 	battle_ui.deselect()
 	while (
-		session.phase == MinigameSession.Phase.BATTLE
+		session.phase == MinigameSessionScript.Phase.BATTLE
 		and _is_ai_team(session.turn_manager.active_team_id)
 	):
 		var actionable := AttackNearestEnemyBehavior.sort_actionable_by_enemy_distance(
@@ -423,7 +432,7 @@ func _run_ai_turn_async() -> void:
 		if actionable.is_empty():
 			if AttackNearestEnemyBehavior.debug_enabled:
 				print("[AI] %s ending turn (no actionable legions)" % session.turn_manager.active_team_id)
-			var end_result := session.apply({"type": "end_turn"})
+			var end_result: Dictionary = session.apply({"type": "end_turn"})
 			if end_result["ok"]:
 				_turn_hud.show_active_team(session.turn_manager.active_team_id)
 			break
@@ -454,20 +463,20 @@ func _run_ai_turn_async() -> void:
 				session.pass_legion_or_force_wait(coords)
 
 		await get_tree().create_timer(AI_LEGION_DELAY).timeout
-		if session.phase == MinigameSession.Phase.ENDED:
+		if session.phase == MinigameSessionScript.Phase.ENDED:
 			break
 
 	_ai_running = false
 	input_locked = false
 	_check_match_end()
-	if session.phase == MinigameSession.Phase.BATTLE and _is_ai_team(session.turn_manager.active_team_id):
+	if session.phase == MinigameSessionScript.Phase.BATTLE and _is_ai_team(session.turn_manager.active_team_id):
 		_maybe_start_ai_turn()
 
 func _on_end_turn() -> void:
 	if input_locked or _ai_running:
 		return
 	battle_ui.deselect()
-	var result := session.apply({"type": "end_turn"})
+	var result: Dictionary = session.apply({"type": "end_turn"})
 	if result["ok"]:
 		_turn_hud.show_active_team(session.turn_manager.active_team_id)
 		_maybe_start_ai_turn()
@@ -496,7 +505,7 @@ func _perform_use_action(
 	if from_tile == null or not from_tile.has_legion():
 		return false
 
-	var result := session.apply(cmd)
+	var result: Dictionary = session.apply(cmd)
 	if not result["ok"]:
 		if AttackNearestEnemyBehavior.debug_enabled:
 			print(
@@ -508,82 +517,48 @@ func _perform_use_action(
 	if not _ai_running:
 		input_locked = true
 
-	var events: Array = result.get("events", [])
-	var payload: Dictionary = result.get("payload", {})
-	if not ("legion_healed" in events or "combat_resolved" in events):
-		battle_ui.clear_overlays()
-
-	if "legion_moved" in events:
-		var legion: Legion = payload.get("legion")
-		presenter.rewire_legion_tile(legion, from_coords, to_coords)
-		var tween := presenter.tween_legion_move(legion, to_coords)
-		if tween:
-			await tween.finished
-		EventBus.legion_ap_changed.emit(legion)
-	elif "legions_swapped" in events:
-		var legion_a: Legion = session.grid.get(to_coords).legion
-		var legion_b: Legion = session.grid.get(from_coords).legion
-		presenter.rewire_legion_tile(legion_a, from_coords, to_coords)
-		presenter.rewire_legion_tile(legion_b, to_coords, from_coords)
-		var tweens := presenter.tween_legion_swap(legion_a, legion_b, to_coords, from_coords)
-		for t in tweens:
-			if t:
-				await t.finished
-		EventBus.legion_ap_changed.emit(legion_a)
-		EventBus.legion_ap_changed.emit(legion_b)
-	elif "combat_resolved" in events:
-		var attacked := await _perform_attack_visuals(from_coords, to_coords, payload.get("combat", {}))
-		if not _ai_running:
-			input_locked = false
-		_check_match_end()
-		return attacked
-	elif "legion_healed" in events:
-		await _action_playback.play_heal(from_coords, payload, {
-			"deselect_after": not _ai_running,
-			"deselect": battle_ui.deselect,
-			"on_ap_changed": func(legion: Legion) -> void: EventBus.legion_ap_changed.emit(legion),
-		})
-		if not _ai_running:
-			input_locked = false
-		_check_match_end()
-		return true
-
-	var refresh_coords := from_coords
-	if "legion_moved" in events or "legions_swapped" in events:
-		refresh_coords = to_coords
-
-	presenter.remove_dead_legions(session)
+	var played := await action_runner.play_result(
+		self,
+		session,
+		presenter,
+		_action_playback,
+		result,
+		from_coords,
+		_battle_action_hooks()
+	)
 	if not _ai_running:
-		battle_ui.refresh_after_action(refresh_coords)
 		input_locked = false
 	_check_match_end()
-	return true
+	return played
 
-func _perform_attack_visuals(
-	from_coords: Vector2i,
-	to_coords: Vector2i,
-	combat: Dictionary
-) -> bool:
-	var from_visu: TileVisu = presenter.tile_visu_at(from_coords)
-	var to_visu: TileVisu = presenter.tile_visu_at(to_coords)
-	if not from_visu or not to_visu or not from_visu.legion_visu or not to_visu.legion_visu:
-		return false
+func _setup_battle_context() -> void:
+	battle_context = BattleContextScript.new()
+	battle_context.session = session
+	battle_context.presenter = presenter
+	battle_context.is_locked_fn = func() -> bool: return input_locked or _ai_running
+	battle_context.apply_action_fn = func(action_id: String, from_coords: Vector2i, to_coords: Vector2i) -> void:
+		request_use_action(action_id, from_coords, to_coords)
+	battle_context.battle_phase_fn = func() -> bool: return session.phase == MinigameSessionScript.Phase.BATTLE
+	battle_context.inspect_fn = func(coords: Vector2i) -> void: inspect_tile(coords)
+	battle_context.clear_inspect_fn = func() -> void: clear_inspect()
 
-	await _action_playback.play_combat(from_coords, to_coords, combat, {
-		"deselect_before": true,
+func _battle_action_hooks() -> Dictionary:
+	return {
+		"session": session,
+		"clear_overlays": battle_ui.clear_overlays,
 		"deselect": battle_ui.deselect,
+		"deselect_before_combat": true,
+		"deselect_after_heal": not _ai_running,
 		"on_ap_changed": func(legion: Legion) -> void: EventBus.legion_ap_changed.emit(legion),
-	})
-	presenter.cleanup_dead_legion_at(from_coords, session)
-	presenter.cleanup_dead_legion_at(to_coords, session)
-	presenter.remove_dead_legions(session)
-	return true
+		"refresh_after_action": battle_ui.refresh_after_action,
+		"on_finished": func() -> void: pass,
+	}
 
 func _overlay_blocking_input() -> bool:
 	return _pass_overlay.visible or _game_over_panel.visible
 
 func _check_match_end() -> void:
-	if session.phase != MinigameSession.Phase.ENDED:
+	if session.phase != MinigameSessionScript.Phase.ENDED:
 		return
 	battle_ui.deselect()
 	_turn_hud.hide()

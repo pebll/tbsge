@@ -1,0 +1,11 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/match/sandbox_config.gd" id="1_cfg"]
+
+[resource]
+script = ExtResource("1_cfg")
+id = "preview_r2"
+display_name = "Unit Preview"
+map_radius = 2
+team_ids = Array[String](["GREEN", "BLUE"])
+allow_spawn = true

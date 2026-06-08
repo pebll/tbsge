@@ -1,37 +1,51 @@
 extends RefCounted
 
-func run(tree: SceneTree) -> bool:
-	var gm := GameManager.new()
-	tree.root.add_child(gm)
-	await tree.process_frame
+const SandboxConfigScript = preload("res://scripts/match/sandbox_config.gd")
+const SandboxSessionScript = preload("res://scripts/match/sandbox_session.gd")
+const GridPresenterScript = preload("res://scripts/visu/grid_presenter.gd")
 
-	# Make the test independent from random terrain generation.
-	for k in gm.grid_model.keys():
-		var t: Tile = gm.grid_model[k]
+func run(tree: SceneTree) -> bool:
+	var config: SandboxConfigScript = load("res://data/sandbox/preview_r2.tres")
+	var session := SandboxSessionScript.new(config)
+	var presenter := GridPresenterScript.new()
+	tree.root.add_child(presenter)
+	await tree.process_frame
+	presenter.build_map_from_grid(session.grid)
+
+	for k in session.grid.keys():
+		var t: Tile = session.grid[k]
 		if t:
 			t.terrain_type = "GRASS"
 			t.walkable = true
 
 	var center := Vector2i(0, 0)
-	if not gm.grid_model.has(center):
-		push_error("GameManager grid missing center tile")
+	if not session.grid.has(center):
+		push_error("Sandbox grid missing center tile")
 		return false
 	print("Success: Center tile exists")
 
 	var spawn_coords := center
-	if not gm.grid_model[spawn_coords].walkable:
+	if not session.grid[spawn_coords].walkable:
 		push_error("Center tile not walkable (expected forced walkable=true)")
 		return false
-	if gm.grid_model[spawn_coords].has_legion():
+	if session.grid[spawn_coords].has_legion():
 		push_error("Center tile already has legion (unexpected)")
 		return false
 	print("Success: Center tile spawnable")
 
 	seed(4242)
-	gm.spawn_unit(spawn_coords)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 4242
+	var result := session.spawn_unit_at(spawn_coords, rng)
+	if not result.get("ok", false):
+		push_error("spawn_unit_at failed: %s" % result.get("error", "?"))
+		return false
 
-	var tile: Tile = gm.grid_model[spawn_coords]
-	var tile_visu: TileVisu = gm.grid_visu[spawn_coords]
+	var legion: Legion = result.get("payload", {}).get("legion")
+	presenter.spawn_legion_visu(legion)
+
+	var tile: Tile = session.grid[spawn_coords]
+	var tile_visu: TileVisu = presenter.grid_visu[spawn_coords]
 	if not tile.has_legion():
 		push_error("spawn_unit did not assign Tile.legion")
 		return false
@@ -43,7 +57,6 @@ func run(tree: SceneTree) -> bool:
 		return false
 	print("Success: Unit spawned at center")
 
-	gm.queue_free()
+	presenter.queue_free()
 	await tree.process_frame
 	return true
-

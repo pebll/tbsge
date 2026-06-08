@@ -8,11 +8,8 @@ func _init(p_grid: Dictionary, p_turn_manager: TurnManager) -> void:
 	grid = p_grid
 	turn_manager = p_turn_manager
 
-static func from_minigame(session: MinigameSession) -> BattleState:
+static func from_session(session) -> BattleState:
 	return BattleState.new(session.grid, session.turn_manager)
-
-static func from_game_manager(gm: GameManager) -> BattleState:
-	return BattleState.new(gm.grid_model, gm.turn_manager)
 
 func tile_at(coords: Vector2i) -> Tile:
 	return grid.get(coords)

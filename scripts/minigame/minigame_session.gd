@@ -1,12 +1,7 @@
 class_name MinigameSession
-extends RefCounted
+extends "res://scripts/match/match_session.gd"
 
-const TurnManagerRes = preload("res://scripts/core/turn_manager.gd")
 const AttackNearestEnemyBehavior = preload("res://scripts/ai/behaviors/attack_nearest_enemy.gd")
-const ActionResolverScript = preload("res://scripts/actions/action_resolver.gd")
-const ActionTargetingScript = preload("res://scripts/actions/action_targeting.gd")
-const BattleStateScript = preload("res://scripts/actions/battle_state.gd")
-const ActionDefinitionScript = preload("res://scripts/actions/action_definition.gd")
 const MapBuilderScript = preload("res://scripts/minigame/map_builder.gd")
 const MinigameRulesScript = preload("res://scripts/minigame/minigame_rules.gd")
 const DraftStateScript = preload("res://scripts/minigame/draft_state.gd")
@@ -16,9 +11,6 @@ enum Phase { DRAFT, BATTLE, ENDED }
 
 var config
 var phase: Phase = Phase.DRAFT
-var grid: Dictionary = {}
-var legions: Array[Legion] = []
-var turn_manager: TurnManager
 var winner: String = ""
 var active_draft_team: String = ""
 var deploy_slots: Dictionary = {}
@@ -27,8 +19,8 @@ var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
 func _init(p_config) -> void:
 	config = p_config
+	super._init(config.team_ids)
 	grid = MapBuilderScript.build_grid(config.map_radius)
-	turn_manager = TurnManagerRes.new(config.team_ids)
 	_rng.seed = 1337
 	for team_id in config.team_ids:
 		drafts[team_id] = DraftStateScript.new(team_id, config.budget)
@@ -101,38 +93,6 @@ func get_deploy_slots(team_id: String) -> Array[Vector2i]:
 		slots.append(c)
 	return slots
 
-func can_act_legion(legion: Legion) -> bool:
-	return legion != null and _is_legion_on_grid(legion) and turn_manager.is_legion_active(legion) and legion.has_ap()
-
-func get_legion_at(coords: Vector2i) -> Legion:
-	return _legion_at(coords)
-
-func get_actionable_coords() -> Array[Vector2i]:
-	prune_stale_legions()
-	var out: Array[Vector2i] = []
-	for legion in legions:
-		if legion.units.is_empty():
-			continue
-		if legion.team_id != turn_manager.active_team_id:
-			continue
-		if not legion.has_ap():
-			continue
-		if legion.tile_coords in turn_manager.waited_coords:
-			continue
-		if not _is_legion_on_grid(legion):
-			continue
-		out.append(legion.tile_coords)
-	return out
-
-func prune_stale_legions() -> void:
-	for legion in legions.duplicate():
-		if legion.units.is_empty():
-			_remove_legion_from_grid(legion)
-			legions.erase(legion)
-			continue
-		if not _is_legion_on_grid(legion):
-			legions.erase(legion)
-
 func pass_legion_or_force_wait(coords: Vector2i) -> void:
 	var result := apply({"type": "pass_legion", "coords": coords})
 	if result["ok"]:
@@ -140,50 +100,6 @@ func pass_legion_or_force_wait(coords: Vector2i) -> void:
 	turn_manager.wait_legion(coords)
 	if AttackNearestEnemyBehavior.debug_enabled:
 		print("[AI] force-wait %s (%s)" % [coords, result.get("error", "?")])
-
-func _is_legion_on_grid(legion: Legion) -> bool:
-	if legion == null:
-		return false
-	var tile: Tile = _tile_at(legion.tile_coords)
-	return tile != null and tile.legion == legion
-
-func _remove_legion_from_grid(legion: Legion) -> void:
-	var tile: Tile = _tile_at(legion.tile_coords)
-	if tile and tile.legion == legion:
-		tile.legion = null
-
-func battle_state() -> BattleStateScript:
-	return BattleStateScript.from_minigame(self)
-
-func get_available_actions(legion: Legion) -> Array[ActionDefinitionScript]:
-	return ActionTargetingScript.available_actions(battle_state(), legion)
-
-func get_action_targets(legion: Legion, action_id: String) -> Array[Vector2i]:
-	var action: ActionDefinitionScript = ActionDefs.get_def(action_id)
-	if action == null:
-		return []
-	return ActionTargetingScript.get_targets(battle_state(), legion, action)
-
-func get_movable_coords(from_coords: Vector2i) -> Array[Vector2i]:
-	return get_action_targets(_legion_at(from_coords), "move")
-
-func get_attackable_coords(from_coords: Vector2i) -> Array[Vector2i]:
-	return get_action_targets(_legion_at(from_coords), "melee_attack")
-
-func get_swappable_coords(from_coords: Vector2i) -> Array[Vector2i]:
-	var legion := _legion_at(from_coords)
-	if legion == null:
-		return []
-	var move_targets := get_action_targets(legion, "move")
-	var out: Array[Vector2i] = []
-	for coords in move_targets:
-		if ActionTargetingScript.is_swap_target(battle_state(), from_coords, coords):
-			out.append(coords)
-	return out
-
-func _legion_at(coords: Vector2i) -> Legion:
-	var tile: Tile = _tile_at(coords)
-	return tile.legion if tile and tile.has_legion() else null
 
 func _apply_draft(cmd_type: String, cmd: Dictionary) -> Dictionary:
 	match cmd_type:
@@ -320,57 +236,26 @@ func _begin_battle() -> void:
 		turn_manager.start_match(config.team_ids[0])
 
 func _battle_use_action(cmd: Dictionary) -> Dictionary:
-	var result: Dictionary = ActionResolverScript.resolve(battle_state(), cmd)
+	var result := resolve_use_action(cmd)
 	if not result.get("ok", false):
-		return _fail(String(result.get("error", "Action failed")))
-
-	var payload: Dictionary = result.get("payload", {})
-	var cleanup_coords: Array[Vector2i] = []
-	if payload.has("from"):
-		cleanup_coords.append(payload["from"])
-	if payload.has("to"):
-		var to_c: Vector2i = payload["to"]
-		if to_c not in cleanup_coords:
-			cleanup_coords.append(to_c)
-	if payload.has("coords"):
-		var self_c: Vector2i = payload["coords"]
-		if self_c not in cleanup_coords:
-			cleanup_coords.append(self_c)
-	for coords in cleanup_coords:
-		_cleanup_empty_legion(coords)
-
+		return result
 	var events: Array = result.get("events", []).duplicate()
 	events.append_array(_check_victory_events())
-	return _ok(events, payload)
+	return _ok(events, result.get("payload", {}))
 
 func _battle_end_turn() -> Dictionary:
 	if phase != Phase.BATTLE:
 		return _fail("Not in battle")
-	var next_team: String = turn_manager.end_team_turn(_typed_legions())
-	return _ok(["turn_changed"], {"active_team": next_team})
+	return apply_end_turn()
 
 func _battle_pass_legion(cmd: Dictionary) -> Dictionary:
-	var coords: Vector2i = cmd.get("coords", Vector2i.ZERO)
-	var tile: Tile = _tile_at(coords)
-	if tile == null or not tile.has_legion():
-		return _fail("No legion at tile")
-	var legion: Legion = tile.legion
-	if not can_act_legion(legion):
-		return _fail("Legion cannot pass")
-	turn_manager.wait_legion(coords)
-	return _ok(["legion_passed"], {"coords": coords})
+	return apply_pass_legion(cmd.get("coords", Vector2i.ZERO))
 
 func _walkable_deploy_slots(zone_coords: Array) -> Array[Vector2i]:
 	var out: Array[Vector2i] = []
 	for coords in zone_coords:
 		if MinigameRulesScript.is_walkable_deploy_slot(grid, coords):
 			out.append(coords)
-	return out
-
-func _typed_legions() -> Array[Legion]:
-	var out: Array[Legion] = []
-	for legion in legions:
-		out.append(legion)
 	return out
 
 func _battle_surrender(cmd: Dictionary) -> Dictionary:
@@ -394,16 +279,6 @@ func _check_victory_events() -> Array:
 		return ["match_ended"]
 	return []
 
-func _cleanup_empty_legion(coords: Vector2i) -> void:
-	var tile: Tile = _tile_at(coords)
-	if tile == null or tile.legion == null:
-		return
-	if tile.legion.units.size() > 0:
-		return
-	var legion: Legion = tile.legion
-	legions.erase(legion)
-	tile.legion = null
-
 func _next_draft_team(current_team: String) -> String:
 	var idx: int = config.team_ids.find(current_team)
 	if idx < 0:
@@ -420,9 +295,6 @@ func _opponent_of(team_id: String) -> String:
 		if other != team_id:
 			return other
 	return ""
-
-func _tile_at(coords: Vector2i) -> Tile:
-	return grid.get(coords)
 
 func _coords_from_tiles(tiles: Array) -> Array[Vector2i]:
 	var out: Array[Vector2i] = []
@@ -467,8 +339,3 @@ func _serialize_legions(for_team: String) -> Array:
 		})
 	return out
 
-func _ok(events: Array, payload: Dictionary = {}) -> Dictionary:
-	return {"ok": true, "error": "", "events": events, "payload": payload}
-
-func _fail(error: String) -> Dictionary:
-	return {"ok": false, "error": error, "events": [], "payload": {}}

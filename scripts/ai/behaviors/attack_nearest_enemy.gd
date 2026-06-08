@@ -3,17 +3,18 @@ extends RefCounted
 
 const HexPathfinder = preload("res://scripts/ai/hex_pathfinder.gd")
 const Utils = preload("res://scripts/core/utils.gd")
+const MatchSessionScript = preload("res://scripts/match/match_session.gd")
 
 static var debug_enabled: bool = true
 
-static func decide(session: MinigameSession, legion: Legion) -> Dictionary:
+static func decide(session: MatchSessionScript, legion: Legion) -> Dictionary:
 	var cmd := _decide_internal(session, legion)
 	if debug_enabled:
 		_log_decision(legion, cmd)
 	return cmd
 
 static func sort_actionable_by_enemy_distance(
-	session: MinigameSession,
+	session: MatchSessionScript,
 	actionable: Array[Vector2i]
 ) -> Array[Vector2i]:
 	if actionable.is_empty():
@@ -35,7 +36,7 @@ static func sort_actionable_by_enemy_distance(
 		print("[AI] Legion order (nearest enemy first): %s" % str(sorted))
 	return sorted
 
-static func _decide_internal(session: MinigameSession, legion: Legion) -> Dictionary:
+static func _decide_internal(session: MatchSessionScript, legion: Legion) -> Dictionary:
 	if legion == null:
 		return _cmd_pass(legion, "no legion")
 	if legion.units.is_empty():
@@ -103,7 +104,7 @@ static func _log_decision(legion: Legion, cmd: Dictionary) -> void:
 		_:
 			print("[AI] %s @ %s PASS (%s)" % [team, coords, reason])
 
-static func _enemy_legions(session: MinigameSession, team_id: String) -> Array[Legion]:
+static func _enemy_legions(session: MatchSessionScript, team_id: String) -> Array[Legion]:
 	var out: Array[Legion] = []
 	for legion in session.legions:
 		if legion.team_id != team_id and not legion.units.is_empty():
@@ -127,7 +128,7 @@ static func _min_enemy_distance(from_coords: Vector2i, enemies: Array[Legion]) -
 		best = mini(best, HexPathfinder.hex_distance(from_coords, enemy.tile_coords))
 	return best
 
-static func _blocked_enemy_coords(session: MinigameSession, team_id: String, ignore_coords: Vector2i) -> Dictionary:
+static func _blocked_enemy_coords(session: MatchSessionScript, team_id: String, ignore_coords: Vector2i) -> Dictionary:
 	var blocked: Dictionary = {}
 	for legion in session.legions:
 		if legion.tile_coords == ignore_coords:
@@ -137,7 +138,7 @@ static func _blocked_enemy_coords(session: MinigameSession, team_id: String, ign
 	return blocked
 
 static func _best_step_toward(
-	session: MinigameSession,
+	session: MatchSessionScript,
 	from_coords: Vector2i,
 	enemy_coords: Vector2i,
 	movable: Array[Vector2i],

@@ -1,30 +1,45 @@
 extends RefCounted
 
-func run(tree: SceneTree) -> bool:
-	var gm := GameManager.new()
-	tree.root.add_child(gm)
-	await tree.process_frame
+const SandboxConfigScript = preload("res://scripts/match/sandbox_config.gd")
+const SandboxSessionScript = preload("res://scripts/match/sandbox_session.gd")
+const GridPresenterScript = preload("res://scripts/visu/grid_presenter.gd")
+const BattleStateScript = preload("res://scripts/actions/battle_state.gd")
 
-	# Make the test independent from random terrain generation.
-	for k in gm.grid_model.keys():
-		var t: Tile = gm.grid_model[k]
+func run(tree: SceneTree) -> bool:
+	var config: SandboxConfigScript = load("res://data/sandbox/preview_r2.tres")
+	var session := SandboxSessionScript.new(config)
+	var presenter := GridPresenterScript.new()
+	tree.root.add_child(presenter)
+	await tree.process_frame
+	presenter.build_map_from_grid(session.grid)
+
+	for k in session.grid.keys():
+		var t: Tile = session.grid[k]
 		if t:
 			t.terrain_type = "GRASS"
 			t.walkable = true
 
 	var from_coords := Vector2i(0, 0)
-	if not gm.grid_model.has(from_coords):
+	if not session.grid.has(from_coords):
 		push_error("Grid missing (0,0)")
 		return false
-	if not gm.grid_model[from_coords].walkable:
+	if not session.grid[from_coords].walkable:
 		push_error("Center not walkable (expected forced walkable=true)")
 		return false
 	print("Success: From tile walkable")
 
 	seed(9001)
-	gm.spawn_unit(from_coords)
-	var from_tile: Tile = gm.grid_model[from_coords]
-	var from_visu: TileVisu = gm.grid_visu[from_coords]
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 9001
+	var spawn_result := session.spawn_unit_at(from_coords, rng)
+	if not spawn_result.get("ok", false):
+		push_error("spawn_unit_at failed")
+		return false
+	var legion_spawned: Legion = spawn_result.get("payload", {}).get("legion")
+	presenter.spawn_legion_visu(legion_spawned)
+
+	var from_tile: Tile = session.grid[from_coords]
+	var from_visu: TileVisu = presenter.grid_visu[from_coords]
 	if not from_tile.has_legion():
 		push_error("Precondition failed: no legion spawned at from_coords")
 		return false
@@ -39,7 +54,7 @@ func run(tree: SceneTree) -> bool:
 	var to_coords := Vector2i(0, 0)
 	var found_to := false
 	var movable := ActionTargeting.get_targets(
-		BattleState.from_game_manager(gm),
+		BattleStateScript.from_session(session),
 		legion_before,
 		ActionDefs.get_def("move")
 	)
@@ -47,7 +62,7 @@ func run(tree: SceneTree) -> bool:
 		push_error("No legal move targets for spawned legion")
 		return false
 	for coords in movable:
-		var t: Tile = gm.grid_model.get(coords)
+		var t: Tile = session.grid.get(coords)
 		if t and t.walkable and not t.has_legion():
 			to_coords = coords
 			found_to = true
@@ -57,31 +72,43 @@ func run(tree: SceneTree) -> bool:
 		return false
 	print("Success: Found destination tile")
 
-	gm.move_unit(from_coords, to_coords)
+	var move_result := session.apply({
+		"type": "use_action",
+		"action_id": "move",
+		"from": from_coords,
+		"to": to_coords,
+	})
+	if not move_result.get("ok", false):
+		push_error("move action failed: %s" % move_result.get("error", "?"))
+		return false
 
-	var to_tile: Tile = gm.grid_model[to_coords]
-	var to_visu: TileVisu = gm.grid_visu[to_coords]
+	presenter.rewire_legion_tile(legion_before, from_coords, to_coords)
+	var tween := presenter.tween_legion_move(legion_before, to_coords)
+	if tween:
+		await tween.finished
+
+	var to_tile: Tile = session.grid[to_coords]
+	var to_visu: TileVisu = presenter.grid_visu[to_coords]
 
 	if from_tile.has_legion():
-		push_error("move_unit did not clear from_tile.legion")
+		push_error("move did not clear from_tile.legion")
 		return false
 	if to_tile.legion != legion_before:
-		push_error("move_unit did not set to_tile.legion to original legion")
+		push_error("move did not set to_tile.legion to original legion")
 		return false
 	if legion_before.tile_coords != to_coords:
-		push_error("move_unit did not update legion.tile_coords")
+		push_error("move did not update legion.tile_coords")
 		return false
 	print("Success: Unit moved (model)")
 
 	if from_visu.legion_visu != null:
-		push_error("move_unit did not clear from_visu.legion_visu")
+		push_error("move did not clear from_visu.legion_visu")
 		return false
 	if to_visu.legion_visu != legion_visu_before:
-		push_error("move_unit did not move legion visu reference")
+		push_error("move did not move legion visu reference")
 		return false
 	print("Success: Unit moved (visu wiring)")
 
-	gm.queue_free()
+	presenter.queue_free()
 	await tree.process_frame
 	return true
-

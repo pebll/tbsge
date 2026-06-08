@@ -5,7 +5,7 @@ const MinigameRulesScript = preload("res://scripts/minigame/minigame_rules.gd")
 const DraftPlacementScript = preload("res://scripts/minigame/draft_placement.gd")
 
 static func build_draft_commands(
-	session: MinigameSession,
+	session,
 	team_id: String,
 	rng: RandomNumberGenerator
 ) -> Array:
@@ -63,7 +63,7 @@ static func _cheapest_unit_price() -> int:
 	return cheapest
 
 static func _find_best_spend_action(
-	session: MinigameSession,
+	session,
 	team_id: String,
 	slots: Array,
 	placements: Dictionary,
@@ -121,7 +121,7 @@ static func _find_best_spend_action(
 	return candidates[rng.randi() % candidates.size()]
 
 static func _best_new_placement(
-	session: MinigameSession,
+	session,
 	team_id: String,
 	coords: Vector2i,
 	unit_type: String,
@@ -156,7 +156,7 @@ static func _best_new_placement(
 	return {}
 
 static func _best_upgrade_placement(
-	session: MinigameSession,
+	session,
 	team_id: String,
 	coords: Vector2i,
 	unit_type: String,
