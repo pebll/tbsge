@@ -3,9 +3,6 @@ extends Node2D
 
 const MenuStreamUtils = preload("res://scripts/core/menu_stream_utils.gd")
 
-const UNITS: Array[String] = [
-	"AXEMAN", "ARCHER", "DRAGON_RIDER", "OGRE", "MAGE", "FLAME", "NECROMANCER", "TREANT",
-]
 const TEAM_IDS: Array[String] = ["GREEN", "BLUE"]
 
 @export var scroll_direction: Vector2 = Vector2(-0.6, -0.2)
@@ -102,7 +99,10 @@ func _configure_decorative_tile(tile_visu: TileVisu) -> void:
 		area.monitorable = false
 
 func _spawn_decorative_legion(tile: Tile, tile_visu: TileVisu) -> void:
-	var unit_type: String = UNITS[_rng.randi() % UNITS.size()]
+	var unit_ids := UnitDefs.get_all_ids()
+	if unit_ids.is_empty():
+		return
+	var unit_type: String = unit_ids[_rng.randi() % unit_ids.size()]
 	var unit_count: int = _rng.randi_range(1, 8)
 	var team_id: String = TEAM_IDS[_rng.randi() % TEAM_IDS.size()]
 	var legion := Legion.new(unit_type, unit_count, tile.coords, team_id)

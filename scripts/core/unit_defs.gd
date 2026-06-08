@@ -13,3 +13,13 @@ func get_def(id: String) -> UnitDefinition:
 		_db = load(DB_PATH)
 	return _db.get_def(id) if _db else null
 
+func get_all_defs() -> Array[UnitDefinition]:
+	if _db == null:
+		_db = load(DB_PATH)
+	return _db.get_all_defs() if _db else []
+
+func get_all_ids() -> Array[String]:
+	if _db == null:
+		_db = load(DB_PATH)
+	return _db.get_all_ids() if _db else []
+

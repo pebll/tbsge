@@ -3,10 +3,6 @@ extends RefCounted
 
 const MinigameRulesScript = preload("res://scripts/minigame/minigame_rules.gd")
 
-const UNIT_TYPES: Array[String] = [
-	"AXEMAN", "ARCHER", "DRAGON_RIDER", "OGRE", "MAGE", "FLAME", "NECROMANCER", "TREANT",
-]
-
 static func build_draft_commands(
 	session: MinigameSession,
 	team_id: String,
@@ -57,7 +53,7 @@ static func build_draft_commands(
 
 static func _pick_unit_type_for_budget(budget_left: int, rng: RandomNumberGenerator) -> String:
 	var affordable: Array[String] = []
-	for unit_type in UNIT_TYPES:
+	for unit_type in UnitDefs.get_all_ids():
 		if MinigameRulesScript.unit_price(unit_type) <= budget_left:
 			affordable.append(unit_type)
 	if affordable.is_empty():

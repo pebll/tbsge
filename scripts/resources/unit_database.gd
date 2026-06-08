@@ -15,3 +15,18 @@ func _ready_cache() -> void:
 func get_def(id: String) -> UnitDefinition:
 	_ready_cache()
 	return _by_id.get(id)
+
+func get_all_defs() -> Array[UnitDefinition]:
+	_ready_cache()
+	var out: Array[UnitDefinition] = []
+	for d in defs:
+		if d:
+			out.append(d)
+	return out
+
+func get_all_ids() -> Array[String]:
+	var out: Array[String] = []
+	for d in get_all_defs():
+		if not String(d.id).is_empty():
+			out.append(d.id)
+	return out

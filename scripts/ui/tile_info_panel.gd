@@ -320,7 +320,5 @@ func _apply_team_accent(team_id: String) -> void:
 	team_footer.add_theme_stylebox_override("panel", footer_sb)
 
 func _load_unit_icon(unit_type: String) -> Texture2D:
-	# Keep consistent with `UnitVisu.update_sprite()` path pattern.
-	var path := "res://assets/units_v2/done/base_uncut_sprites/%s_front.png" % unit_type.to_lower()
-	var tex := load(path)
-	return tex if tex is Texture2D else null
+	var def := UnitDefs.get_def(unit_type)
+	return def.icon if def else null

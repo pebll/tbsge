@@ -2,9 +2,7 @@ class_name SingleUnit
 extends Node2D
 
 
-# Define the terrain types as an enum for clarity and type safety.
-const UNITS = ["KNIGHT", "ARCHER", "DRAGON", "GOBLIN", "MAGE", "FARMER"]
-@export var unit_type: String = "KNIGHT"
+@export var unit_type: String = ""
 @export var direction_front: bool = true
 @export var direction_right: bool = true
 
@@ -17,7 +15,9 @@ var current_offset: Vector2 = Vector2(0, 0)
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
-	unit_type = UNITS[randi() % 6]
+	var unit_ids := UnitDefs.get_all_ids()
+	if unit_type.is_empty() and not unit_ids.is_empty():
+		unit_type = unit_ids[randi() % unit_ids.size()]
 	direction_front = true
 	direction_right = true if randi() % 2 == 0 else false
 	update_sprite()
@@ -30,11 +30,9 @@ func update_direction(direction: Vector2):
 	update_sprite()
 	
 func update_sprite():
-	var face_direction = "front" if direction_front else "back"
-	var new_texture = load("res://assets/units_sliced/units_" + face_direction + "/" + unit_type.to_lower() + ".png")
-	var new_flip_h = direction_front == direction_right
-	#if new_texture != sprite.texture or sprite.flip_h != new_flip_h:
-	#juice_squish()
+	var def := UnitDefs.get_def(unit_type)
+	var new_texture: Texture2D = def.icon if def else null
+	var new_flip_h = !direction_right
 	sprite.texture = new_texture
 	sprite.flip_h = new_flip_h
 

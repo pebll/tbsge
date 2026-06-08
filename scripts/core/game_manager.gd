@@ -9,7 +9,6 @@ const BattleStateScript = preload("res://scripts/actions/battle_state.gd")
 @export var map_radius: int = 3
 var tile_size: float = 135.3
 var tile_size_xy_ratio: float = 0.75
-const UNITS = ["AXEMAN", "ARCHER", "DRAGON_RIDER", "OGRE", "MAGE", "FLAME", "NECROMANCER", "TREANT"]
 const TEAM_IDS: Array[String] = ["GREEN", "BLUE"]
 
 @onready var grid_visu : Dictionary[Vector2i, TileVisu] = {}
@@ -132,7 +131,10 @@ func spawn_unit(coords: Vector2i):
 		print("tile not adequate for spawning")
 		return # only spawn if tile is empty
 	var team_id: String = turn_manager.active_team_id
-	var legion = Legion.new(UNITS[randi() % 8], randi() % 8 + 1, coords, team_id)
+	var unit_ids := UnitDefs.get_all_ids()
+	if unit_ids.is_empty():
+		return
+	var legion = Legion.new(unit_ids[randi() % unit_ids.size()], randi() % 8 + 1, coords, team_id)
 	legion.refresh_ap()
 	var legionVisu = preload("res://scenes/legion.tscn").instantiate()
 	# TODO: refactor this into own folder (like for the tiles)

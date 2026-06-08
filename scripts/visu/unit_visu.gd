@@ -308,11 +308,12 @@ func update_direction(direction: Vector2):
 	update_sprite()
 	
 func update_sprite():
-	var face_direction = "front" # (back does not exist yet) ##if direction_front else "back"
-	var new_texture = load("res://assets/units_v2/done/base_uncut_sprites/" + unit.unit_type.to_lower() + "_" + face_direction + ".png")
-	var new_flip_h = !direction_right ##direction_front == direction_right
-	#if new_texture != sprite.texture or sprite.flip_h != new_flip_h:
-	#juice_squish()
+	var new_texture: Texture2D = null
+	if unit and unit.definition:
+		new_texture = unit.definition.icon
+	if new_texture == null:
+		push_warning("UnitVisu: no icon for unit type '%s'" % (unit.unit_type if unit else ""))
+	var new_flip_h = !direction_right
 	sprite.texture = new_texture
 	sprite.flip_h = new_flip_h
 	sprite.position = local_position
