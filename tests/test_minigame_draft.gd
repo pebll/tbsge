@@ -3,6 +3,7 @@ extends RefCounted
 const MinigameSession = preload("res://scripts/minigame/minigame_session.gd")
 const MinigameConfig = preload("res://scripts/minigame/minigame_config.gd")
 const DraftState = preload("res://scripts/minigame/draft_state.gd")
+const MinigameRulesScript = preload("res://scripts/minigame/minigame_rules.gd")
 
 func run(_tree: SceneTree) -> bool:
 	if not _test_budget_and_validation():
@@ -10,6 +11,8 @@ func run(_tree: SceneTree) -> bool:
 	if not _test_hidden_opponent_draft():
 		return false
 	if not _test_both_ready_starts_battle():
+		return false
+	if not _test_ai_spends_all_gold():
 		return false
 	print("Success: Minigame draft tests")
 	return true
@@ -129,5 +132,41 @@ func _test_both_ready_starts_battle() -> bool:
 		return false
 	if session.legions.size() != 2:
 		push_error("Expected 2 legions on board")
+		return false
+	return true
+
+func _test_ai_spends_all_gold() -> bool:
+	var session := _prepare_session()
+	var green_slots: Array = session.get_deploy_slots("GREEN")
+	session.apply({
+		"type": "draft_set_legion",
+		"team": "GREEN",
+		"coords": green_slots[0],
+		"unit_type": "ARCHER",
+		"unit_count": 1,
+	})
+	session.apply({"type": "draft_ready", "team": "GREEN"})
+
+	var AiDrafter = preload("res://scripts/ai/ai_drafter.gd")
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	var cmds: Array = AiDrafter.build_draft_commands(session, "BLUE", rng)
+	for cmd in cmds:
+		var result := session.apply(cmd)
+		if not result["ok"]:
+			push_error("AI draft command failed: %s" % result["error"])
+			return false
+
+	var draft: DraftState = session.drafts["BLUE"] as DraftState
+	var cheapest := 999999
+	for unit_type in UnitDefs.get_all_ids():
+		cheapest = mini(cheapest, MinigameRulesScript.unit_price(unit_type))
+	if draft.remaining_budget >= cheapest:
+		push_error(
+			"AI should spend down to less than cheapest unit (%d left)" % draft.remaining_budget
+		)
+		return false
+	if draft.placements.is_empty():
+		push_error("AI should draft at least one legion")
 		return false
 	return true
