@@ -21,6 +21,13 @@ const MinigameRulesScript = preload("res://scripts/minigame/minigame_rules.gd")
 @onready var health_value: Label = %HealthValue
 @onready var unit_count_icon: TextureRect = %UnitCountIcon
 @onready var unit_count_value: Label = %UnitCountValue
+@onready var size_icon: TextureRect = %SizeIcon
+@onready var size_value: Label = %SizeValue
+@onready var price_icon: TextureRect = %PriceIcon
+@onready var price_value: Label = %PriceValue
+@onready var shield_stat: HBoxContainer = %ShieldStat
+@onready var shield_icon: TextureRect = %ShieldIcon
+@onready var shield_value: Label = %ShieldValue
 @onready var ap_stat: HBoxContainer = %ApStat
 @onready var ap_icon: TextureRect = %ApIcon
 @onready var ap_value: Label = %ApValue
@@ -52,6 +59,9 @@ const ICON_ATTACK := preload("res://assets/icons/base_icons_sprites/sword.png")
 const ICON_HEALTH := preload("res://assets/icons/base_icons_sprites/heart.png")
 const ICON_UNIT_COUNT := preload("res://assets/icons/base_icons_sprites/torso.png")
 const ICON_AP := preload("res://assets/icons/base_icons_sprites/boot.png")
+const ICON_SIZE := preload("res://assets/icons/base_icons_sprites/strong.png")
+const ICON_PRICE := preload("res://assets/icons/base_icons_sprites/coin.png")
+const ICON_SHIELD := preload("res://assets/icons/base_icons_sprites/shield.png")
 
 func _ready() -> void:
 	_apply_style()
@@ -85,17 +95,26 @@ func _apply_style() -> void:
 	health_value.add_theme_color_override("font_color", COLOR_TEXT)
 	unit_count_value.add_theme_color_override("font_color", COLOR_TEXT)
 	ap_value.add_theme_color_override("font_color", COLOR_TEXT)
+	size_value.add_theme_color_override("font_color", COLOR_TEXT)
+	price_value.add_theme_color_override("font_color", COLOR_TEXT)
+	shield_value.add_theme_color_override("font_color", COLOR_TEXT)
 
 	attack_icon.texture = ICON_ATTACK
 	health_icon.texture = ICON_HEALTH
 	unit_count_icon.texture = ICON_UNIT_COUNT
 	ap_icon.texture = ICON_AP
+	size_icon.texture = ICON_SIZE
+	price_icon.texture = ICON_PRICE
+	shield_icon.texture = ICON_SHIELD
 
 	_configure_stat_icon(unit_icon, Vector2(110, 150))
 	_configure_stat_icon(attack_icon)
 	_configure_stat_icon(health_icon)
 	_configure_stat_icon(unit_count_icon)
 	_configure_stat_icon(ap_icon, Vector2(56, 56))
+	_configure_stat_icon(size_icon, Vector2(56, 56))
+	_configure_stat_icon(price_icon, Vector2(56, 56))
+	_configure_stat_icon(shield_icon, Vector2(56, 56))
 
 func _configure_stat_icon(icon: TextureRect, min_size: Vector2 = Vector2(72, 72)) -> void:
 	icon.custom_minimum_size = min_size
@@ -178,6 +197,7 @@ func _render_legion(legion: Legion) -> void:
 
 	unit_count_value.text = "%d" % legion.units.size()
 	ap_value.text = "%d/%d" % [legion.current_ap, legion.max_ap]
+	_render_unit_type_stats(unit0, legion.unit_type)
 
 	unit_icon.texture = unit0.definition.icon if unit0 and unit0.definition and unit0.definition.icon else _load_unit_icon(legion.unit_type)
 
@@ -318,6 +338,22 @@ func _apply_team_accent(team_id: String) -> void:
 	footer_sb.corner_radius_bottom_left = 8
 	footer_sb.corner_radius_bottom_right = 8
 	team_footer.add_theme_stylebox_override("panel", footer_sb)
+
+func _render_unit_type_stats(unit0: Unit, unit_type: String) -> void:
+	var def: UnitDefinition = unit0.definition if unit0 and unit0.definition else UnitDefs.get_def(unit_type)
+	if def == null:
+		size_value.text = ""
+		price_value.text = ""
+		shield_stat.hide()
+		return
+
+	size_value.text = "%.1f" % def.size
+	price_value.text = "%d" % def.price
+	if def.shield > 0:
+		shield_stat.show()
+		shield_value.text = "%d" % def.shield
+	else:
+		shield_stat.hide()
 
 func _load_unit_icon(unit_type: String) -> Texture2D:
 	var def := UnitDefs.get_def(unit_type)

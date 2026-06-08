@@ -29,22 +29,38 @@ func update_direction(direction: Vector2):
 	juice_direct(direction)
 	update_sprite()
 	
+func _get_base_scale() -> Vector2:
+	const BASE_SPRITE_SCALE := Vector2(0.2, 0.2)
+	var image_scale := 1.0
+	var def := UnitDefs.get_def(unit_type)
+	if def and def.image_size > 0.0:
+		image_scale = def.image_size
+	return BASE_SPRITE_SCALE * image_scale
+
 func update_sprite():
 	var def := UnitDefs.get_def(unit_type)
 	var new_texture: Texture2D = def.icon if def else null
 	var new_flip_h = !direction_right
 	sprite.texture = new_texture
 	sprite.flip_h = new_flip_h
+	sprite.scale = _get_base_scale()
 
 func start_idle_animation():
-	var base_scale = 0.2
-	var stretch_percentage = 0.02
-	var scale_high = base_scale*(1+stretch_percentage)
-	var scale_low = base_scale*(1-stretch_percentage)
-	var loop_time = 1
+	var base_scale := _get_base_scale()
+	sprite.scale = base_scale
+	var stretch_percentage := 0.02
+	var scale_a := Vector2(
+		base_scale.x * (1.0 - stretch_percentage),
+		base_scale.y * (1.0 + stretch_percentage)
+	)
+	var scale_b := Vector2(
+		base_scale.x * (1.0 + stretch_percentage),
+		base_scale.y * (1.0 - stretch_percentage)
+	)
+	var loop_time := 1.0
 	idle_tween = create_tween().set_loops()
-	idle_tween.tween_property(sprite, "scale", Vector2(scale_low, scale_high), loop_time)
-	idle_tween.tween_property(sprite, "scale", Vector2(scale_high, scale_low), loop_time)
+	idle_tween.tween_property(sprite, "scale", scale_a, loop_time)
+	idle_tween.tween_property(sprite, "scale", scale_b, loop_time)
 
 func juice_move(target_pos: Vector2):
 	var move_time = 0.4
@@ -82,8 +98,8 @@ func juice_squish():
 	active_tween = create_tween()
 	var anim_time = 0.1
 	var scale_factor = 1.03
-	var base_scale = sprite.scale
-	var target_scale = Vector2(base_scale.x/scale_factor, base_scale.y*scale_factor)
+	var base_scale := _get_base_scale()
+	var target_scale := Vector2(base_scale.x / scale_factor, base_scale.y * scale_factor)
 	active_tween.tween_property(sprite, "scale", target_scale, anim_time/2).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
 	active_tween.tween_property(sprite, "scale", base_scale, anim_time).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_IN)
 

@@ -57,6 +57,14 @@ func _apply_team_banner() -> void:
 	banner.self_modulate = team.color
 	banner.visible = true
 
+func _get_image_size_scale() -> float:
+	if legion == null:
+		return 1.0
+	var def := UnitDefs.get_def(legion.unit_type)
+	if def and def.image_size > 0.0:
+		return def.image_size
+	return 1.0
+
 func _stable_jitter(i: int, amount: float) -> Vector2:
 	var sx := sin(float(_formation_seed) + float(i) * 12.9898) * 43758.5453
 	var sy := sin(float(_formation_seed) + float(i) * 78.233) * 12515.8731
@@ -107,8 +115,9 @@ func update_local_positions() -> void:
 		children[0].local_position = Vector2.ZERO
 		return
 
-	var base_spacing := 30
-	var randomness := 5.0
+	var image_scale := _get_image_size_scale()
+	var base_spacing := int(30.0 * image_scale)
+	var randomness := 5.0 * image_scale
 	var positions: Array[Vector2] = []
 	var cols := 2 if count == 4 else int(ceil(sqrt(count * 1.5)))
 	var rows := int(ceil(float(count) / float(cols)))

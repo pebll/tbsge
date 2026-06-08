@@ -44,7 +44,14 @@ func _setup_flash_shader() -> void:
 	sprite.material = _flash_mat
 
 func _get_base_scale() -> Vector2:
-	return BASE_SPRITE_SCALE
+	var image_scale := 1.0
+	if unit and unit.definition and unit.definition.image_size > 0.0:
+		image_scale = unit.definition.image_size
+	return BASE_SPRITE_SCALE * image_scale
+
+func _apply_base_sprite_scale() -> void:
+	if sprite:
+		sprite.scale = _get_base_scale()
 
 func _play_white_flash(duration: float) -> void:
 	_play_color_flash(Color.WHITE, duration)
@@ -317,19 +324,26 @@ func update_sprite():
 	sprite.texture = new_texture
 	sprite.flip_h = new_flip_h
 	sprite.position = local_position
+	_apply_base_sprite_scale()
 
 func start_idle_animation() -> void:
 	if idle_tween and idle_tween.is_running():
 		idle_tween.kill()
-	sprite.scale = _get_base_scale()
-	var base_scale := BASE_SPRITE_SCALE.x
-	var stretch_percentage = 0.02
-	var scale_high = base_scale*(1+stretch_percentage)
-	var scale_low = base_scale*(1-stretch_percentage)
-	var loop_time = 1
+	var base_scale := _get_base_scale()
+	sprite.scale = base_scale
+	var stretch_percentage := 0.02
+	var scale_a := Vector2(
+		base_scale.x * (1.0 - stretch_percentage),
+		base_scale.y * (1.0 + stretch_percentage)
+	)
+	var scale_b := Vector2(
+		base_scale.x * (1.0 + stretch_percentage),
+		base_scale.y * (1.0 - stretch_percentage)
+	)
+	var loop_time := 1.0
 	idle_tween = create_tween().set_loops()
-	idle_tween.tween_property(sprite, "scale", Vector2(scale_low, scale_high), loop_time)
-	idle_tween.tween_property(sprite, "scale", Vector2(scale_high, scale_low), loop_time)
+	idle_tween.tween_property(sprite, "scale", scale_a, loop_time)
+	idle_tween.tween_property(sprite, "scale", scale_b, loop_time)
 
 func juice_move(_target_pos: Vector2) -> Tween:
 	var move_time = 0.4
@@ -468,11 +482,11 @@ func juice_squish():
 	if active_tween and active_tween.is_running():
 		return
 	active_tween = create_tween()
-	var anim_time = 0.1
-	var scale_factor = 1.03
-	var base_scale = sprite.scale
-	var target_scale = Vector2(base_scale.x/scale_factor, base_scale.y*scale_factor)
-	active_tween.tween_property(sprite, "scale", target_scale, anim_time/2).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	var anim_time := 0.1
+	var scale_factor := 1.03
+	var base_scale := _get_base_scale()
+	var target_scale := Vector2(base_scale.x / scale_factor, base_scale.y * scale_factor)
+	active_tween.tween_property(sprite, "scale", target_scale, anim_time / 2).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
 	active_tween.tween_property(sprite, "scale", base_scale, anim_time).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_IN)
 
 func juice_direct(direction: Vector2):

@@ -16,10 +16,18 @@ func _init(unit_type: String, unit_count: int, tile_coords: Vector2i, team_id: S
 	self.unit_count = unit_count
 	self.tile_coords = tile_coords
 	self.team_id = team_id
-	current_ap = max_ap
+	_apply_unit_type_defaults()
 	for i in range(unit_count):
 		var unit = Unit.new(self.unit_type)
 		units.append(unit)
+
+func _apply_unit_type_defaults() -> void:
+	var def := UnitDefs.get_def(unit_type)
+	if def and def.ap > 0:
+		max_ap = def.ap
+	else:
+		max_ap = DEFAULT_MAX_AP
+	current_ap = max_ap
 
 func has_ap() -> bool:
 	return current_ap > 0
@@ -38,3 +46,5 @@ func spend_all_ap() -> void:
 
 func refresh_ap() -> void:
 	current_ap = max_ap
+	for unit in units:
+		unit.reset_turn_state()

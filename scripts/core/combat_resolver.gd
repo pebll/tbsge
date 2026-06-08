@@ -51,20 +51,28 @@ static func resolve_combat(attacking_legion: Legion, defending_legion: Legion, r
 		var target_index := rng.randi_range(0, current_defender_legion.units.size() - 1)
 		var target_unit: Unit = current_defender_legion.units[target_index]
 
-		var damage := float(attacker_unit.attack)
+		var raw_damage := float(attacker_unit.attack)
+		var shield_result := target_unit.absorb_damage(raw_damage)
+		var damage: float = shield_result["applied"]
+		var shield_absorbed: float = shield_result["absorbed"]
 		var hp_before: float = float(target_unit.current_health)
 		target_unit.current_health -= damage
 		var hp_after: float = float(target_unit.current_health)
 		var hp_lost: float = clampf(hp_before - maxf(0.0, hp_after), 0.0, hp_before)
 
-		print("Hit #%d: %s -> %s for %d (target hp %d/%d)" % [
+		var hit_log := "Hit #%d: %s -> %s for %d" % [
 			hit_index,
 			current_attacker_legion.unit_type,
 			current_defender_legion.unit_type,
 			int(damage),
+		]
+		if shield_absorbed > 0.0:
+			hit_log += " (%d absorbed by shield)" % int(shield_absorbed)
+		hit_log += " (target hp %d/%d)" % [
 			int(max(0.0, target_unit.current_health)),
 			int(target_unit.max_health),
-		])
+		]
+		print(hit_log)
 
 		hits.append({
 			"hit_index": hit_index,
@@ -72,6 +80,8 @@ static func resolve_combat(attacking_legion: Legion, defending_legion: Legion, r
 			"defender_legion": current_defender_legion,
 			"attacker": attacker_unit,
 			"target": target_unit,
+			"raw_damage": raw_damage,
+			"shield_absorbed": shield_absorbed,
 			"damage": damage,
 			"target_hp_before": hp_before,
 			"target_hp_after": hp_after,

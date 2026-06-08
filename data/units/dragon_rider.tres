@@ -1,7 +1,7 @@
-[gd_resource type="Resource" format=3 uid="uid://d1w0r3xk7m8c2"]
+[gd_resource type="Resource" script_class="UnitDefinition" format=3 uid="uid://d1w0r3xk7m8c2"]
 
-[ext_resource type="Script" path="res://scripts/resources/unit_definition.gd" id="1_def"]
-[ext_resource type="Texture2D" path="res://assets/units_v2/done/base_uncut_sprites/dragon_rider_front.png" id="2_icon"]
+[ext_resource type="Script" uid="uid://xdkpld8vue81" path="res://scripts/resources/unit_definition.gd" id="1_def"]
+[ext_resource type="Texture2D" uid="uid://b30c58vws63wk" path="res://assets/units_v2/done/base_uncut_sprites/dragon_rider_front.png" id="2_icon"]
 
 [resource]
 script = ExtResource("1_def")
@@ -9,7 +9,8 @@ id = "DRAGON_RIDER"
 display_name = "Dragon Rider"
 max_health = 18
 attack = 7
+ap = 3
+image_size = 1.2
 size = 3.0
 price = 8
 icon = ExtResource("2_icon")
-

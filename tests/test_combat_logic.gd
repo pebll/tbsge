@@ -9,6 +9,8 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_dead_unit_never_hits_back():
 		return false
+	if not _test_shield_absorbs_first_hit_only():
+		return false
 	print("Success: Combat logic tests")
 	return true
 
@@ -101,5 +103,30 @@ func _test_dead_unit_never_hits_back() -> bool:
 				push_error("Dead unit attacked after dying (should not hit back)")
 				return false
 
+	return true
+
+func _test_shield_absorbs_first_hit_only() -> bool:
+	var target := Unit.new("OGRE")
+	target.shield_max = 2
+	target.shield_remaining = 2
+
+	var first: Dictionary = target.absorb_damage(5.0)
+	if int(first["applied"]) != 3 or int(first["absorbed"]) != 2:
+		push_error("Expected shield 2 to reduce 5 damage to 3 on first hit")
+		return false
+	if target.shield_remaining != 0:
+		push_error("Shield should be broken after first hit")
+		return false
+
+	var second: Dictionary = target.absorb_damage(5.0)
+	if int(second["applied"]) != 5 or int(second["absorbed"]) != 0:
+		push_error("Expected full 5 damage once shield is broken")
+		return false
+
+	target.shield_remaining = 0
+	target.reset_turn_state()
+	if target.shield_remaining != 2:
+		push_error("reset_turn_state should restore shield at turn start")
+		return false
 	return true
 

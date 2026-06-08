@@ -9,6 +9,8 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_refresh_ap():
 		return false
+	if not _test_ap_from_unit_definition():
+		return false
 	print("Success: Legion AP tests")
 	return true
 
@@ -52,5 +54,16 @@ func _test_refresh_ap() -> bool:
 	legion.refresh_ap()
 	if legion.current_ap != legion.max_ap:
 		push_error("refresh_ap should restore max AP")
+		return false
+	return true
+
+func _test_ap_from_unit_definition() -> bool:
+	var dragon := Legion.new("DRAGON_RIDER", 1, Vector2i.ZERO, "GREEN")
+	if dragon.max_ap != 3 or dragon.current_ap != 3:
+		push_error("DRAGON_RIDER should start with 3 AP from unit definition")
+		return false
+	var archer := Legion.new("ARCHER", 1, Vector2i.ZERO, "GREEN")
+	if archer.max_ap != 2:
+		push_error("ARCHER should start with default 2 AP")
 		return false
 	return true
