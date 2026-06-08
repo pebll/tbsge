@@ -4,6 +4,7 @@
 [ext_resource type="Script" path="res://scripts/core/strategy_camera.gd" id="2_cam"]
 [ext_resource type="Texture2D" path="res://assets/background_sunset.png" id="3_bg"]
 [ext_resource type="Script" path="res://scripts/minigame/minigame_presenter.gd" id="4_pres"]
+[ext_resource type="Script" path="res://scripts/visu/zoom_invariant_background.gd" id="5_zib"]
 
 [node name="Minigame" type="Node2D"]
 script = ExtResource("1_root")
@@ -14,8 +15,9 @@ script = ExtResource("2_cam")
 
 [node name="Background" type="Sprite2D" parent="Camera2D"]
 z_index = -1000
-scale = Vector2(0.6219443, 0.6219444)
+scale = Vector2(1.4926663, 1.4926666)
 texture = ExtResource("3_bg")
+script = ExtResource("5_zib")
 
 [node name="MinigamePresenter" type="Node2D" parent="."]
 script = ExtResource("4_pres")

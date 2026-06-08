@@ -3,6 +3,7 @@
 [ext_resource type="PackedScene" uid="uid://dui7jcbdhwh8s" path="res://scenes/game_manager.tscn" id="1_jyyb0"]
 [ext_resource type="Texture2D" uid="uid://bha4mcu302lcl" path="res://assets/background_sunset.png" id="1_rkf7y"]
 [ext_resource type="Script" path="res://scripts/core/strategy_camera.gd" id="2_cam"]
+[ext_resource type="Script" path="res://scripts/visu/zoom_invariant_background.gd" id="3_zib"]
 
 [node name="UnitPreview" type="Node2D" unique_id=2032121888]
 
@@ -12,8 +13,9 @@ script = ExtResource("2_cam")
 
 [node name="Background" type="Sprite2D" parent="Camera2D" unique_id=731660998]
 z_index = -1000
-scale = Vector2(0.6219443, 0.6219444)
+scale = Vector2(1.4926663, 1.4926666)
 texture = ExtResource("1_rkf7y")
+script = ExtResource("3_zib")
 
 [node name="GameManager" parent="." unique_id=1748821921 instance=ExtResource("1_jyyb0")]
 map_radius = 2
