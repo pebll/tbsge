@@ -1,9 +1,9 @@
 class_name MenuStreamUtils
 
+const HexLayoutScript = preload("res://scripts/core/hex_layout.gd")
+
 static func axial_to_world(q: int, r: int, tile_size: float, ratio: float) -> Vector2:
-	var x := tile_size * (float(q) + 0.5 * float(r))
-	var y := tile_size * ratio * (0.75 * float(r))
-	return Vector2(x, y)
+	return HexLayoutScript.axial_to_world(q, r, tile_size, ratio)
 
 static func world_to_axial_approx(world: Vector2, tile_size: float, ratio: float) -> Vector2:
 	var r_approx := world.y / (tile_size * ratio * 0.75)

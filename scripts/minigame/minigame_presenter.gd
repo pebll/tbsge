@@ -1,8 +1,9 @@
 class_name MinigamePresenter
 extends Node2D
 
-const TILE_SIZE := 135.3
-const TILE_SIZE_XY_RATIO := 0.75
+const HexLayoutScript = preload("res://scripts/core/hex_layout.gd")
+const TILE_SIZE := HexLayoutScript.DEFAULT_TILE_SIZE
+const TILE_SIZE_XY_RATIO := HexLayoutScript.DEFAULT_XY_RATIO
 const LEGION_SCENE := preload("res://scenes/legion.tscn")
 const HEX_TILE_SCENE := preload("res://scenes/hextile.tscn")
 
@@ -26,10 +27,9 @@ func build_map(session: MinigameSession) -> void:
 	for coords in session.grid.keys():
 		var tile: Tile = session.grid[coords]
 		var hex_tile: TileVisu = HEX_TILE_SCENE.instantiate()
-		var x := TILE_SIZE * (float(coords.x) + 0.5 * float(coords.y))
-		var y := TILE_SIZE * TILE_SIZE_XY_RATIO * (0.75 * float(coords.y))
-		hex_tile.position = Vector2(x, y)
-		hex_tile.z_index = int(y / 10.0)
+		var world_pos: Vector2 = HexLayoutScript.axial_to_worldv(coords, TILE_SIZE, TILE_SIZE_XY_RATIO)
+		hex_tile.position = world_pos
+		hex_tile.z_index = HexLayoutScript.depth_sort_z(world_pos.y)
 		tiles_container.add_child(hex_tile)
 		hex_tile.init(tile)
 		grid_visu[coords] = hex_tile

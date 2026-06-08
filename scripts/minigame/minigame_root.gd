@@ -6,15 +6,9 @@ const MINIGAME_SCENE := "res://scenes/runnables/minigame.tscn"
 const MENU_SCENE := "res://scenes/runnables/menu.tscn"
 const INVALID_COORDS := Vector2i(2147483646, 2147483646)
 
-const COMBAT_HIT_BEAT := 0.4
-const COMBAT_DEATH_BEAT := 0.6
-const COMBAT_REPOSITION_BEAT := 0.45
-
-const ICON_DEATHS := preload("res://assets/icons/base_icons_sprites/skull.png")
-const ICON_HP_LOST := preload("res://assets/icons/base_icons_sprites/damage.png")
-const ICON_HEAL_REPORT := preload("res://assets/icons/base_icons_sprites/heart.png")
 const AttackNearestEnemyBehavior = preload("res://scripts/ai/behaviors/attack_nearest_enemy.gd")
 const AiDrafter = preload("res://scripts/ai/ai_drafter.gd")
+const ActionPlaybackScript = preload("res://scripts/battle/action_playback.gd")
 
 const AI_LEGION_DELAY := 0.5
 
@@ -32,6 +26,7 @@ var _unit_picker: MinigameUnitPicker
 var _turn_hud: TurnHud
 var _tile_info_panel: TileInfoPanel
 var _combat_fx_layer: CanvasLayer
+var _action_playback: RefCounted
 var _pass_overlay: PanelContainer
 var _status_label: Label
 var _game_over_panel: GameOverPanel
@@ -113,6 +108,12 @@ func _setup_ui() -> void:
 	_combat_fx_layer.name = "CombatFX"
 	_combat_fx_layer.layer = 2
 	add_child(_combat_fx_layer)
+	_action_playback = ActionPlaybackScript.new(
+		self,
+		func(c: Vector2i) -> TileVisu: return presenter.tile_visu_at(c),
+		func(legion: Legion) -> LegionVisu: return presenter.get_legion_visu(legion),
+		_combat_fx_layer
+	)
 
 	_pass_overlay = PanelContainer.new()
 	_pass_overlay.visible = false
@@ -537,7 +538,11 @@ func _perform_use_action(
 		_check_match_end()
 		return attacked
 	elif "legion_healed" in events:
-		await _perform_heal_visuals(from_coords, payload)
+		await _action_playback.play_heal(from_coords, payload, {
+			"deselect_after": not _ai_running,
+			"deselect": battle_ui.deselect,
+			"on_ap_changed": func(legion: Legion) -> void: EventBus.legion_ap_changed.emit(legion),
+		})
 		if not _ai_running:
 			input_locked = false
 		_check_match_end()
@@ -564,283 +569,15 @@ func _perform_attack_visuals(
 	if not from_visu or not to_visu or not from_visu.legion_visu or not to_visu.legion_visu:
 		return false
 
-	var attacker: Legion = from_visu.legion_visu.legion
-	var defender: Legion = to_visu.legion_visu.legion
-	var attacker_world_pos: Vector2 = from_visu.legion_visu.global_position
-	var defender_world_pos: Vector2 = to_visu.legion_visu.global_position
-
-	battle_ui.deselect()
-
-	var hits: Array = combat.get("hits", [])
-	var deaths: Array = combat.get("deaths", [])
-
-	await _play_combat_visuals(hits, deaths, from_coords, to_coords, attacker, defender)
-	_show_combat_losses(hits, deaths, attacker, defender, attacker_world_pos, defender_world_pos)
-	_hide_combat_hp_fx_later(from_coords, to_coords)
+	await _action_playback.play_combat(from_coords, to_coords, combat, {
+		"deselect_before": true,
+		"deselect": battle_ui.deselect,
+		"on_ap_changed": func(legion: Legion) -> void: EventBus.legion_ap_changed.emit(legion),
+	})
 	presenter.cleanup_dead_legion_at(from_coords, session)
 	presenter.cleanup_dead_legion_at(to_coords, session)
 	presenter.remove_dead_legions(session)
 	return true
-
-func _play_combat_visuals(
-	hits: Array,
-	deaths: Array,
-	from_coords: Vector2i,
-	to_coords: Vector2i,
-	attacker: Legion,
-	defender: Legion
-) -> void:
-	var from_visu: TileVisu = presenter.tile_visu_at(from_coords)
-	var to_visu: TileVisu = presenter.tile_visu_at(to_coords)
-	if not from_visu or not to_visu:
-		return
-
-	var legion_to_visu: Dictionary = {}
-	if attacker:
-		var av: LegionVisu = presenter.get_legion_visu(attacker)
-		if av:
-			legion_to_visu[attacker] = av
-	if defender:
-		var dv: LegionVisu = presenter.get_legion_visu(defender)
-		if dv:
-			legion_to_visu[defender] = dv
-	for h in hits:
-		var atk_legion: Legion = h["attacker_legion"]
-		var def_legion: Legion = h["defender_legion"]
-		if not legion_to_visu.has(atk_legion):
-			var av2: LegionVisu = presenter.get_legion_visu(atk_legion)
-			if av2:
-				legion_to_visu[atk_legion] = av2
-		if not legion_to_visu.has(def_legion):
-			var dv2: LegionVisu = presenter.get_legion_visu(def_legion)
-			if dv2:
-				legion_to_visu[def_legion] = dv2
-
-	var deaths_by_hit: Dictionary = {}
-	for d in deaths:
-		deaths_by_hit[d["hit_index"]] = d
-
-	var a_visu: LegionVisu = legion_to_visu.get(attacker)
-	var d_visu: LegionVisu = legion_to_visu.get(defender)
-	if a_visu and d_visu:
-		var face_dir := (d_visu.global_position - a_visu.global_position).normalized()
-		a_visu.update_direction(face_dir)
-		d_visu.update_direction(-face_dir)
-
-	for h in hits:
-		var atk_legion: Legion = h["attacker_legion"]
-		var def_legion: Legion = h["defender_legion"]
-		var atk_unit: Unit = h["attacker"]
-		var def_unit: Unit = h["target"]
-		var def_hp_before: float = float(h.get("target_hp_before", -1.0))
-		var def_hp_after: float = float(h.get("target_hp_after", -1.0))
-		var atk_visu: LegionVisu = legion_to_visu.get(atk_legion)
-		var def_visu: LegionVisu = legion_to_visu.get(def_legion)
-		if not atk_visu or not def_visu:
-			continue
-		var dir := (def_visu.global_position - atk_visu.global_position).normalized()
-		atk_visu.animate_unit_attack(atk_unit, dir)
-		var hit_idx: int = h["hit_index"]
-		var died_on_hit := false
-		if deaths_by_hit.has(hit_idx):
-			var d = deaths_by_hit[hit_idx]
-			if d.get("legion") == def_legion and d.get("unit") == def_unit:
-				died_on_hit = true
-				def_visu.animate_unit_death(def_unit, dir)
-		if not died_on_hit:
-			def_visu.animate_unit_hitted(
-				def_unit, dir, def_hp_before, def_hp_after, float(def_unit.max_health)
-			)
-		var beat := COMBAT_DEATH_BEAT if died_on_hit else COMBAT_HIT_BEAT
-		await get_tree().create_timer(beat).timeout
-
-	for lv in legion_to_visu.values():
-		if lv:
-			lv.update_local_positions()
-			lv.tween_units_to_local_positions()
-	await get_tree().create_timer(COMBAT_REPOSITION_BEAT).timeout
-	_restart_legion_idle_animations(legion_to_visu)
-	for lv in legion_to_visu.values():
-		if lv:
-			lv.sync_all_unit_hp_bars()
-	if attacker:
-		EventBus.legion_ap_changed.emit(attacker)
-
-func _restart_legion_idle_animations(legion_to_visu: Dictionary) -> void:
-	for lv in legion_to_visu.values():
-		if lv and is_instance_valid(lv):
-			lv.start_idle_animation()
-
-func _hide_combat_hp_fx_later(from_coords: Vector2i, to_coords: Vector2i) -> void:
-	await get_tree().create_timer(3.3).timeout
-	for coords in [from_coords, to_coords]:
-		var tile_visu: TileVisu = presenter.tile_visu_at(coords)
-		if tile_visu and tile_visu.legion_visu:
-			tile_visu.legion_visu.hide_all_combat_hp_fx()
-
-func _perform_heal_visuals(coords: Vector2i, payload: Dictionary) -> void:
-	var tile_visu: TileVisu = presenter.tile_visu_at(coords)
-	if not tile_visu or not tile_visu.legion_visu:
-		return
-	var legion_visu: LegionVisu = tile_visu.legion_visu
-	var legion: Legion = payload.get("legion")
-	var world_pos: Vector2 = legion_visu.global_position
-
-	var unit_heals: Array = payload.get("unit_heals", [])
-	for entry in unit_heals:
-		var unit: Unit = entry.get("unit")
-		if unit == null:
-			continue
-		legion_visu.animate_unit_healed(
-			unit,
-			float(entry.get("hp_before", 0)),
-			float(entry.get("hp_after", 0)),
-			float(unit.max_health)
-		)
-		await get_tree().create_timer(COMBAT_HIT_BEAT).timeout
-
-	legion_visu.update_local_positions()
-	legion_visu.tween_units_to_local_positions()
-	await get_tree().create_timer(COMBAT_REPOSITION_BEAT).timeout
-	legion_visu.start_idle_animation()
-	legion_visu.sync_all_unit_hp_bars()
-	if legion:
-		EventBus.legion_ap_changed.emit(legion)
-	if not _ai_running:
-		battle_ui.deselect()
-	_spawn_heal_popup(world_pos, int(payload.get("healed_total", 0)))
-	await get_tree().create_timer(3.3).timeout
-	legion_visu.hide_all_combat_hp_fx()
-
-func _show_combat_losses(
-	hits: Array,
-	deaths: Array,
-	attacker: Legion,
-	defender: Legion,
-	attacker_world_pos: Vector2,
-	defender_world_pos: Vector2
-) -> void:
-	if not _combat_fx_layer:
-		return
-	var hp_lost_by_legion: Dictionary = {}
-	for h in hits:
-		var def_legion: Legion = h.get("defender_legion")
-		var lost := int(round(float(h.get("hp_lost", 0.0))))
-		if def_legion and lost > 0:
-			hp_lost_by_legion[def_legion] = int(hp_lost_by_legion.get(def_legion, 0)) + lost
-	var deaths_by_legion: Dictionary = {}
-	for d in deaths:
-		var l: Legion = d.get("legion")
-		if l:
-			deaths_by_legion[l] = int(deaths_by_legion.get(l, 0)) + 1
-	if attacker:
-		_spawn_losses_popup(
-			attacker_world_pos,
-			int(deaths_by_legion.get(attacker, 0)),
-			int(hp_lost_by_legion.get(attacker, 0))
-		)
-	if defender:
-		_spawn_losses_popup(
-			defender_world_pos,
-			int(deaths_by_legion.get(defender, 0)),
-			int(hp_lost_by_legion.get(defender, 0))
-		)
-
-func _spawn_losses_popup(world_pos: Vector2, deaths_count: int, hp_lost: int) -> void:
-	if deaths_count <= 0 and hp_lost <= 0:
-		return
-	var canvas_xform := get_viewport().get_canvas_transform()
-	var screen_pos := canvas_xform * world_pos
-	var block := VBoxContainer.new()
-	block.add_theme_constant_override("separation", 6)
-	block.position = screen_pos + Vector2(-40, -170)
-	block.modulate = Color(1, 1, 1, 0)
-	_combat_fx_layer.add_child(block)
-	var icon_size := Vector2(84, 84)
-	var font_size := 46
-	var outline_size := 10
-	var outline_color := Color(0.0, 0.0, 0.0, 0.95)
-	if hp_lost > 0:
-		var hp_row := HBoxContainer.new()
-		hp_row.add_theme_constant_override("separation", 10)
-		block.add_child(hp_row)
-		var damage_icon := TextureRect.new()
-		damage_icon.custom_minimum_size = icon_size
-		damage_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		damage_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		damage_icon.texture = ICON_HP_LOST
-		hp_row.add_child(damage_icon)
-		var hp_label := Label.new()
-		hp_label.text = "%d" % hp_lost
-		hp_label.add_theme_font_size_override("font_size", font_size)
-		hp_label.add_theme_color_override("font_color", Color(1, 1, 1))
-		hp_label.add_theme_constant_override("outline_size", outline_size)
-		hp_label.add_theme_color_override("outline_color", outline_color)
-		hp_row.add_child(hp_label)
-	if deaths_count > 0:
-		var deaths_row := HBoxContainer.new()
-		deaths_row.add_theme_constant_override("separation", 10)
-		block.add_child(deaths_row)
-		var skull := TextureRect.new()
-		skull.custom_minimum_size = icon_size
-		skull.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		skull.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		skull.texture = ICON_DEATHS
-		deaths_row.add_child(skull)
-		var deaths_label := Label.new()
-		deaths_label.text = "%d" % deaths_count
-		deaths_label.add_theme_font_size_override("font_size", font_size)
-		deaths_label.add_theme_color_override("font_color", Color(1, 1, 1))
-		deaths_label.add_theme_constant_override("outline_size", outline_size)
-		deaths_label.add_theme_color_override("outline_color", outline_color)
-		deaths_row.add_child(deaths_label)
-	var tween := block.create_tween()
-	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	tween.tween_property(block, "modulate:a", 1.0, 0.22)
-	tween.set_trans(Tween.TRANS_LINEAR).set_ease(Tween.EASE_IN_OUT)
-	tween.tween_property(block, "position", block.position + Vector2(0, -90), 3.0)
-	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-	tween.tween_property(block, "modulate:a", 0.0, 0.28)
-	tween.tween_callback(block.queue_free)
-
-func _spawn_heal_popup(world_pos: Vector2, healed_total: int) -> void:
-	if healed_total <= 0 or not _combat_fx_layer:
-		return
-	var canvas_xform := get_viewport().get_canvas_transform()
-	var screen_pos := canvas_xform * world_pos
-	var block := VBoxContainer.new()
-	block.add_theme_constant_override("separation", 6)
-	block.position = screen_pos + Vector2(-40, -170)
-	block.modulate = Color(1, 1, 1, 0)
-	_combat_fx_layer.add_child(block)
-	var icon_size := Vector2(84, 84)
-	var font_size := 46
-	var outline_size := 10
-	var outline_color := Color(0.0, 0.0, 0.0, 0.95)
-	var heal_row := HBoxContainer.new()
-	heal_row.add_theme_constant_override("separation", 10)
-	block.add_child(heal_row)
-	var heal_icon := TextureRect.new()
-	heal_icon.custom_minimum_size = icon_size
-	heal_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	heal_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	heal_icon.texture = ICON_HEAL_REPORT
-	heal_row.add_child(heal_icon)
-	var heal_label := Label.new()
-	heal_label.text = "+%d" % healed_total
-	heal_label.add_theme_font_size_override("font_size", font_size)
-	heal_label.add_theme_color_override("font_color", Color(0.55, 1.0, 0.65))
-	heal_label.add_theme_constant_override("outline_size", outline_size)
-	heal_label.add_theme_color_override("outline_color", outline_color)
-	heal_row.add_child(heal_label)
-	var tween := block.create_tween()
-	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	tween.tween_property(block, "modulate:a", 1.0, 0.22)
-	tween.set_trans(Tween.TRANS_LINEAR).set_ease(Tween.EASE_IN_OUT)
-	tween.tween_property(block, "position", block.position + Vector2(0, -90), 3.0)
-	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-	tween.tween_property(block, "modulate:a", 0.0, 0.28)
-	tween.tween_callback(block.queue_free)
 
 func _overlay_blocking_input() -> bool:
 	return _pass_overlay.visible or _game_over_panel.visible

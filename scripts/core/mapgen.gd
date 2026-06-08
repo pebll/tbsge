@@ -1,7 +1,9 @@
 class_name MapGenerator
 
-var tile_size: float = 135.3
-var tile_size_xy_ratio: float = 0.75
+const HexLayoutScript = preload("res://scripts/core/hex_layout.gd")
+
+var tile_size: float = HexLayoutScript.DEFAULT_TILE_SIZE
+var tile_size_xy_ratio: float = HexLayoutScript.DEFAULT_XY_RATIO
 
 func _init(p_tile_size: float, p_tile_size_xy_ratio: float) -> void:
 	tile_size = p_tile_size
@@ -22,10 +24,9 @@ func generate_hex_map(radius: int, parent: Node, grid_visu: Dictionary, grid_mod
 				continue
 			var tile = Tile.new(q, r)
 			var hex_tile: TileVisu = preload("res://scenes/hextile.tscn").instantiate()
-			var x = tile_size * (q + 0.5 * r)
-			var y = tile_size* tile_size_xy_ratio * (0.75 * r)
-			hex_tile.position = Vector2(x, y)
-			hex_tile.z_index = y / 10
+			var world_pos: Vector2 = HexLayoutScript.axial_to_world(q, r, tile_size, tile_size_xy_ratio)
+			hex_tile.position = world_pos
+			hex_tile.z_index = HexLayoutScript.depth_sort_z(world_pos.y)
 			parent.add_child(hex_tile)
 			hex_tile.init(tile)
 			grid_visu[Vector2i(q, r)] = hex_tile
