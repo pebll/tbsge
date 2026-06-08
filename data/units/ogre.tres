@@ -1,16 +1,15 @@
-[gd_resource type="Resource" script_class="UnitDefinition" format=3 uid="uid://c5m3x8q8t2p0n"]
+[gd_resource type="Resource" script_class="UnitDefinition" format=3 uid="uid://be4uyt4m1dab1"]
 
 [ext_resource type="Script" uid="uid://xdkpld8vue81" path="res://scripts/resources/unit_definition.gd" id="1_def"]
-[ext_resource type="Texture2D" uid="uid://cxkgr8nat1i8t" path="res://assets/units_v2/done/evil_sprites/ogre.png" id="1_rd7uk"]
+[ext_resource type="Texture2D" uid="uid://cxkgr8nat1i8t" path="res://assets/units_v2/done/evil_sprites/ogre.png" id="2_icon"]
 
 [resource]
 script = ExtResource("1_def")
 id = "OGRE"
 display_name = "Ogre"
-max_health = 24
+max_health = 22
 attack = 8
-shield = 1
-image_size = 1.2
+image_size = 1.1
 size = 2.5
-price = 10
-icon = ExtResource("1_rd7uk")
+price = 9
+icon = ExtResource("2_icon")

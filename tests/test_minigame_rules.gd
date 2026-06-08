@@ -11,20 +11,20 @@ func run(_tree: SceneTree) -> bool:
 	return true
 
 func _test_pricing_and_sizes() -> bool:
-	if MinigameRules.unit_price("ARCHER") != 3:
-		push_error("ARCHER price expected 3")
+	if MinigameRules.unit_price("GOBLIN") != 3:
+		push_error("GOBLIN price expected 3")
 		return false
-	if MinigameRules.unit_price("OGRE") != 10:
-		push_error("OGRE price expected 10")
+	if MinigameRules.unit_price("GOLEM") != 10:
+		push_error("GOLEM price expected 10")
 		return false
-	if MinigameRules.max_units_in_legion("ARCHER") != 8:
-		push_error("ARCHER max units expected 8")
+	if MinigameRules.max_units_in_legion("GOBLIN") != 12:
+		push_error("GOBLIN max units expected 12")
 		return false
-	if MinigameRules.max_units_in_legion("DRAGON_RIDER") != 4:
-		push_error("DRAGON_RIDER max units expected 4")
+	if MinigameRules.max_units_in_legion("SCORPION_RIDER") != 4:
+		push_error("SCORPION_RIDER max units expected 4")
 		return false
-	if MinigameRules.legion_cost("ARCHER", 4) != 12:
-		push_error("4 archers should cost 12 gold")
+	if MinigameRules.legion_cost("GOBLIN", 4) != 12:
+		push_error("4 goblins should cost 12 gold")
 		return false
 	return true
 

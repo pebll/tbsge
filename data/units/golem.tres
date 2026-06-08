@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="UnitDefinition" format=3 uid="uid://ba22dvks5bqkt"]
+
+[ext_resource type="Script" uid="uid://xdkpld8vue81" path="res://scripts/resources/unit_definition.gd" id="1_def"]
+[ext_resource type="Texture2D" uid="uid://dokuy8v6j5tlf" path="res://assets/units_v2/done/sand_sprites/golem.png" id="2_icon"]
+
+[resource]
+script = ExtResource("1_def")
+id = "GOLEM"
+display_name = "Golem"
+max_health = 26
+attack = 4
+shield = 2
+image_size = 1.12
+size = 3.0
+price = 10
+icon = ExtResource("2_icon")

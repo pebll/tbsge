@@ -22,4 +22,3 @@ func get_all_ids() -> Array[String]:
 	if _db == null:
 		_db = load(DB_PATH)
 	return _db.get_all_ids() if _db else []
-

@@ -35,7 +35,7 @@ func _targets_in_order(hits: Array) -> Array:
 	return out
 
 func _test_first_hit_attacker_and_no_double_attacks() -> bool:
-	var a := _mk_legion("ARCHER", 2, 100, 1)
+	var a := _mk_legion("GOBLIN", 2, 100, 1)
 	var b := _mk_legion("OGRE", 2, 100, 1)
 
 	var result: Dictionary = CombatResolver.resolve_combat(a, b, 123)
@@ -63,7 +63,7 @@ func _test_first_hit_attacker_and_no_double_attacks() -> bool:
 func _test_alternate_then_drain_when_one_side_exhausts_attackers() -> bool:
 	# Pattern example: A has 3, B has 1, nobody dies.
 	# Expected attacker legions: A, B, A, A (B exhausted -> A drains remaining attackers).
-	var a := _mk_legion("ARCHER", 3, 1000, 1)
+	var a := _mk_legion("GOBLIN", 3, 1000, 1)
 	var b := _mk_legion("OGRE", 1, 1000, 1)
 
 	var result: Dictionary = CombatResolver.resolve_combat(a, b, 7)
@@ -84,8 +84,8 @@ func _test_alternate_then_drain_when_one_side_exhausts_attackers() -> bool:
 
 func _test_dead_unit_never_hits_back() -> bool:
 	# Ensure a unit that dies before its turn never becomes an attacker.
-	var a := _mk_legion("AXEMAN", 2, 10, 100) # will kill on hit
-	var b := _mk_legion("ARCHER", 2, 10, 1)
+	var a := _mk_legion("DEMON", 2, 10, 100) # will kill on hit
+	var b := _mk_legion("GOBLIN", 2, 10, 1)
 
 	var result: Dictionary = CombatResolver.resolve_combat(a, b, 42)
 	var hits: Array = result["hits"]

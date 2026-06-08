@@ -20,6 +20,10 @@ var corpses: Node2D
 var current_offset: Vector2 = Vector2(0, 0)
 var _formation_seed: int = 0
 
+const FORMATION_BASE_SPACING := 30.0
+const FORMATION_MAX_RADIUS := 58.0
+const FORMATION_ROW_SQUASH := 0.75
+
 func init(p_legion: Legion, formation_seed: int = -1) -> void:
 	legion = p_legion
 	_unit_to_visu.clear()
@@ -57,13 +61,14 @@ func _apply_team_banner() -> void:
 	banner.self_modulate = team.color
 	banner.visible = true
 
-func _get_image_size_scale() -> float:
+func _get_formation_scale() -> float:
 	if legion == null:
 		return 1.0
 	var def := UnitDefs.get_def(legion.unit_type)
-	if def and def.image_size > 0.0:
-		return def.image_size
-	return 1.0
+	if def == null or def.size <= 0.0:
+		return 1.0
+	# Spacing follows legion "size" capacity, not sprite art scale.
+	return clampf(def.size / 1.5, 0.88, 1.12)
 
 func _stable_jitter(i: int, amount: float) -> Vector2:
 	var sx := sin(float(_formation_seed) + float(i) * 12.9898) * 43758.5453
@@ -111,27 +116,41 @@ func update_local_positions() -> void:
 	var count := children.size()
 	if count == 0:
 		return
-	if count == 1:
-		children[0].local_position = Vector2.ZERO
-		return
 
-	var image_scale := _get_image_size_scale()
-	var base_spacing := int(30.0 * image_scale)
-	var randomness := 5.0 * image_scale
-	var positions: Array[Vector2] = []
-	var cols := 2 if count == 4 else int(ceil(sqrt(count * 1.5)))
+	var positions := _build_formation_positions(count)
+	for i in range(count):
+		children[i].local_position = positions[i]
+
+func _build_formation_positions(count: int) -> Array[Vector2]:
+	if count == 1:
+		return [Vector2.ZERO]
+
+	var formation_scale := _get_formation_scale()
+	var spacing := FORMATION_BASE_SPACING * formation_scale
+	var cols := maxi(1, int(ceil(sqrt(float(count) * 1.35))))
 	var rows := int(ceil(float(count) / float(cols)))
 
+	# Tighten spacing as count grows so the legion stays on the tile.
+	var half_w := (float(cols - 1) * spacing) * 0.5
+	var half_h := (float(rows - 1) * spacing * FORMATION_ROW_SQUASH) * 0.5
+	var extent := maxf(half_w, half_h)
+	var max_radius := FORMATION_MAX_RADIUS * formation_scale
+	if extent > max_radius and extent > 0.0:
+		spacing *= max_radius / extent
+
+	var randomness := minf(4.0 * formation_scale, spacing * 0.12)
+	var positions: Array[Vector2] = []
+
 	for i in range(count):
-		var row := i / cols
+		var row := int(i / cols)
 		var col := i % cols
-		var x: float = (float(col) - float(cols - 1) * 0.5) * float(base_spacing)
-		var y: float = (float(row) - float(rows - 1) * 0.5) * float(base_spacing) * 0.8
+		var units_in_row := mini(cols, count - row * cols)
+		var x := (float(col) - float(units_in_row - 1) * 0.5) * spacing
+		var y := (float(row) - float(rows - 1) * 0.5) * spacing * FORMATION_ROW_SQUASH
 		var jitter := _stable_jitter(i, randomness)
 		positions.append(Vector2(x + jitter.x, y + jitter.y))
 
-	for i in range(count):
-		children[i].local_position = positions[i]
+	return positions
 
 func refresh_unit_sprites() -> void:
 	for u in units.get_children():

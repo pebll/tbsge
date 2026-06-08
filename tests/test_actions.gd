@@ -37,7 +37,7 @@ func _start_battle(session: MinigameSession) -> Dictionary:
 		"type": "draft_set_legion",
 		"team": "GREEN",
 		"coords": green_slots[0],
-		"unit_type": "ARCHER",
+		"unit_type": "GOBLIN",
 		"unit_count": 2,
 	})
 	session.apply({"type": "draft_ready", "team": "GREEN"})
@@ -45,7 +45,7 @@ func _start_battle(session: MinigameSession) -> Dictionary:
 		"type": "draft_set_legion",
 		"team": "BLUE",
 		"coords": blue_slots[0],
-		"unit_type": "AXEMAN",
+		"unit_type": "RAT_SPEAR",
 		"unit_count": 2,
 	})
 	session.apply({"type": "draft_ready", "team": "BLUE"})
@@ -119,7 +119,7 @@ func _test_swap_via_move_action() -> bool:
 	var swap_tile: Tile = session.grid.get(swap_coords)
 	if swap_tile == null or swap_tile.has_legion():
 		return true
-	var green_b := Legion.new("ARCHER", 2, swap_coords, "GREEN")
+	var green_b := Legion.new("GOBLIN", 2, swap_coords, "GREEN")
 	swap_tile.legion = green_b
 	session.legions.append(green_b)
 

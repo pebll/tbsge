@@ -24,6 +24,8 @@ var _damage_hp_bar: ProgressBar
 
 const FLASH_SHADER := preload("res://assets/shaders/sprite_white_flash.gdshader")
 const BASE_SPRITE_SCALE := Vector2(0.2, 0.2)
+## Most unit sheets are ~352x384; vermine sheets are ~690x752 and need auto-normalizing.
+const REFERENCE_SPRITE_HEIGHT := 384.0
 
 var _flash_mat: ShaderMaterial
 var _flash_tween: Tween
@@ -43,11 +45,27 @@ func _setup_flash_shader() -> void:
 	_flash_mat.set_shader_parameter("flash_amount", 0.0)
 	sprite.material = _flash_mat
 
+func _get_unit_def() -> UnitDefinition:
+	if unit == null:
+		return null
+	if unit.definition:
+		return unit.definition
+	return UnitDefs.get_def(unit.unit_type)
+
+func _get_texture_normalize_scale(texture: Texture2D) -> float:
+	if texture == null:
+		return 1.0
+	var tex_height := float(texture.get_height())
+	if tex_height <= 0.0:
+		return 1.0
+	return REFERENCE_SPRITE_HEIGHT / tex_height
+
 func _get_base_scale() -> Vector2:
-	var image_scale := 1.0
-	if unit and unit.definition and unit.definition.image_size > 0.0:
-		image_scale = unit.definition.image_size
-	return BASE_SPRITE_SCALE * image_scale
+	var def := _get_unit_def()
+	var image_scale := def.image_size if def else 1.0
+	var texture: Texture2D = def.icon if def and def.icon else sprite.texture
+	var tex_norm := _get_texture_normalize_scale(texture)
+	return BASE_SPRITE_SCALE * image_scale * tex_norm
 
 func _apply_base_sprite_scale() -> void:
 	if sprite:

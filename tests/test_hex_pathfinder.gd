@@ -30,7 +30,7 @@ func _blocked_except(grid: Dictionary, except: Array[Vector2i] = []) -> Dictiona
 	return blocked
 
 func _place_legion(grid: Dictionary, coords: Vector2i, team_id: String = "GREEN") -> Legion:
-	var legion := Legion.new("ARCHER", 1, coords, team_id)
+	var legion := Legion.new("GOBLIN", 1, coords, team_id)
 	var tile: Tile = grid.get(coords)
 	tile.legion = legion
 	return legion

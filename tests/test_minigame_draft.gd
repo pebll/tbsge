@@ -40,8 +40,8 @@ func _test_budget_and_validation() -> bool:
 		"type": "draft_set_legion",
 		"team": "GREEN",
 		"coords": coords,
-		"unit_type": "ARCHER",
-		"unit_count": 9,
+		"unit_type": "GOBLIN",
+		"unit_count": 13,
 	})
 	if too_many["ok"]:
 		push_error("Expected failure when exceeding legion size")
@@ -51,11 +51,11 @@ func _test_budget_and_validation() -> bool:
 		"type": "draft_set_legion",
 		"team": "GREEN",
 		"coords": coords,
-		"unit_type": "ARCHER",
+		"unit_type": "GOBLIN",
 		"unit_count": 4,
 	})
 	if not ok["ok"]:
-		push_error("Expected valid archer placement: %s" % ok["error"])
+		push_error("Expected valid goblin placement: %s" % ok["error"])
 		return false
 
 	var draft = session.drafts["GREEN"] as DraftState
@@ -67,7 +67,7 @@ func _test_budget_and_validation() -> bool:
 		"type": "draft_set_legion",
 		"team": "GREEN",
 		"coords": slots[1],
-		"unit_type": "OGRE",
+		"unit_type": "GOLEM",
 		"unit_count": 4,
 	})
 	if overspend["ok"]:
@@ -82,7 +82,7 @@ func _test_hidden_opponent_draft() -> bool:
 		"type": "draft_set_legion",
 		"team": "GREEN",
 		"coords": green_slots[0],
-		"unit_type": "MAGE",
+		"unit_type": "ASSASSIN",
 		"unit_count": 2,
 	})
 
@@ -105,7 +105,7 @@ func _test_both_ready_starts_battle() -> bool:
 		"type": "draft_set_legion",
 		"team": "GREEN",
 		"coords": green_slots[0],
-		"unit_type": "ARCHER",
+		"unit_type": "GOBLIN",
 		"unit_count": 3,
 	})
 	var green_ready := session.apply({"type": "draft_ready", "team": "GREEN"})
@@ -120,7 +120,7 @@ func _test_both_ready_starts_battle() -> bool:
 		"type": "draft_set_legion",
 		"team": "BLUE",
 		"coords": blue_slots[0],
-		"unit_type": "AXEMAN",
+		"unit_type": "RAT_SPEAR",
 		"unit_count": 2,
 	})
 	var blue_ready := session.apply({"type": "draft_ready", "team": "BLUE"})
@@ -142,7 +142,7 @@ func _test_ai_spends_all_gold() -> bool:
 		"type": "draft_set_legion",
 		"team": "GREEN",
 		"coords": green_slots[0],
-		"unit_type": "ARCHER",
+		"unit_type": "GOBLIN",
 		"unit_count": 1,
 	})
 	session.apply({"type": "draft_ready", "team": "GREEN"})

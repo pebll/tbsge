@@ -38,7 +38,7 @@ func _start_battle_with_legions(
 		"type": "draft_set_legion",
 		"team": "GREEN",
 		"coords": green_coords if green_coords != Vector2i.ZERO else green_slots[0],
-		"unit_type": "ARCHER",
+		"unit_type": "GOBLIN",
 		"unit_count": 2,
 	})
 	session.apply({"type": "draft_ready", "team": "GREEN"})
@@ -46,7 +46,7 @@ func _start_battle_with_legions(
 		"type": "draft_set_legion",
 		"team": "BLUE",
 		"coords": blue_coords if blue_coords != Vector2i.ZERO else blue_slots[0],
-		"unit_type": "AXEMAN",
+		"unit_type": "RAT_SPEAR",
 		"unit_count": 2,
 	})
 	session.apply({"type": "draft_ready", "team": "BLUE"})
@@ -124,7 +124,7 @@ func _test_ai_draft_and_battle_turn() -> bool:
 		"type": "draft_set_legion",
 		"team": "GREEN",
 		"coords": green_slots[0],
-		"unit_type": "ARCHER",
+		"unit_type": "GOBLIN",
 		"unit_count": 1,
 	})
 	session.apply({"type": "draft_ready", "team": "GREEN"})

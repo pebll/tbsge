@@ -16,8 +16,8 @@ func _test_team_alternation() -> bool:
 	var team_order: Array[String] = ["GREEN", "BLUE"]
 	var tm := TurnManager.new(team_order)
 	tm.start_match("GREEN")
-	var g := Legion.new("ARCHER", 1, Vector2i.ZERO, "GREEN")
-	var b := Legion.new("ARCHER", 1, Vector2i.ONE, "BLUE")
+	var g := Legion.new("GOBLIN", 1, Vector2i.ZERO, "GREEN")
+	var b := Legion.new("GOBLIN", 1, Vector2i.ONE, "BLUE")
 	g.current_ap = 0
 	b.current_ap = 0
 	var legions: Array[Legion] = [g, b]
@@ -38,9 +38,9 @@ func _test_actionable_and_wait() -> bool:
 	var green_only: Array[String] = ["GREEN"]
 	var tm := TurnManager.new(green_only)
 	tm.start_match("GREEN")
-	var active := Legion.new("ARCHER", 1, Vector2i(0, 0), "GREEN")
-	var spent := Legion.new("ARCHER", 1, Vector2i(1, 0), "GREEN")
-	var waited := Legion.new("ARCHER", 1, Vector2i(2, 0), "GREEN")
+	var active := Legion.new("GOBLIN", 1, Vector2i(0, 0), "GREEN")
+	var spent := Legion.new("GOBLIN", 1, Vector2i(1, 0), "GREEN")
+	var waited := Legion.new("GOBLIN", 1, Vector2i(2, 0), "GREEN")
 	spent.current_ap = 0
 	var legions: Array[Legion] = [active, spent, waited]
 
@@ -60,8 +60,8 @@ func _test_tab_cycle() -> bool:
 	var green_only: Array[String] = ["GREEN"]
 	var tm := TurnManager.new(green_only)
 	tm.start_match("GREEN")
-	var a := Legion.new("ARCHER", 1, Vector2i(0, 0), "GREEN")
-	var b := Legion.new("ARCHER", 1, Vector2i(1, 0), "GREEN")
+	var a := Legion.new("GOBLIN", 1, Vector2i(0, 0), "GREEN")
+	var b := Legion.new("GOBLIN", 1, Vector2i(1, 0), "GREEN")
 	var legions: Array[Legion] = [a, b]
 
 	var first: Vector2i = tm.tab_next(legions)

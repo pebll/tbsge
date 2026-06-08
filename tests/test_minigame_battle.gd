@@ -31,7 +31,7 @@ func _start_battle(session: MinigameSession) -> void:
 		"type": "draft_set_legion",
 		"team": "GREEN",
 		"coords": green_slots[0],
-		"unit_type": "ARCHER",
+		"unit_type": "GOBLIN",
 		"unit_count": 2,
 	})
 	session.apply({"type": "draft_ready", "team": "GREEN"})
@@ -39,7 +39,7 @@ func _start_battle(session: MinigameSession) -> void:
 		"type": "draft_set_legion",
 		"team": "BLUE",
 		"coords": blue_slots[0],
-		"unit_type": "AXEMAN",
+		"unit_type": "RAT_SPEAR",
 		"unit_count": 2,
 	})
 	session.apply({"type": "draft_ready", "team": "BLUE"})
@@ -99,7 +99,7 @@ func _test_victory_by_elimination() -> bool:
 		"type": "draft_set_legion",
 		"team": "GREEN",
 		"coords": green_slots[0],
-		"unit_type": "FLAME",
+		"unit_type": "DEMON",
 		"unit_count": 1,
 	})
 	session.apply({"type": "draft_ready", "team": "GREEN"})
@@ -107,7 +107,7 @@ func _test_victory_by_elimination() -> bool:
 		"type": "draft_set_legion",
 		"team": "BLUE",
 		"coords": blue_slots[0],
-		"unit_type": "ARCHER",
+		"unit_type": "GOBLIN",
 		"unit_count": 1,
 	})
 	session.apply({"type": "draft_ready", "team": "BLUE"})

@@ -29,13 +29,23 @@ func update_direction(direction: Vector2):
 	juice_direct(direction)
 	update_sprite()
 	
+const BASE_SPRITE_SCALE := Vector2(0.2, 0.2)
+const REFERENCE_SPRITE_HEIGHT := 384.0
+
+func _get_texture_normalize_scale(texture: Texture2D) -> float:
+	if texture == null:
+		return 1.0
+	var tex_height := float(texture.get_height())
+	if tex_height <= 0.0:
+		return 1.0
+	return REFERENCE_SPRITE_HEIGHT / tex_height
+
 func _get_base_scale() -> Vector2:
-	const BASE_SPRITE_SCALE := Vector2(0.2, 0.2)
-	var image_scale := 1.0
 	var def := UnitDefs.get_def(unit_type)
-	if def and def.image_size > 0.0:
-		image_scale = def.image_size
-	return BASE_SPRITE_SCALE * image_scale
+	var image_scale := def.image_size if def else 1.0
+	var texture: Texture2D = def.icon if def and def.icon else sprite.texture
+	var tex_norm := _get_texture_normalize_scale(texture)
+	return BASE_SPRITE_SCALE * image_scale * tex_norm
 
 func update_sprite():
 	var def := UnitDefs.get_def(unit_type)
