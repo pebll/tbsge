@@ -27,7 +27,8 @@ var turn_manager: TurnManager
 var input: GameInput
 
 const ICON_DEATHS := preload("res://assets/icons/base_icons_sprites/skull.png")
-const ICON_HP_LOST := preload("res://assets/icons/base_icons_sprites/heart.png")
+const ICON_HP_LOST := preload("res://assets/icons/base_icons_sprites/damage.png")
+const ICON_HEAL_REPORT := preload("res://assets/icons/base_icons_sprites/heart.png")
 
 ## Combat pacing (seconds). Timers are used between hits — tween.finished is unreliable when tweens get killed/replaced.
 const COMBAT_HIT_BEAT := 0.4
@@ -194,10 +195,11 @@ func use_battle_action(action_id: String, from_coords: Vector2i, to_coords: Vect
 		return
 
 	input.begin_action()
-	ui.clear_overlays()
 
 	var events: Array = result.get("events", [])
 	var payload: Dictionary = result.get("payload", {})
+	if not ("legion_healed" in events or "combat_resolved" in events):
+		ui.clear_overlays()
 	var refresh_coords := from_coords
 	var tweens: Array = []
 
@@ -218,7 +220,9 @@ func use_battle_action(action_id: String, from_coords: Vector2i, to_coords: Vect
 		input.end_action()
 		return
 	elif "legion_healed" in events:
-		_notify_legion_ap_changed(payload.get("legion"))
+		await _perform_heal_visuals(from_coords, payload)
+		input.end_action()
+		return
 
 	_finish_action_after_tweens(tweens, func() -> void:
 		ui.refresh_after_action(refresh_coords)
@@ -342,6 +346,9 @@ func _play_combat_visuals(from_coords: Vector2i, to_coords: Vector2i, combat: Di
 			lv.tween_units_to_local_positions()
 	await _combat_beat(COMBAT_REPOSITION_BEAT)
 	_restart_legion_idle_animations(legion_to_visu)
+	for lv in legion_to_visu.values():
+		if lv:
+			lv.sync_all_unit_hp_bars()
 
 	_show_combat_losses(hits, deaths, attacker, defender, attacker_world_pos, defender_world_pos)
 	_hide_combat_hp_fx_later(legion_to_visu)
@@ -410,12 +417,12 @@ func _spawn_losses_popup(world_pos: Vector2, deaths_count: int, hp_lost: int) ->
 		hp_row.add_theme_constant_override("separation", 10)
 		block.add_child(hp_row)
 
-		var heart := TextureRect.new()
-		heart.custom_minimum_size = icon_size
-		heart.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		heart.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		heart.texture = ICON_HP_LOST
-		hp_row.add_child(heart)
+		var damage_icon := TextureRect.new()
+		damage_icon.custom_minimum_size = icon_size
+		damage_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		damage_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		damage_icon.texture = ICON_HP_LOST
+		hp_row.add_child(damage_icon)
 
 		var hp_label := Label.new()
 		hp_label.text = "%d" % hp_lost
@@ -447,6 +454,77 @@ func _spawn_losses_popup(world_pos: Vector2, deaths_count: int, hp_lost: int) ->
 
 	var tween := block.create_tween()
 	# Fast fade-in, long slow ascent, fast fade-out late.
+	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tween.tween_property(block, "modulate:a", 1.0, 0.22)
+	tween.set_trans(Tween.TRANS_LINEAR).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(block, "position", block.position + Vector2(0, -90), 3.0)
+	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	tween.tween_property(block, "modulate:a", 0.0, 0.28)
+	tween.tween_callback(block.queue_free)
+
+func _perform_heal_visuals(coords: Vector2i, payload: Dictionary) -> void:
+	var tile_visu: TileVisu = grid_visu.get(coords)
+	if not tile_visu or not tile_visu.legion_visu:
+		return
+	var legion_visu: LegionVisu = tile_visu.legion_visu
+	var legion: Legion = payload.get("legion")
+	var world_pos: Vector2 = legion_visu.global_position
+
+	var unit_heals: Array = payload.get("unit_heals", [])
+	for entry in unit_heals:
+		var unit: Unit = entry.get("unit")
+		if unit == null:
+			continue
+		legion_visu.animate_unit_healed(
+			unit,
+			float(entry.get("hp_before", 0)),
+			float(entry.get("hp_after", 0)),
+			float(unit.max_health)
+		)
+		await _combat_beat(COMBAT_HIT_BEAT)
+
+	legion_visu.update_local_positions()
+	legion_visu.tween_units_to_local_positions()
+	await _combat_beat(COMBAT_REPOSITION_BEAT)
+	legion_visu.start_idle_animation()
+	legion_visu.sync_all_unit_hp_bars()
+	_notify_legion_ap_changed(legion)
+	ui.deselect()
+	_spawn_heal_popup(world_pos, int(payload.get("healed_total", 0)))
+	await get_tree().create_timer(3.3).timeout
+	legion_visu.hide_all_combat_hp_fx()
+
+func _spawn_heal_popup(world_pos: Vector2, healed_total: int) -> void:
+	if healed_total <= 0 or not combat_fx_layer:
+		return
+	var canvas_xform := get_viewport().get_canvas_transform()
+	var screen_pos := canvas_xform * world_pos
+	var block := VBoxContainer.new()
+	block.add_theme_constant_override("separation", 6)
+	block.position = screen_pos + Vector2(-40, -170)
+	block.modulate = Color(1, 1, 1, 0)
+	combat_fx_layer.add_child(block)
+	var icon_size := Vector2(84, 84)
+	var font_size := 46
+	var outline_size := 10
+	var outline_color := Color(0.0, 0.0, 0.0, 0.95)
+	var heal_row := HBoxContainer.new()
+	heal_row.add_theme_constant_override("separation", 10)
+	block.add_child(heal_row)
+	var heal_icon := TextureRect.new()
+	heal_icon.custom_minimum_size = icon_size
+	heal_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	heal_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	heal_icon.texture = ICON_HEAL_REPORT
+	heal_row.add_child(heal_icon)
+	var heal_label := Label.new()
+	heal_label.text = "+%d" % healed_total
+	heal_label.add_theme_font_size_override("font_size", font_size)
+	heal_label.add_theme_color_override("font_color", Color(0.55, 1.0, 0.65))
+	heal_label.add_theme_constant_override("outline_size", outline_size)
+	heal_label.add_theme_color_override("outline_color", outline_color)
+	heal_row.add_child(heal_label)
+	var tween := block.create_tween()
 	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	tween.tween_property(block, "modulate:a", 1.0, 0.22)
 	tween.set_trans(Tween.TRANS_LINEAR).set_ease(Tween.EASE_IN_OUT)

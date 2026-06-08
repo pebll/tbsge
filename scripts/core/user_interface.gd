@@ -8,11 +8,25 @@ var interaction: BattleInteraction
 func _init(gamemanager_: GameManager) -> void:
 	gamemanager = gamemanager_
 	interaction = BattleInteraction.new()
-	interaction.battle_state_fn = func(): return BattleStateScript.from_game_manager(gamemanager)
-	interaction.tile_visu_fn = func(coords: Vector2i) -> TileVisu: return gamemanager.grid_visu.get(coords)
-	interaction.is_locked_fn = func() -> bool: return gamemanager.input.is_locked()
-	interaction.can_act_fn = func(legion: Legion) -> bool: return gamemanager.can_act_legion(legion)
+	interaction.battle_state_fn = func():
+		if not is_instance_valid(gamemanager):
+			return null
+		return BattleStateScript.from_game_manager(gamemanager)
+	interaction.tile_visu_fn = func(coords: Vector2i) -> TileVisu:
+		if not is_instance_valid(gamemanager):
+			return null
+		return gamemanager.grid_visu.get(coords)
+	interaction.is_locked_fn = func() -> bool:
+		if not is_instance_valid(gamemanager):
+			return true
+		return gamemanager.input.is_locked()
+	interaction.can_act_fn = func(legion: Legion) -> bool:
+		if not is_instance_valid(gamemanager):
+			return false
+		return gamemanager.can_act_legion(legion)
 	interaction.apply_action_fn = func(action_id: String, from_coords: Vector2i, to_coords: Vector2i) -> void:
+		if not is_instance_valid(gamemanager):
+			return
 		gamemanager.use_battle_action(action_id, from_coords, to_coords)
 	interaction.allows_spawn_fn = func(_coords: Vector2i) -> bool: return true
 	interaction.spawn_fn = func(coords: Vector2i) -> void: gamemanager.spawn_unit(coords)
@@ -51,3 +65,6 @@ func cycle_legion_tab() -> void:
 
 func pass_current_legion() -> void:
 	interaction.pass_current_legion()
+
+func unbind() -> void:
+	interaction.unbind_events()

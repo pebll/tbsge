@@ -141,19 +141,29 @@ static func _execute_self_heal(
 	coords: Vector2i
 ) -> Dictionary:
 	var healed := 0
+	var unit_heals: Array = []
 	for unit in legion.units:
 		if unit == null:
 			continue
 		var before := int(unit.current_health)
 		unit.current_health = mini(before + action.heal_amount, int(unit.max_health))
-		if int(unit.current_health) > before:
-			healed += int(unit.current_health) - before
+		var after := int(unit.current_health)
+		if after > before:
+			var gained := after - before
+			healed += gained
+			unit_heals.append({
+				"unit": unit,
+				"hp_before": before,
+				"hp_after": after,
+				"hp_gained": gained,
+			})
 	legion.spend_ap(action.ap_cost)
 	_apply_terminal(state, legion, action, coords)
 	return _ok(["legion_healed"], {
 		"action_id": action.id,
 		"coords": coords,
 		"healed_total": healed,
+		"unit_heals": unit_heals,
 		"legion": legion,
 	})
 

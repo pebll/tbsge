@@ -9,6 +9,8 @@ signal ready_pressed
 @onready var gold_total: Label = %GoldTotal
 @onready var ready_button: GameButton = %ReadyButton
 
+const ICON_COIN := preload("res://assets/icons/base_icons_sprites/coin.png")
+
 const COLOR_BG := Color(0.91, 0.86, 0.78)
 const COLOR_BORDER := Color(0.78, 0.70, 0.58)
 const COLOR_TEXT := Color(0.12, 0.10, 0.08)
@@ -18,7 +20,20 @@ const RADIUS := 16
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_apply_style()
+	_add_gold_icon()
 	ready_button.pressed.connect(func(): ready_pressed.emit())
+
+func _add_gold_icon() -> void:
+	var gold_row: HBoxContainer = gold_value.get_parent() as HBoxContainer
+	if gold_row == null:
+		return
+	var icon := TextureRect.new()
+	icon.texture = ICON_COIN
+	icon.custom_minimum_size = Vector2(40, 40)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	gold_row.add_child(icon)
+	gold_row.move_child(icon, 0)
 
 func _apply_style() -> void:
 	var sb := StyleBoxFlat.new()

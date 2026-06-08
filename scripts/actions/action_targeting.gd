@@ -35,6 +35,8 @@ static func get_targets(
 
 	match action.targeting:
 		ActionDefinitionScript.TargetingKind.SELF:
+			if not _legion_needs_heal(legion):
+				return []
 			return [from_coords]
 		ActionDefinitionScript.TargetingKind.ADJACENT_MOVE:
 			return _move_targets(state, from_tile, legion)
@@ -58,6 +60,12 @@ static func _coords_from_tiles(tiles: Array) -> Array[Vector2i]:
 		if t is Tile:
 			out.append(t.coords)
 	return out
+
+static func _legion_needs_heal(legion: Legion) -> bool:
+	for unit in legion.units:
+		if unit != null and int(unit.current_health) < int(unit.max_health):
+			return true
+	return false
 
 static func is_swap_target(state: BattleStateScript, from_coords: Vector2i, to_coords: Vector2i) -> bool:
 	var to_tile: Tile = state.tile_at(to_coords)

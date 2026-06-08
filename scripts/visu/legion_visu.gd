@@ -37,7 +37,13 @@ func init(p_legion: Legion, formation_seed: int = -1) -> void:
 	_apply_unit_layout()
 	for child in units.get_children():
 		child.start_idle_animation()
+	sync_all_unit_hp_bars()
 	_apply_team_banner()
+
+func sync_all_unit_hp_bars() -> void:
+	for uv in _unit_to_visu.values():
+		if uv:
+			uv.sync_damage_hp_bar()
 
 func _apply_team_banner() -> void:
 	if not banner:
@@ -188,7 +194,17 @@ func animate_unit_hitted(unit: Unit, direction: Vector2, hp_before: float = -1.0
 	uv.update_direction(-direction)
 	if hp_before >= 0.0 and hp_after >= 0.0 and hp_max > 0.0:
 		uv.show_combat_hp_chip(hp_before, hp_after, hp_max)
+	else:
+		uv.sync_damage_hp_bar()
 	return uv.juice_hitted(direction)
+
+func animate_unit_healed(unit: Unit, hp_before: float, hp_after: float, hp_max: float) -> Tween:
+	var uv: UnitVisu = get_unit_visu(unit)
+	if not uv:
+		return null
+	if hp_max > 0.0:
+		uv.show_combat_hp_chip_heal(hp_before, hp_after, hp_max)
+	return uv.juice_heal_jump()
 
 func animate_unit_death(unit: Unit, direction: Vector2) -> Array[Tween]:
 	var tweens: Array[Tween] = []
@@ -226,3 +242,4 @@ func hide_all_combat_hp_fx() -> void:
 	for uv in _unit_to_visu.values():
 		if uv:
 			uv.hide_combat_hp_fx()
+	sync_all_unit_hp_bars()

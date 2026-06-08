@@ -19,6 +19,8 @@ var _hp_bar_now: ProgressBar
 var _hp_fx_tween: Tween
 var _hp_fx_token: int = 0
 var _hp_fx_hide_tween: Tween
+var _damage_hp_root: Control
+var _damage_hp_bar: ProgressBar
 
 const FLASH_SHADER := preload("res://assets/shaders/sprite_white_flash.gdshader")
 const BASE_SPRITE_SCALE := Vector2(0.2, 0.2)
@@ -32,6 +34,8 @@ func init(unit: Unit):
 func _ready() -> void:
 	_setup_flash_shader()
 	_build_hp_fx()
+	_build_persistent_hp_bar()
+	sync_damage_hp_bar()
 
 func _setup_flash_shader() -> void:
 	_flash_mat = ShaderMaterial.new()
@@ -43,10 +47,14 @@ func _get_base_scale() -> Vector2:
 	return BASE_SPRITE_SCALE
 
 func _play_white_flash(duration: float) -> void:
+	_play_color_flash(Color.WHITE, duration)
+
+func _play_color_flash(color: Color, duration: float) -> void:
 	if not _flash_mat:
 		return
 	if _flash_tween and _flash_tween.is_running():
 		_flash_tween.kill()
+	_flash_mat.set_shader_parameter("flash_color", Vector3(color.r, color.g, color.b))
 	_flash_mat.set_shader_parameter("flash_amount", 1.0)
 	_flash_tween = create_tween()
 	_flash_tween.tween_method(_set_flash_amount, 1.0, 0.0, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
@@ -123,9 +131,85 @@ func _build_hp_fx() -> void:
 	now_fill.corner_radius_bottom_right = 5
 	_hp_bar_now.add_theme_stylebox_override("fill", now_fill)
 
+func _apply_damage_chip_bar_style() -> void:
+	var chip_fill := StyleBoxFlat.new()
+	chip_fill.bg_color = Color(1, 1, 1, 0.95)
+	chip_fill.corner_radius_top_left = 5
+	chip_fill.corner_radius_top_right = 5
+	chip_fill.corner_radius_bottom_left = 5
+	chip_fill.corner_radius_bottom_right = 5
+	_hp_bar_chip.add_theme_stylebox_override("fill", chip_fill)
+
+func _apply_heal_chip_bar_style() -> void:
+	var chip_fill := StyleBoxFlat.new()
+	chip_fill.bg_color = Color(0.25, 0.95, 0.38, 1)
+	chip_fill.corner_radius_top_left = 5
+	chip_fill.corner_radius_top_right = 5
+	chip_fill.corner_radius_bottom_left = 5
+	chip_fill.corner_radius_bottom_right = 5
+	_hp_bar_chip.add_theme_stylebox_override("fill", chip_fill)
+
+func _apply_damage_now_bar_style() -> void:
+	var now_fill := StyleBoxFlat.new()
+	now_fill.bg_color = Color(0.65, 0.12, 0.10, 1)
+	now_fill.corner_radius_top_left = 5
+	now_fill.corner_radius_top_right = 5
+	now_fill.corner_radius_bottom_left = 5
+	now_fill.corner_radius_bottom_right = 5
+	_hp_bar_now.add_theme_stylebox_override("fill", now_fill)
+
+func _build_persistent_hp_bar() -> void:
+	_damage_hp_root = Control.new()
+	_damage_hp_root.visible = false
+	_damage_hp_root.z_index = 3400
+	sprite.add_child(_damage_hp_root)
+	_damage_hp_root.position = Vector2(-37, -148)
+	_damage_hp_root.custom_minimum_size = Vector2(74, 10)
+
+	_damage_hp_bar = ProgressBar.new()
+	_damage_hp_bar.custom_minimum_size = Vector2(74, 10)
+	_damage_hp_bar.show_percentage = false
+	_damage_hp_root.add_child(_damage_hp_bar)
+
+	var bg := StyleBoxFlat.new()
+	bg.bg_color = Color(0.1, 0.1, 0.1, 0.9)
+	bg.border_color = Color(0, 0, 0, 1)
+	bg.border_width_left = 1
+	bg.border_width_right = 1
+	bg.border_width_top = 1
+	bg.border_width_bottom = 1
+	bg.corner_radius_top_left = 4
+	bg.corner_radius_top_right = 4
+	bg.corner_radius_bottom_left = 4
+	bg.corner_radius_bottom_right = 4
+	_damage_hp_bar.add_theme_stylebox_override("background", bg)
+
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = Color(0.82, 0.18, 0.14, 1)
+	fill.corner_radius_top_left = 4
+	fill.corner_radius_top_right = 4
+	fill.corner_radius_bottom_left = 4
+	fill.corner_radius_bottom_right = 4
+	_damage_hp_bar.add_theme_stylebox_override("fill", fill)
+
+func sync_damage_hp_bar() -> void:
+	if unit == null or _damage_hp_bar == null or _damage_hp_root == null:
+		return
+	var max_v := maxf(1.0, float(unit.max_health))
+	var current := clampf(float(unit.current_health), 0.0, max_v)
+	if current >= max_v:
+		_damage_hp_root.visible = false
+		return
+	_damage_hp_root.visible = true
+	_damage_hp_bar.min_value = 0.0
+	_damage_hp_bar.max_value = max_v
+	_damage_hp_bar.value = current
+
 func show_combat_hp_chip(hp_before: float, hp_after: float, hp_max: float) -> void:
 	if not _hp_fx_root or not _hp_bar_chip or not _hp_bar_now:
 		return
+	if _damage_hp_root:
+		_damage_hp_root.visible = false
 
 	_hp_fx_token += 1
 	if _hp_fx_tween and _hp_fx_tween.is_running():
@@ -138,6 +222,8 @@ func show_combat_hp_chip(hp_before: float, hp_after: float, hp_max: float) -> vo
 	_hp_bar_chip.max_value = max_v
 	_hp_bar_now.min_value = 0
 	_hp_bar_now.max_value = max_v
+	_apply_damage_now_bar_style()
+	_apply_damage_chip_bar_style()
 
 	_hp_fx_root.visible = true
 	_hp_fx_root.modulate = Color(1, 1, 1, 0)
@@ -154,6 +240,43 @@ func show_combat_hp_chip(hp_before: float, hp_after: float, hp_max: float) -> vo
 	_hp_fx_tween.tween_interval(0.22)
 	_hp_fx_tween.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	_hp_fx_tween.tween_property(_hp_bar_chip, "value", clampf(hp_after, 0.0, max_v), 0.65)
+	_hp_fx_tween.tween_callback(sync_damage_hp_bar)
+
+func show_combat_hp_chip_heal(hp_before: float, hp_after: float, hp_max: float) -> void:
+	if not _hp_fx_root or not _hp_bar_chip or not _hp_bar_now:
+		return
+	if _damage_hp_root:
+		_damage_hp_root.visible = false
+
+	_hp_fx_token += 1
+	if _hp_fx_tween and _hp_fx_tween.is_running():
+		_hp_fx_tween.kill()
+	if _hp_fx_hide_tween and _hp_fx_hide_tween.is_running():
+		_hp_fx_hide_tween.kill()
+
+	var max_v := maxf(1.0, hp_max)
+	_hp_bar_chip.min_value = 0
+	_hp_bar_chip.max_value = max_v
+	_hp_bar_now.min_value = 0
+	_hp_bar_now.max_value = max_v
+	_apply_damage_now_bar_style()
+	_apply_heal_chip_bar_style()
+
+	_hp_fx_root.visible = true
+	_hp_fx_root.modulate = Color(1, 1, 1, 0)
+
+	# Mirror of damage: green chip rises first, red current HP lags behind.
+	_hp_bar_now.value = clampf(hp_before, 0.0, max_v)
+	_hp_bar_chip.value = clampf(hp_before, 0.0, max_v)
+
+	_hp_fx_tween = create_tween()
+	_hp_fx_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_hp_fx_tween.tween_property(_hp_fx_root, "modulate:a", 1.0, 0.12)
+	_hp_fx_tween.tween_property(_hp_bar_chip, "value", clampf(hp_after, 0.0, max_v), 0.12)
+	_hp_fx_tween.tween_interval(0.22)
+	_hp_fx_tween.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_hp_fx_tween.tween_property(_hp_bar_now, "value", clampf(hp_after, 0.0, max_v), 0.65)
+	_hp_fx_tween.tween_callback(sync_damage_hp_bar)
 
 func hide_combat_hp_fx(instant: bool = false) -> void:
 	if not _hp_fx_root:
@@ -166,6 +289,7 @@ func hide_combat_hp_fx(instant: bool = false) -> void:
 	if instant:
 		_hp_fx_root.modulate.a = 0.0
 		_hp_fx_root.visible = false
+		sync_damage_hp_bar()
 		return
 
 	_hp_fx_hide_tween = create_tween()
@@ -174,6 +298,7 @@ func hide_combat_hp_fx(instant: bool = false) -> void:
 	_hp_fx_hide_tween.tween_callback(func ():
 		if _hp_fx_root:
 			_hp_fx_root.visible = false
+		sync_damage_hp_bar()
 	)
 
 func update_direction(direction: Vector2):
@@ -233,6 +358,20 @@ func _stop_motion_tweens() -> void:
 		idle_tween.kill()
 	if move_tween and move_tween.is_running():
 		move_tween.kill()
+
+func juice_heal_jump() -> Tween:
+	_stop_motion_tweens()
+	var start_pos := sprite.position
+	var jump_up := start_pos + Vector2(0, -10)
+	var base_scale := _get_base_scale()
+	var squish_scale := Vector2(base_scale.x * 1.06, base_scale.y * 0.94)
+	active_tween = create_tween()
+	active_tween.tween_property(sprite, "position", jump_up, 0.1).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	active_tween.parallel().tween_property(sprite, "scale", squish_scale, 0.08).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	active_tween.tween_property(sprite, "position", start_pos, 0.15).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	active_tween.parallel().tween_property(sprite, "scale", base_scale, 0.15).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+	active_tween.tween_callback(start_idle_animation)
+	return active_tween
 
 func juice_hitted(_direction: Vector2) -> Tween:
 	_stop_motion_tweens()

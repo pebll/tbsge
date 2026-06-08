@@ -36,7 +36,11 @@ static func sort_actionable_by_enemy_distance(
 	return sorted
 
 static func _decide_internal(session: MinigameSession, legion: Legion) -> Dictionary:
-	if legion == null or not session.can_act_legion(legion):
+	if legion == null:
+		return _cmd_pass(legion, "no legion")
+	if legion.units.is_empty():
+		return _cmd_pass(legion, "empty legion")
+	if not session.can_act_legion(legion):
 		return _cmd_pass(legion, "cannot act")
 
 	var enemies := _enemy_legions(session, legion.team_id)

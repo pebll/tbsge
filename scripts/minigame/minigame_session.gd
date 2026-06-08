@@ -2,6 +2,7 @@ class_name MinigameSession
 extends RefCounted
 
 const TurnManagerRes = preload("res://scripts/core/turn_manager.gd")
+const AttackNearestEnemyBehavior = preload("res://scripts/ai/behaviors/attack_nearest_enemy.gd")
 const ActionResolverScript = preload("res://scripts/actions/action_resolver.gd")
 const ActionTargetingScript = preload("res://scripts/actions/action_targeting.gd")
 const BattleStateScript = preload("res://scripts/actions/battle_state.gd")
@@ -101,7 +102,55 @@ func get_deploy_slots(team_id: String) -> Array[Vector2i]:
 	return slots
 
 func can_act_legion(legion: Legion) -> bool:
-	return legion != null and turn_manager.is_legion_active(legion) and legion.has_ap()
+	return legion != null and _is_legion_on_grid(legion) and turn_manager.is_legion_active(legion) and legion.has_ap()
+
+func get_legion_at(coords: Vector2i) -> Legion:
+	return _legion_at(coords)
+
+func get_actionable_coords() -> Array[Vector2i]:
+	prune_stale_legions()
+	var out: Array[Vector2i] = []
+	for legion in legions:
+		if legion.units.is_empty():
+			continue
+		if legion.team_id != turn_manager.active_team_id:
+			continue
+		if not legion.has_ap():
+			continue
+		if legion.tile_coords in turn_manager.waited_coords:
+			continue
+		if not _is_legion_on_grid(legion):
+			continue
+		out.append(legion.tile_coords)
+	return out
+
+func prune_stale_legions() -> void:
+	for legion in legions.duplicate():
+		if legion.units.is_empty():
+			_remove_legion_from_grid(legion)
+			legions.erase(legion)
+			continue
+		if not _is_legion_on_grid(legion):
+			legions.erase(legion)
+
+func pass_legion_or_force_wait(coords: Vector2i) -> void:
+	var result := apply({"type": "pass_legion", "coords": coords})
+	if result["ok"]:
+		return
+	turn_manager.wait_legion(coords)
+	if AttackNearestEnemyBehavior.debug_enabled:
+		print("[AI] force-wait %s (%s)" % [coords, result.get("error", "?")])
+
+func _is_legion_on_grid(legion: Legion) -> bool:
+	if legion == null:
+		return false
+	var tile: Tile = _tile_at(legion.tile_coords)
+	return tile != null and tile.legion == legion
+
+func _remove_legion_from_grid(legion: Legion) -> void:
+	var tile: Tile = _tile_at(legion.tile_coords)
+	if tile and tile.legion == legion:
+		tile.legion = null
 
 func battle_state() -> BattleStateScript:
 	return BattleStateScript.from_minigame(self)
@@ -351,7 +400,8 @@ func _cleanup_empty_legion(coords: Vector2i) -> void:
 		return
 	if tile.legion.units.size() > 0:
 		return
-	legions.erase(tile.legion)
+	var legion: Legion = tile.legion
+	legions.erase(legion)
 	tile.legion = null
 
 func _next_draft_team(current_team: String) -> String:

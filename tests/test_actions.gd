@@ -12,6 +12,10 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_swap_via_move_action():
 		return false
+	if not _test_stale_legion_not_actionable():
+		return false
+	if not _test_self_heal_unavailable_at_full_hp():
+		return false
 	print("Success: Action system tests")
 	return true
 
@@ -130,5 +134,34 @@ func _test_swap_via_move_action() -> bool:
 		return false
 	if "legions_swapped" not in result.get("events", []):
 		push_error("Expected legions_swapped event")
+		return false
+	return true
+
+func _test_stale_legion_not_actionable() -> bool:
+	var session := _prepare_session()
+	var legions := _start_battle(session)
+	var green: Legion = legions["green"]
+	var coords := green.tile_coords
+	var tile: Tile = session.grid.get(coords)
+	tile.legion = null
+	if coords in session.get_actionable_coords():
+		push_error("Stale legion should not be actionable")
+		return false
+	session.pass_legion_or_force_wait(coords)
+	if coords not in session.turn_manager.waited_coords:
+		push_error("force-wait should mark coords as waited")
+		return false
+	return true
+
+func _test_self_heal_unavailable_at_full_hp() -> bool:
+	var session := _prepare_session()
+	var legions := _start_battle(session)
+	var green: Legion = legions["green"]
+	var heal_def: ActionDefinition = ActionDefs.get_def("self_heal")
+	if ActionTargetingScript.can_use(session.battle_state(), green, heal_def):
+		push_error("Self heal should be unavailable at full HP")
+		return false
+	if not session.get_action_targets(green, "self_heal").is_empty():
+		push_error("Self heal should have no targets at full HP")
 		return false
 	return true

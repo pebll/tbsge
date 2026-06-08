@@ -11,7 +11,8 @@ const COMBAT_DEATH_BEAT := 0.6
 const COMBAT_REPOSITION_BEAT := 0.45
 
 const ICON_DEATHS := preload("res://assets/icons/base_icons_sprites/skull.png")
-const ICON_HP_LOST := preload("res://assets/icons/base_icons_sprites/heart.png")
+const ICON_HP_LOST := preload("res://assets/icons/base_icons_sprites/damage.png")
+const ICON_HEAL_REPORT := preload("res://assets/icons/base_icons_sprites/heart.png")
 const AttackNearestEnemyBehavior = preload("res://scripts/ai/behaviors/attack_nearest_enemy.gd")
 const AiDrafter = preload("res://scripts/ai/ai_drafter.gd")
 
@@ -55,6 +56,10 @@ func _ready() -> void:
 	EventBus.tile_clicked.connect(_on_draft_tile_clicked)
 	EventBus.tile_right_clicked.connect(_on_tile_right_clicked)
 	EventBus.legion_ap_changed.connect(_on_legion_ap_changed)
+
+func _exit_tree() -> void:
+	if battle_ui:
+		battle_ui.unbind()
 
 func _input(event: InputEvent) -> void:
 	if input_locked or _ai_running or _unit_picker.visible:
@@ -412,7 +417,7 @@ func _run_ai_turn_async() -> void:
 	):
 		var actionable := AttackNearestEnemyBehavior.sort_actionable_by_enemy_distance(
 			session,
-			session.turn_manager.get_actionable_coords(session._typed_legions())
+			session.get_actionable_coords()
 		)
 		if actionable.is_empty():
 			if AttackNearestEnemyBehavior.debug_enabled:
@@ -423,7 +428,14 @@ func _run_ai_turn_async() -> void:
 			break
 
 		var coords: Vector2i = actionable[0]
-		var legion: Legion = session.grid.get(coords).legion
+		var legion: Legion = session.get_legion_at(coords)
+		if legion == null:
+			if AttackNearestEnemyBehavior.debug_enabled:
+				print("[AI] stale legion slot @ %s, skipping" % coords)
+			session.pass_legion_or_force_wait(coords)
+			await get_tree().create_timer(AI_LEGION_DELAY).timeout
+			continue
+
 		var cmd: Dictionary = AttackNearestEnemyBehavior.decide(session, legion)
 		match String(cmd.get("type", "")):
 			"use_action":
@@ -436,9 +448,9 @@ func _run_ai_turn_async() -> void:
 				if not ok:
 					if AttackNearestEnemyBehavior.debug_enabled:
 						print("[AI] action failed for %s @ %s, passing legion" % [legion.team_id, coords])
-					session.apply({"type": "pass_legion", "coords": coords})
+					session.pass_legion_or_force_wait(coords)
 			_:
-				session.apply({"type": "pass_legion", "coords": coords})
+				session.pass_legion_or_force_wait(coords)
 
 		await get_tree().create_timer(AI_LEGION_DELAY).timeout
 		if session.phase == MinigameSession.Phase.ENDED:
@@ -494,10 +506,11 @@ func _perform_use_action(
 
 	if not _ai_running:
 		input_locked = true
-	battle_ui.clear_overlays()
 
 	var events: Array = result.get("events", [])
 	var payload: Dictionary = result.get("payload", {})
+	if not ("legion_healed" in events or "combat_resolved" in events):
+		battle_ui.clear_overlays()
 
 	if "legion_moved" in events:
 		var legion: Legion = payload.get("legion")
@@ -524,9 +537,11 @@ func _perform_use_action(
 		_check_match_end()
 		return attacked
 	elif "legion_healed" in events:
-		var healed_legion: Legion = payload.get("legion")
-		if healed_legion:
-			EventBus.legion_ap_changed.emit(healed_legion)
+		await _perform_heal_visuals(from_coords, payload)
+		if not _ai_running:
+			input_locked = false
+		_check_match_end()
+		return true
 
 	var refresh_coords := from_coords
 	if "legion_moved" in events or "legions_swapped" in events:
@@ -645,6 +660,9 @@ func _play_combat_visuals(
 			lv.tween_units_to_local_positions()
 	await get_tree().create_timer(COMBAT_REPOSITION_BEAT).timeout
 	_restart_legion_idle_animations(legion_to_visu)
+	for lv in legion_to_visu.values():
+		if lv:
+			lv.sync_all_unit_hp_bars()
 	if attacker:
 		EventBus.legion_ap_changed.emit(attacker)
 
@@ -659,6 +677,40 @@ func _hide_combat_hp_fx_later(from_coords: Vector2i, to_coords: Vector2i) -> voi
 		var tile_visu: TileVisu = presenter.tile_visu_at(coords)
 		if tile_visu and tile_visu.legion_visu:
 			tile_visu.legion_visu.hide_all_combat_hp_fx()
+
+func _perform_heal_visuals(coords: Vector2i, payload: Dictionary) -> void:
+	var tile_visu: TileVisu = presenter.tile_visu_at(coords)
+	if not tile_visu or not tile_visu.legion_visu:
+		return
+	var legion_visu: LegionVisu = tile_visu.legion_visu
+	var legion: Legion = payload.get("legion")
+	var world_pos: Vector2 = legion_visu.global_position
+
+	var unit_heals: Array = payload.get("unit_heals", [])
+	for entry in unit_heals:
+		var unit: Unit = entry.get("unit")
+		if unit == null:
+			continue
+		legion_visu.animate_unit_healed(
+			unit,
+			float(entry.get("hp_before", 0)),
+			float(entry.get("hp_after", 0)),
+			float(unit.max_health)
+		)
+		await get_tree().create_timer(COMBAT_HIT_BEAT).timeout
+
+	legion_visu.update_local_positions()
+	legion_visu.tween_units_to_local_positions()
+	await get_tree().create_timer(COMBAT_REPOSITION_BEAT).timeout
+	legion_visu.start_idle_animation()
+	legion_visu.sync_all_unit_hp_bars()
+	if legion:
+		EventBus.legion_ap_changed.emit(legion)
+	if not _ai_running:
+		battle_ui.deselect()
+	_spawn_heal_popup(world_pos, int(payload.get("healed_total", 0)))
+	await get_tree().create_timer(3.3).timeout
+	legion_visu.hide_all_combat_hp_fx()
 
 func _show_combat_losses(
 	hits: Array,
@@ -712,12 +764,12 @@ func _spawn_losses_popup(world_pos: Vector2, deaths_count: int, hp_lost: int) ->
 		var hp_row := HBoxContainer.new()
 		hp_row.add_theme_constant_override("separation", 10)
 		block.add_child(hp_row)
-		var heart := TextureRect.new()
-		heart.custom_minimum_size = icon_size
-		heart.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		heart.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		heart.texture = ICON_HP_LOST
-		hp_row.add_child(heart)
+		var damage_icon := TextureRect.new()
+		damage_icon.custom_minimum_size = icon_size
+		damage_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		damage_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		damage_icon.texture = ICON_HP_LOST
+		hp_row.add_child(damage_icon)
 		var hp_label := Label.new()
 		hp_label.text = "%d" % hp_lost
 		hp_label.add_theme_font_size_override("font_size", font_size)
@@ -742,6 +794,45 @@ func _spawn_losses_popup(world_pos: Vector2, deaths_count: int, hp_lost: int) ->
 		deaths_label.add_theme_constant_override("outline_size", outline_size)
 		deaths_label.add_theme_color_override("outline_color", outline_color)
 		deaths_row.add_child(deaths_label)
+	var tween := block.create_tween()
+	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tween.tween_property(block, "modulate:a", 1.0, 0.22)
+	tween.set_trans(Tween.TRANS_LINEAR).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(block, "position", block.position + Vector2(0, -90), 3.0)
+	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	tween.tween_property(block, "modulate:a", 0.0, 0.28)
+	tween.tween_callback(block.queue_free)
+
+func _spawn_heal_popup(world_pos: Vector2, healed_total: int) -> void:
+	if healed_total <= 0 or not _combat_fx_layer:
+		return
+	var canvas_xform := get_viewport().get_canvas_transform()
+	var screen_pos := canvas_xform * world_pos
+	var block := VBoxContainer.new()
+	block.add_theme_constant_override("separation", 6)
+	block.position = screen_pos + Vector2(-40, -170)
+	block.modulate = Color(1, 1, 1, 0)
+	_combat_fx_layer.add_child(block)
+	var icon_size := Vector2(84, 84)
+	var font_size := 46
+	var outline_size := 10
+	var outline_color := Color(0.0, 0.0, 0.0, 0.95)
+	var heal_row := HBoxContainer.new()
+	heal_row.add_theme_constant_override("separation", 10)
+	block.add_child(heal_row)
+	var heal_icon := TextureRect.new()
+	heal_icon.custom_minimum_size = icon_size
+	heal_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	heal_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	heal_icon.texture = ICON_HEAL_REPORT
+	heal_row.add_child(heal_icon)
+	var heal_label := Label.new()
+	heal_label.text = "+%d" % healed_total
+	heal_label.add_theme_font_size_override("font_size", font_size)
+	heal_label.add_theme_color_override("font_color", Color(0.55, 1.0, 0.65))
+	heal_label.add_theme_constant_override("outline_size", outline_size)
+	heal_label.add_theme_color_override("outline_color", outline_color)
+	heal_row.add_child(heal_label)
 	var tween := block.create_tween()
 	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	tween.tween_property(block, "modulate:a", 1.0, 0.22)

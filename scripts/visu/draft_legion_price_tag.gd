@@ -1,7 +1,7 @@
 class_name DraftLegionPriceTag
 extends Node2D
 
-const ICON_COIN_STANDIN := preload("res://assets/icons/base_icons_sprites/hat.png")
+const ICON_COIN := preload("res://assets/icons/base_icons_sprites/coin.png")
 
 func _ready() -> void:
 	z_index = 1100
@@ -10,7 +10,7 @@ func set_cost(cost: int) -> void:
 	for child in get_children():
 		child.queue_free()
 	var icon := Sprite2D.new()
-	icon.texture = ICON_COIN_STANDIN
+	icon.texture = ICON_COIN
 	icon.scale = Vector2(0.09, 0.09)
 	icon.position = Vector2(-28, 0)
 	add_child(icon)
