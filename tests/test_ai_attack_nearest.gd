@@ -77,8 +77,8 @@ func _test_attacks_adjacent_enemy() -> bool:
 	_teleport_legion(session, blue, Vector2i(1, -1))
 
 	var cmd: Dictionary = AttackNearestEnemyBehavior.decide(session, green)
-	if cmd.get("type") != "attack":
-		push_error("Expected attack command, got %s" % cmd)
+	if cmd.get("type") != "use_action" or cmd.get("action_id") != "melee_attack":
+		push_error("Expected melee_attack command, got %s" % cmd)
 		return false
 	if cmd.get("from") != green.tile_coords or cmd.get("to") != blue.tile_coords:
 		push_error("Attack should target adjacent enemy")
@@ -94,7 +94,7 @@ func _test_moves_toward_nearest_enemy() -> bool:
 	_teleport_legion(session, blue, Vector2i(2, -2))
 
 	var cmd: Dictionary = AttackNearestEnemyBehavior.decide(session, green)
-	if cmd.get("type") != "move":
+	if cmd.get("type") != "use_action" or cmd.get("action_id") != "move":
 		push_error("Expected move toward enemy, got %s" % cmd)
 		return false
 	if cmd.get("from") != green.tile_coords:
@@ -157,7 +157,7 @@ func _test_ai_draft_and_battle_turn() -> bool:
 		return false
 
 	var cmd: Dictionary = AttackNearestEnemyBehavior.decide(session, blue_legion)
-	if cmd.get("type") not in ["move", "attack", "pass"]:
+	if cmd.get("type") not in ["use_action", "pass"]:
 		push_error("AI should return a battle command")
 		return false
 	return true

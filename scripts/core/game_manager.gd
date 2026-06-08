@@ -3,6 +3,8 @@ extends Node2D
 
 const CombatResolver = preload("res://scripts/core/combat_resolver.gd")
 const TurnManagerRes = preload("res://scripts/core/turn_manager.gd")
+const ActionResolverScript = preload("res://scripts/actions/action_resolver.gd")
+const BattleStateScript = preload("res://scripts/actions/battle_state.gd")
 
 @export var map_radius: int = 3
 var tile_size: float = 135.3
@@ -107,6 +109,10 @@ func _setup_tile_info_ui() -> void:
 	tile_info_layer.add_child(tile_info_panel)
 	tile_info_panel.hide()
 
+	var action_bar = preload("res://scenes/ui/battle_action_bar.tscn").instantiate()
+	tile_info_layer.add_child(action_bar)
+	ui.attach_action_bar(action_bar)
+
 func _setup_combat_fx_ui() -> void:
 	combat_fx_layer = CanvasLayer.new()
 	combat_fx_layer.name = "CombatFX"
@@ -152,88 +158,96 @@ func clear_inspect() -> void:
 	if tile_info_panel:
 		tile_info_panel.hide()
 
-func move_unit(from_coords: Vector2i, to_coords: Vector2i):
-	var from_tile = grid_model.get(from_coords)
-	var to_tile = grid_model.get(to_coords)
-	var from_visu = grid_visu.get(from_coords)
-	var to_visu = grid_visu.get(to_coords)
-	if not from_tile or not to_tile or not from_visu or not to_visu:
+func move_unit(from_coords: Vector2i, to_coords: Vector2i) -> void:
+	var result := apply_battle_action("move", from_coords, to_coords)
+	if not result.get("ok", false):
 		return
-	if not from_tile.legion:
-		return
-	if to_tile.has_legion():
-		return
+	if "legion_moved" in result.get("events", []):
+		var legion: Legion = result.get("payload", {}).get("legion")
+		var tween := _animate_resolved_move(from_coords, to_coords)
+		if legion:
+			_notify_legion_ap_changed(legion)
+		if tween:
+			_finish_action_after_tweens([tween], func() -> void: pass)
 
-	var legion: Legion = from_tile.legion
-	if not can_act_legion(legion) or not legion.can_afford(1):
-		return
-	if input.is_locked():
-		return
-
-	var legion_visu: LegionVisu = from_visu.legion_visu
-	if not legion_visu:
-		return
-
-	input.begin_action()
-
-	from_tile.legion = null
-	from_visu.legion_visu = null
-	to_tile.legion = legion
-	to_visu.legion_visu = legion_visu
-	legion.tile_coords = to_coords
-	legion.spend_ap(1)
-
-	var move_tween: Tween = legion_visu.juice_move(to_visu.position)
-	_notify_legion_ap_changed(legion)
-	_finish_action_after_tweens([move_tween], func() -> void:
-		ui.refresh_after_action(to_coords)
-		input.end_action()
-	)
+func attack_unit(from_coords: Vector2i, to_coords: Vector2i) -> void:
+	use_battle_action("melee_attack", from_coords, to_coords)
 
 func swap_legions(from_coords: Vector2i, to_coords: Vector2i) -> void:
-	var from_tile: Tile = grid_model.get(from_coords)
-	var to_tile: Tile = grid_model.get(to_coords)
-	var from_visu: TileVisu = grid_visu.get(from_coords)
-	var to_visu: TileVisu = grid_visu.get(to_coords)
-	if not from_tile or not to_tile or not from_visu or not to_visu:
-		return
-	if not from_tile.legion or not to_tile.legion:
-		return
-	if from_tile.legion.team_id != to_tile.legion.team_id:
-		return
+	use_battle_action("move", from_coords, to_coords)
 
-	var legion_a: Legion = from_tile.legion
-	var legion_b: Legion = to_tile.legion
-	if not can_act_legion(legion_a) or not legion_a.can_afford(1) or not legion_b.can_afford(1):
-		return
+func apply_battle_action(action_id: String, from_coords: Vector2i, to_coords: Vector2i) -> Dictionary:
+	var cmd := {
+		"action_id": action_id,
+		"from": from_coords,
+		"to": to_coords,
+	}
+	if action_id == "melee_attack":
+		cmd["rng_seed"] = randi()
+	return ActionResolverScript.resolve(BattleStateScript.from_game_manager(self), cmd)
+
+func use_battle_action(action_id: String, from_coords: Vector2i, to_coords: Vector2i) -> void:
 	if input.is_locked():
 		return
-
-	var visu_a: LegionVisu = from_visu.legion_visu
-	var visu_b: LegionVisu = to_visu.legion_visu
-	if not visu_a or not visu_b:
+	var result: Dictionary = apply_battle_action(action_id, from_coords, to_coords)
+	if not result.get("ok", false):
 		return
 
 	input.begin_action()
+	ui.clear_overlays()
 
-	from_tile.legion = legion_b
-	from_visu.legion_visu = visu_b
-	to_tile.legion = legion_a
-	to_visu.legion_visu = visu_a
+	var events: Array = result.get("events", [])
+	var payload: Dictionary = result.get("payload", {})
+	var refresh_coords := from_coords
+	var tweens: Array = []
 
-	legion_a.tile_coords = to_coords
-	legion_b.tile_coords = from_coords
+	if "legion_moved" in events:
+		tweens.append(_animate_resolved_move(from_coords, to_coords))
+		refresh_coords = to_coords
+		_notify_legion_ap_changed(payload.get("legion"))
+	elif "legions_swapped" in events:
+		tweens.append_array(_animate_resolved_swap(from_coords, to_coords))
+		refresh_coords = to_coords
+		var legion_a: Legion = grid_model.get(to_coords).legion
+		var legion_b: Legion = grid_model.get(from_coords).legion
+		_notify_legion_ap_changed(legion_a)
+		_notify_legion_ap_changed(legion_b)
+	elif "combat_resolved" in events:
+		await _play_combat_visuals(from_coords, to_coords, payload.get("combat", {}))
+		ui.deselect()
+		input.end_action()
+		return
+	elif "legion_healed" in events:
+		_notify_legion_ap_changed(payload.get("legion"))
 
-	var tween_a: Tween = visu_a.juice_move(to_visu.position)
-	var tween_b: Tween = visu_b.juice_move(from_visu.position)
-	legion_a.spend_ap(1)
-	legion_b.spend_ap(1)
-	_notify_legion_ap_changed(legion_a)
-	_notify_legion_ap_changed(legion_b)
-	_finish_action_after_tweens([tween_a, tween_b], func() -> void:
-		ui.refresh_after_action(to_coords)
+	_finish_action_after_tweens(tweens, func() -> void:
+		ui.refresh_after_action(refresh_coords)
 		input.end_action()
 	)
+
+func _animate_resolved_move(from_coords: Vector2i, to_coords: Vector2i) -> Tween:
+	var from_visu: TileVisu = grid_visu.get(from_coords)
+	var to_visu: TileVisu = grid_visu.get(to_coords)
+	if not from_visu or not to_visu or not from_visu.legion_visu:
+		return null
+	var legion_visu: LegionVisu = from_visu.legion_visu
+	from_visu.legion_visu = null
+	to_visu.legion_visu = legion_visu
+	return legion_visu.juice_move(to_visu.position)
+
+func _animate_resolved_swap(from_coords: Vector2i, to_coords: Vector2i) -> Array:
+	var from_visu: TileVisu = grid_visu.get(from_coords)
+	var to_visu: TileVisu = grid_visu.get(to_coords)
+	if not from_visu or not to_visu or not from_visu.legion_visu or not to_visu.legion_visu:
+		return []
+	var visu_a: LegionVisu = from_visu.legion_visu
+	var visu_b: LegionVisu = to_visu.legion_visu
+	from_visu.legion_visu = visu_b
+	to_visu.legion_visu = visu_a
+	return [
+		visu_a.juice_move(to_visu.position),
+		visu_b.juice_move(from_visu.position),
+	]
 
 func _finish_action_after_tweens(tweens: Array, on_done: Callable) -> void:
 	for tween in tweens:
@@ -250,38 +264,19 @@ func _restart_legion_idle_animations(legion_to_visu: Dictionary) -> void:
 		if lv and is_instance_valid(lv):
 			lv.start_idle_animation()
 
-func attack_unit(from_coords: Vector2i, to_coords: Vector2i) -> void:
-	_play_combat(from_coords, to_coords)
-
-func _play_combat(from_coords: Vector2i, to_coords: Vector2i) -> void:
-	var from_tile = grid_model.get(from_coords)
-	var to_tile = grid_model.get(to_coords)
+func _play_combat_visuals(from_coords: Vector2i, to_coords: Vector2i, combat: Dictionary) -> void:
 	var from_visu = grid_visu.get(from_coords)
 	var to_visu = grid_visu.get(to_coords)
-	if not from_tile or not to_tile or not from_visu or not to_visu:
-		return
-	if not from_visu.legion_visu or not to_visu.legion_visu:
+	if not from_visu or not to_visu or not from_visu.legion_visu or not to_visu.legion_visu:
 		return
 
-	# Logic-only combat: update healths and remove dead units/legions.
-	var attacker: Legion = from_tile.legion
-	var defender: Legion = to_tile.legion
+	var attacker: Legion = from_visu.legion_visu.legion
+	var defender: Legion = to_visu.legion_visu.legion
 	if not attacker or not defender:
 		return
-	if attacker.team_id == defender.team_id:
-		return
-	if not can_act_legion(attacker) or not attacker.has_ap():
-		return
-	if input.is_locked():
-		return
 
-	input.begin_action()
-	attacker.spend_all_ap()
-	_notify_legion_ap_changed(attacker)
-
-	var result: Dictionary = CombatResolver.resolve_combat(attacker, defender, randi())
-	var hits: Array = result.get("hits", [])
-	var deaths: Array = result.get("deaths", [])
+	var hits: Array = combat.get("hits", [])
+	var deaths: Array = combat.get("deaths", [])
 
 	# Snapshot initial positions in case a legion dies and gets removed.
 	var attacker_world_pos: Vector2 = from_visu.legion_visu.global_position
@@ -353,9 +348,6 @@ func _play_combat(from_coords: Vector2i, to_coords: Vector2i) -> void:
 
 	_cleanup_dead_legion(from_coords)
 	_cleanup_dead_legion(to_coords)
-
-	ui.deselect()
-	input.end_action()
 
 func _hide_combat_hp_fx_later(legion_to_visu: Dictionary) -> void:
 	# Keep bars visible a bit after the fight, similar to the losses popup linger.

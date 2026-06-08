@@ -13,3 +13,5 @@ extends Resource
 @export var price: int = 5
 
 @export var icon: Texture2D
+## Empty = legion uses default move / melee_attack / self_heal.
+@export var action_ids: Array[String] = []

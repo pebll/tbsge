@@ -25,6 +25,7 @@ EventBus="*uid://wps2obuyjcpy"
 AudioManager="*uid://cxvbv8c8txafc"
 UnitDefs="*res://scripts/core/unit_defs.gd"
 TeamDefs="*res://scripts/core/team_defs.gd"
+ActionDefs="*res://scripts/actions/action_defs.gd"
 
 [editor]
 

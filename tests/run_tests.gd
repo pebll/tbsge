@@ -19,6 +19,7 @@ func _initialize() -> void:
 		"res://tests/test_minigame_draft.gd",
 		"res://tests/test_hex_pathfinder.gd",
 		"res://tests/test_ai_attack_nearest.gd",
+		"res://tests/test_actions.gd",
 		"res://tests/test_minigame_battle.gd",
 	]
 

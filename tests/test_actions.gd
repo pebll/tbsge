@@ -1,0 +1,134 @@
+extends RefCounted
+
+const MinigameSession = preload("res://scripts/minigame/minigame_session.gd")
+const MinigameConfig = preload("res://scripts/minigame/minigame_config.gd")
+const ActionResolverScript = preload("res://scripts/actions/action_resolver.gd")
+const ActionTargetingScript = preload("res://scripts/actions/action_targeting.gd")
+
+func run(_tree: SceneTree) -> bool:
+	if not _test_self_heal_costs_two_ap_and_ends_turn():
+		return false
+	if not _test_move_then_heal_impossible():
+		return false
+	if not _test_swap_via_move_action():
+		return false
+	print("Success: Action system tests")
+	return true
+
+func _load_config() -> MinigameConfig:
+	return load("res://data/minigame/duel_r3.tres") as MinigameConfig
+
+func _prepare_session() -> MinigameSession:
+	var session := MinigameSession.new(_load_config())
+	for tile in session.grid.values():
+		tile.terrain_type = "GRASS"
+		tile.walkable = true
+	session.refresh_deploy_slots()
+	return session
+
+func _start_battle(session: MinigameSession) -> Dictionary:
+	var green_slots: Array = session.get_deploy_slots("GREEN")
+	var blue_slots: Array = session.get_deploy_slots("BLUE")
+	session.apply({
+		"type": "draft_set_legion",
+		"team": "GREEN",
+		"coords": green_slots[0],
+		"unit_type": "ARCHER",
+		"unit_count": 2,
+	})
+	session.apply({"type": "draft_ready", "team": "GREEN"})
+	session.apply({
+		"type": "draft_set_legion",
+		"team": "BLUE",
+		"coords": blue_slots[0],
+		"unit_type": "AXEMAN",
+		"unit_count": 2,
+	})
+	session.apply({"type": "draft_ready", "team": "BLUE"})
+	var green_legion: Legion = null
+	var blue_legion: Legion = null
+	for legion in session.legions:
+		if legion.team_id == "GREEN":
+			green_legion = legion
+		else:
+			blue_legion = legion
+	return {"green": green_legion, "blue": blue_legion}
+
+func _test_self_heal_costs_two_ap_and_ends_turn() -> bool:
+	var session := _prepare_session()
+	var legions := _start_battle(session)
+	var green: Legion = legions["green"]
+	for u in green.units:
+		u.current_health = max(1, u.max_health - 4)
+
+	var result := session.apply({
+		"type": "use_action",
+		"action_id": "self_heal",
+		"from": green.tile_coords,
+		"to": green.tile_coords,
+	})
+	if not result["ok"]:
+		push_error("Self heal failed: %s" % result.get("error"))
+		return false
+	if green.current_ap != 0:
+		push_error("Heal should spend all AP (terminal)")
+		return false
+	if green.tile_coords not in session.turn_manager.waited_coords:
+		push_error("Heal should end legion turn")
+		return false
+	return true
+
+func _test_move_then_heal_impossible() -> bool:
+	var session := _prepare_session()
+	var legions := _start_battle(session)
+	var green: Legion = legions["green"]
+	var move_targets := session.get_action_targets(green, "move")
+	if move_targets.is_empty():
+		push_error("Expected a move target")
+		return false
+	var move := session.apply({
+		"type": "use_action",
+		"action_id": "move",
+		"from": green.tile_coords,
+		"to": move_targets[0],
+	})
+	if not move["ok"]:
+		push_error("Move failed")
+		return false
+	if green.current_ap != 1:
+		push_error("Move should leave 1 AP")
+		return false
+	var heal_def: ActionDefinition = ActionDefs.get_def("self_heal")
+	if ActionTargetingScript.can_use(session.battle_state(), green, heal_def):
+		push_error("Should not be able to heal after move with only 1 AP left")
+		return false
+	return true
+
+func _test_swap_via_move_action() -> bool:
+	var session := _prepare_session()
+	var legions := _start_battle(session)
+	var green_a: Legion = legions["green"]
+	var green_slots: Array = session.get_deploy_slots("GREEN")
+	if green_slots.size() < 2:
+		return true
+	var swap_coords: Vector2i = green_slots[1]
+	var swap_tile: Tile = session.grid.get(swap_coords)
+	if swap_tile == null or swap_tile.has_legion():
+		return true
+	var green_b := Legion.new("ARCHER", 2, swap_coords, "GREEN")
+	swap_tile.legion = green_b
+	session.legions.append(green_b)
+
+	var result := session.apply({
+		"type": "use_action",
+		"action_id": "move",
+		"from": green_a.tile_coords,
+		"to": swap_coords,
+	})
+	if not result["ok"]:
+		push_error("Swap via move failed: %s" % result.get("error"))
+		return false
+	if "legions_swapped" not in result.get("events", []):
+		push_error("Expected legions_swapped event")
+		return false
+	return true

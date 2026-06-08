@@ -33,23 +33,29 @@ func run(tree: SceneTree) -> bool:
 		return false
 	print("Success: Unit spawned")
 
+	var legion_before: Legion = from_tile.legion
+	var legion_visu_before: LegionVisu = from_visu.legion_visu
+
 	var to_coords := Vector2i(0, 0)
 	var found_to := false
-	for k in gm.grid_model.keys():
-		if k == from_coords:
-			continue
-		var t: Tile = gm.grid_model[k]
+	var movable := ActionTargeting.get_targets(
+		BattleState.from_game_manager(gm),
+		legion_before,
+		ActionDefs.get_def("move")
+	)
+	if movable.is_empty():
+		push_error("No legal move targets for spawned legion")
+		return false
+	for coords in movable:
+		var t: Tile = gm.grid_model.get(coords)
 		if t and t.walkable and not t.has_legion():
-			to_coords = k
+			to_coords = coords
 			found_to = true
 			break
 	if not found_to:
 		push_error("No walkable empty tile found for to_coords")
 		return false
 	print("Success: Found destination tile")
-
-	var legion_before: Legion = from_tile.legion
-	var legion_visu_before: LegionVisu = from_visu.legion_visu
 
 	gm.move_unit(from_coords, to_coords)
 

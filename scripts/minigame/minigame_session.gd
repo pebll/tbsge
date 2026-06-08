@@ -1,8 +1,11 @@
 class_name MinigameSession
 extends RefCounted
 
-const CombatResolver = preload("res://scripts/core/combat_resolver.gd")
 const TurnManagerRes = preload("res://scripts/core/turn_manager.gd")
+const ActionResolverScript = preload("res://scripts/actions/action_resolver.gd")
+const ActionTargetingScript = preload("res://scripts/actions/action_targeting.gd")
+const BattleStateScript = preload("res://scripts/actions/battle_state.gd")
+const ActionDefinitionScript = preload("res://scripts/actions/action_definition.gd")
 const MapBuilderScript = preload("res://scripts/minigame/map_builder.gd")
 const MinigameRulesScript = preload("res://scripts/minigame/minigame_rules.gd")
 const DraftStateScript = preload("res://scripts/minigame/draft_state.gd")
@@ -100,14 +103,38 @@ func get_deploy_slots(team_id: String) -> Array[Vector2i]:
 func can_act_legion(legion: Legion) -> bool:
 	return legion != null and turn_manager.is_legion_active(legion) and legion.has_ap()
 
+func battle_state() -> BattleStateScript:
+	return BattleStateScript.from_minigame(self)
+
+func get_available_actions(legion: Legion) -> Array[ActionDefinitionScript]:
+	return ActionTargetingScript.available_actions(battle_state(), legion)
+
+func get_action_targets(legion: Legion, action_id: String) -> Array[Vector2i]:
+	var action: ActionDefinitionScript = ActionDefs.get_def(action_id)
+	if action == null:
+		return []
+	return ActionTargetingScript.get_targets(battle_state(), legion, action)
+
 func get_movable_coords(from_coords: Vector2i) -> Array[Vector2i]:
-	return _coords_from_tiles(Utils.get_movable_tiles(_tile_at(from_coords), grid))
+	return get_action_targets(_legion_at(from_coords), "move")
 
 func get_attackable_coords(from_coords: Vector2i) -> Array[Vector2i]:
-	return _coords_from_tiles(Utils.get_attackable_tiles(_tile_at(from_coords), grid))
+	return get_action_targets(_legion_at(from_coords), "melee_attack")
 
 func get_swappable_coords(from_coords: Vector2i) -> Array[Vector2i]:
-	return _coords_from_tiles(Utils.get_swappable_tiles(_tile_at(from_coords), grid))
+	var legion := _legion_at(from_coords)
+	if legion == null:
+		return []
+	var move_targets := get_action_targets(legion, "move")
+	var out: Array[Vector2i] = []
+	for coords in move_targets:
+		if ActionTargetingScript.is_swap_target(battle_state(), from_coords, coords):
+			out.append(coords)
+	return out
+
+func _legion_at(coords: Vector2i) -> Legion:
+	var tile: Tile = _tile_at(coords)
+	return tile.legion if tile and tile.has_legion() else null
 
 func _apply_draft(cmd_type: String, cmd: Dictionary) -> Dictionary:
 	match cmd_type:
@@ -122,12 +149,27 @@ func _apply_draft(cmd_type: String, cmd: Dictionary) -> Dictionary:
 
 func _apply_battle(cmd_type: String, cmd: Dictionary) -> Dictionary:
 	match cmd_type:
+		"use_action":
+			return _battle_use_action(cmd)
 		"move":
-			return _battle_move(cmd)
+			return _battle_use_action({
+				"action_id": "move",
+				"from": cmd.get("from", Vector2i.ZERO),
+				"to": cmd.get("to", Vector2i.ZERO),
+			})
 		"swap":
-			return _battle_swap(cmd)
+			return _battle_use_action({
+				"action_id": "move",
+				"from": cmd.get("from", Vector2i.ZERO),
+				"to": cmd.get("to", Vector2i.ZERO),
+			})
 		"attack":
-			return _battle_attack(cmd)
+			return _battle_use_action({
+				"action_id": "melee_attack",
+				"from": cmd.get("from", Vector2i.ZERO),
+				"to": cmd.get("to", Vector2i.ZERO),
+				"rng_seed": cmd.get("rng_seed", _rng.randi()),
+			})
 		"end_turn":
 			return _battle_end_turn()
 		"pass_legion":
@@ -228,87 +270,29 @@ func _begin_battle() -> void:
 	if not config.team_ids.is_empty():
 		turn_manager.start_match(config.team_ids[0])
 
-func _battle_move(cmd: Dictionary) -> Dictionary:
-	var from_coords: Vector2i = cmd.get("from", Vector2i.ZERO)
-	var to_coords: Vector2i = cmd.get("to", Vector2i.ZERO)
-	var from_tile: Tile = _tile_at(from_coords)
-	var to_tile: Tile = _tile_at(to_coords)
-	if from_tile == null or to_tile == null:
-		return _fail("Invalid tile")
-	if not from_tile.has_legion() or to_tile.has_legion():
-		return _fail("Invalid move")
-	var legion: Legion = from_tile.legion
-	if not can_act_legion(legion) or not legion.can_afford(1):
-		return _fail("Legion cannot move")
-	if to_coords not in get_movable_coords(from_coords):
-		return _fail("Target not reachable")
+func _battle_use_action(cmd: Dictionary) -> Dictionary:
+	var result: Dictionary = ActionResolverScript.resolve(battle_state(), cmd)
+	if not result.get("ok", false):
+		return _fail(String(result.get("error", "Action failed")))
 
-	from_tile.legion = null
-	to_tile.legion = legion
-	legion.tile_coords = to_coords
-	legion.spend_ap(1)
-	var events: Array = ["legion_moved"]
+	var payload: Dictionary = result.get("payload", {})
+	var cleanup_coords: Array[Vector2i] = []
+	if payload.has("from"):
+		cleanup_coords.append(payload["from"])
+	if payload.has("to"):
+		var to_c: Vector2i = payload["to"]
+		if to_c not in cleanup_coords:
+			cleanup_coords.append(to_c)
+	if payload.has("coords"):
+		var self_c: Vector2i = payload["coords"]
+		if self_c not in cleanup_coords:
+			cleanup_coords.append(self_c)
+	for coords in cleanup_coords:
+		_cleanup_empty_legion(coords)
+
+	var events: Array = result.get("events", []).duplicate()
 	events.append_array(_check_victory_events())
-	return _ok(events, {"from": from_coords, "to": to_coords, "legion": legion})
-
-func _battle_swap(cmd: Dictionary) -> Dictionary:
-	var from_coords: Vector2i = cmd.get("from", Vector2i.ZERO)
-	var to_coords: Vector2i = cmd.get("to", Vector2i.ZERO)
-	var from_tile: Tile = _tile_at(from_coords)
-	var to_tile: Tile = _tile_at(to_coords)
-	if from_tile == null or to_tile == null:
-		return _fail("Invalid tile")
-	if not from_tile.has_legion() or not to_tile.has_legion():
-		return _fail("Invalid swap")
-	var legion_a: Legion = from_tile.legion
-	var legion_b: Legion = to_tile.legion
-	if legion_a.team_id != legion_b.team_id:
-		return _fail("Cannot swap enemy legions")
-	if not can_act_legion(legion_a) or not legion_a.can_afford(1):
-		return _fail("Legion cannot swap")
-	if not legion_b.can_afford(1):
-		return _fail("Partner legion cannot swap")
-	if to_coords not in get_swappable_coords(from_coords):
-		return _fail("Target not swappable")
-
-	from_tile.legion = legion_b
-	to_tile.legion = legion_a
-	legion_a.tile_coords = to_coords
-	legion_b.tile_coords = from_coords
-	legion_a.spend_ap(1)
-	legion_b.spend_ap(1)
-	return _ok(["legions_swapped"], {"from": from_coords, "to": to_coords})
-
-func _battle_attack(cmd: Dictionary) -> Dictionary:
-	var from_coords: Vector2i = cmd.get("from", Vector2i.ZERO)
-	var to_coords: Vector2i = cmd.get("to", Vector2i.ZERO)
-	var from_tile: Tile = _tile_at(from_coords)
-	var to_tile: Tile = _tile_at(to_coords)
-	if from_tile == null or to_tile == null:
-		return _fail("Invalid tile")
-	if not from_tile.has_legion() or not to_tile.has_legion():
-		return _fail("Invalid attack")
-	var attacker: Legion = from_tile.legion
-	var defender: Legion = to_tile.legion
-	if attacker.team_id == defender.team_id:
-		return _fail("Cannot attack ally")
-	if not can_act_legion(attacker) or not attacker.has_ap():
-		return _fail("Legion cannot attack")
-	if to_coords not in get_attackable_coords(from_coords):
-		return _fail("Target not attackable")
-
-	var rng_seed: int = int(cmd.get("rng_seed", _rng.randi()))
-	attacker.spend_all_ap()
-	var result: Dictionary = CombatResolver.resolve_combat(attacker, defender, rng_seed)
-	_cleanup_empty_legion(from_coords)
-	_cleanup_empty_legion(to_coords)
-	var events: Array = ["combat_resolved"]
-	events.append_array(_check_victory_events())
-	return _ok(events, {
-		"from": from_coords,
-		"to": to_coords,
-		"combat": result,
-	})
+	return _ok(events, payload)
 
 func _battle_end_turn() -> Dictionary:
 	if phase != Phase.BATTLE:

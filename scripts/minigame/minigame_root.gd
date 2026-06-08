@@ -92,6 +92,10 @@ func _setup_ui() -> void:
 	_turn_hud.hide()
 	_turn_hud.next_turn_pressed.connect(_on_end_turn)
 
+	var action_bar = preload("res://scenes/ui/battle_action_bar.tscn").instantiate()
+	_ui_layer.add_child(action_bar)
+	battle_ui.attach_action_bar(action_bar)
+
 	_tile_info_panel = preload("res://scenes/ui/tile_info_panel.tscn").instantiate()
 	_ui_layer.add_child(_tile_info_panel)
 	_tile_info_panel.hide()
@@ -406,8 +410,13 @@ func _run_ai_turn_async() -> void:
 		session.phase == MinigameSession.Phase.BATTLE
 		and _is_ai_team(session.turn_manager.active_team_id)
 	):
-		var actionable := session.turn_manager.get_actionable_coords(session._typed_legions())
+		var actionable := AttackNearestEnemyBehavior.sort_actionable_by_enemy_distance(
+			session,
+			session.turn_manager.get_actionable_coords(session._typed_legions())
+		)
 		if actionable.is_empty():
+			if AttackNearestEnemyBehavior.debug_enabled:
+				print("[AI] %s ending turn (no actionable legions)" % session.turn_manager.active_team_id)
 			var end_result := session.apply({"type": "end_turn"})
 			if end_result["ok"]:
 				_turn_hud.show_active_team(session.turn_manager.active_team_id)
@@ -417,10 +426,17 @@ func _run_ai_turn_async() -> void:
 		var legion: Legion = session.grid.get(coords).legion
 		var cmd: Dictionary = AttackNearestEnemyBehavior.decide(session, legion)
 		match String(cmd.get("type", "")):
-			"move":
-				await _perform_move(cmd.get("from", coords), cmd.get("to", coords))
-			"attack":
-				await _perform_attack(cmd.get("from", coords), cmd.get("to", coords))
+			"use_action":
+				var ok := await _perform_use_action(
+					String(cmd.get("action_id", "")),
+					cmd.get("from", coords),
+					cmd.get("to", coords),
+					int(cmd.get("rng_seed", randi()))
+				)
+				if not ok:
+					if AttackNearestEnemyBehavior.debug_enabled:
+						print("[AI] action failed for %s @ %s, passing legion" % [legion.team_id, coords])
+					session.apply({"type": "pass_legion", "coords": coords})
 			_:
 				session.apply({"type": "pass_legion", "coords": coords})
 
@@ -443,75 +459,103 @@ func _on_end_turn() -> void:
 		_turn_hud.show_active_team(session.turn_manager.active_team_id)
 		_maybe_start_ai_turn()
 
-func request_move(from_coords: Vector2i, to_coords: Vector2i) -> void:
+func request_use_action(action_id: String, from_coords: Vector2i, to_coords: Vector2i) -> void:
 	if input_locked or _ai_running:
 		return
-	await _perform_move(from_coords, to_coords)
+	await _perform_use_action(action_id, from_coords, to_coords, randi())
 
-func _perform_move(from_coords: Vector2i, to_coords: Vector2i) -> void:
-	var legion: Legion = session.grid.get(from_coords).legion
-	var result := session.apply({"type": "move", "from": from_coords, "to": to_coords})
+func _perform_use_action(
+	action_id: String,
+	from_coords: Vector2i,
+	to_coords: Vector2i,
+	rng_seed: int = 0
+) -> bool:
+	var cmd := {
+		"type": "use_action",
+		"action_id": action_id,
+		"from": from_coords,
+		"to": to_coords,
+	}
+	if action_id == "melee_attack":
+		cmd["rng_seed"] = rng_seed
+
+	var from_tile: Tile = session.grid.get(from_coords)
+	if from_tile == null or not from_tile.has_legion():
+		return false
+
+	var result := session.apply(cmd)
 	if not result["ok"]:
-		return
+		if AttackNearestEnemyBehavior.debug_enabled:
+			print(
+				"[AI] action rejected: %s %s -> %s (%s)"
+				% [action_id, from_coords, to_coords, result.get("error", "?")]
+			)
+		return false
+
 	if not _ai_running:
 		input_locked = true
 	battle_ui.clear_overlays()
-	presenter.rewire_legion_tile(legion, from_coords, to_coords)
-	var tween := presenter.tween_legion_move(legion, to_coords)
-	if tween:
-		await tween.finished
-	EventBus.legion_ap_changed.emit(legion)
+
+	var events: Array = result.get("events", [])
+	var payload: Dictionary = result.get("payload", {})
+
+	if "legion_moved" in events:
+		var legion: Legion = payload.get("legion")
+		presenter.rewire_legion_tile(legion, from_coords, to_coords)
+		var tween := presenter.tween_legion_move(legion, to_coords)
+		if tween:
+			await tween.finished
+		EventBus.legion_ap_changed.emit(legion)
+	elif "legions_swapped" in events:
+		var legion_a: Legion = session.grid.get(to_coords).legion
+		var legion_b: Legion = session.grid.get(from_coords).legion
+		presenter.rewire_legion_tile(legion_a, from_coords, to_coords)
+		presenter.rewire_legion_tile(legion_b, to_coords, from_coords)
+		var tweens := presenter.tween_legion_swap(legion_a, legion_b, to_coords, from_coords)
+		for t in tweens:
+			if t:
+				await t.finished
+		EventBus.legion_ap_changed.emit(legion_a)
+		EventBus.legion_ap_changed.emit(legion_b)
+	elif "combat_resolved" in events:
+		var attacked := await _perform_attack_visuals(from_coords, to_coords, payload.get("combat", {}))
+		if not _ai_running:
+			input_locked = false
+		_check_match_end()
+		return attacked
+	elif "legion_healed" in events:
+		var healed_legion: Legion = payload.get("legion")
+		if healed_legion:
+			EventBus.legion_ap_changed.emit(healed_legion)
+
+	var refresh_coords := from_coords
+	if "legion_moved" in events or "legions_swapped" in events:
+		refresh_coords = to_coords
+
 	presenter.remove_dead_legions(session)
-	battle_ui.refresh_after_action(to_coords)
 	if not _ai_running:
+		battle_ui.refresh_after_action(refresh_coords)
 		input_locked = false
 	_check_match_end()
+	return true
 
-func request_swap(from_coords: Vector2i, to_coords: Vector2i) -> void:
-	if input_locked:
-		return
-	var legion_a: Legion = session.grid.get(from_coords).legion
-	var legion_b: Legion = session.grid.get(to_coords).legion
-	var result := session.apply({"type": "swap", "from": from_coords, "to": to_coords})
-	if not result["ok"]:
-		return
-	input_locked = true
-	battle_ui.clear_overlays()
-	presenter.rewire_legion_tile(legion_a, from_coords, to_coords)
-	presenter.rewire_legion_tile(legion_b, to_coords, from_coords)
-	var tweens := presenter.tween_legion_swap(legion_a, legion_b, to_coords, from_coords)
-	for t in tweens:
-		if t:
-			await t.finished
-	EventBus.legion_ap_changed.emit(legion_a)
-	EventBus.legion_ap_changed.emit(legion_b)
-	battle_ui.refresh_after_action(to_coords)
-	input_locked = false
-
-func request_attack(from_coords: Vector2i, to_coords: Vector2i) -> void:
-	if input_locked or _ai_running:
-		return
-	await _perform_attack(from_coords, to_coords)
-
-func _perform_attack(from_coords: Vector2i, to_coords: Vector2i) -> void:
+func _perform_attack_visuals(
+	from_coords: Vector2i,
+	to_coords: Vector2i,
+	combat: Dictionary
+) -> bool:
 	var from_visu: TileVisu = presenter.tile_visu_at(from_coords)
 	var to_visu: TileVisu = presenter.tile_visu_at(to_coords)
 	if not from_visu or not to_visu or not from_visu.legion_visu or not to_visu.legion_visu:
-		return
+		return false
 
 	var attacker: Legion = from_visu.legion_visu.legion
 	var defender: Legion = to_visu.legion_visu.legion
 	var attacker_world_pos: Vector2 = from_visu.legion_visu.global_position
 	var defender_world_pos: Vector2 = to_visu.legion_visu.global_position
 
-	var result := session.apply({"type": "attack", "from": from_coords, "to": to_coords})
-	if not result["ok"]:
-		return
-	if not _ai_running:
-		input_locked = true
 	battle_ui.deselect()
 
-	var combat: Dictionary = result["payload"].get("combat", {})
 	var hits: Array = combat.get("hits", [])
 	var deaths: Array = combat.get("deaths", [])
 
@@ -521,9 +565,7 @@ func _perform_attack(from_coords: Vector2i, to_coords: Vector2i) -> void:
 	presenter.cleanup_dead_legion_at(from_coords, session)
 	presenter.cleanup_dead_legion_at(to_coords, session)
 	presenter.remove_dead_legions(session)
-	if not _ai_running:
-		input_locked = false
-	_check_match_end()
+	return true
 
 func _play_combat_visuals(
 	hits: Array,
