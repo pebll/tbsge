@@ -1,7 +1,7 @@
 extends RefCounted
 
-const MinigameSession = preload("res://scripts/minigame/minigame_session.gd")
-const MinigameConfig = preload("res://scripts/minigame/minigame_config.gd")
+const MinigameSessionScript = preload("res://scripts/minigame/minigame_session.gd")
+const MinigameTestHelpersScript = preload("res://tests/minigame_test_helpers.gd")
 
 func run(_tree: SceneTree) -> bool:
 	if not _test_move_and_turns():
@@ -13,52 +13,23 @@ func run(_tree: SceneTree) -> bool:
 	print("Success: Minigame battle tests")
 	return true
 
-func _load_config():
-	return load("res://data/minigame/duel_r3.tres") as MinigameConfig
-
-func _prepare_session() -> MinigameSession:
-	var session := MinigameSession.new(_load_config())
-	for tile in session.grid.values():
-		tile.terrain_type = "GRASS"
-		tile.walkable = true
-	session.refresh_deploy_slots()
-	return session
-
-func _start_battle(session: MinigameSession) -> void:
-	var green_slots: Array = session.get_deploy_slots("GREEN")
-	var blue_slots: Array = session.get_deploy_slots("BLUE")
-	session.apply({
-		"type": "draft_set_legion",
-		"team": "GREEN",
-		"coords": green_slots[0],
-		"unit_type": "GOBLIN",
-		"unit_count": 2,
-	})
-	session.apply({"type": "draft_ready", "team": "GREEN"})
-	session.apply({
-		"type": "draft_set_legion",
-		"team": "BLUE",
-		"coords": blue_slots[0],
-		"unit_type": "RAT_SPEAR",
-		"unit_count": 2,
-	})
-	session.apply({"type": "draft_ready", "team": "BLUE"})
-
 func _test_move_and_turns() -> bool:
-	var session := _prepare_session()
-	_start_battle(session)
-	if session.turn_manager.active_team_id != "GREEN":
-		push_error("GREEN should move first")
+	var session := MinigameTestHelpersScript.prepare_session()
+	MinigameTestHelpersScript.start_two_legion_battle(session)
+	var team_a_id: String = MinigameTestHelpersScript.team_a(session)
+	var team_b_id: String = MinigameTestHelpersScript.team_b(session)
+	if session.turn_manager.active_team_id != team_a_id:
+		push_error("%s should move first" % team_a_id)
 		return false
 
-	var green_legion: Legion = session.legions[0]
-	var from_coords := green_legion.tile_coords
+	var legion_a: Legion = session.legions[0]
+	var from_coords := legion_a.tile_coords
 	var movable := session.get_movable_coords(from_coords)
 	if movable.is_empty():
 		push_error("Expected at least one movable tile")
 		return false
 
-	var move := session.apply({
+	var move: Dictionary = session.apply({
 		"type": "move",
 		"from": from_coords,
 		"to": movable[0],
@@ -67,89 +38,33 @@ func _test_move_and_turns() -> bool:
 		push_error("Move failed: %s" % move["error"])
 		return false
 
-	var end_turn := session.apply({"type": "end_turn"})
+	var end_turn: Dictionary = session.apply({"type": "end_turn"})
 	if not end_turn["ok"]:
 		push_error("End turn failed")
 		return false
-	if session.turn_manager.active_team_id != "BLUE":
-		push_error("Expected BLUE turn after end_turn")
+	if session.turn_manager.active_team_id != team_b_id:
+		push_error("Expected %s turn after end_turn" % team_b_id)
 		return false
 	return true
 
 func _test_surrender() -> bool:
-	var session := _prepare_session()
-	_start_battle(session)
-	var result := session.apply({"type": "surrender", "team": "GREEN"})
+	var session := MinigameTestHelpersScript.prepare_session()
+	MinigameTestHelpersScript.start_two_legion_battle(session)
+	var team_a_id: String = MinigameTestHelpersScript.team_a(session)
+	var team_b_id: String = MinigameTestHelpersScript.team_b(session)
+	var result: Dictionary = session.apply({"type": "surrender", "team": team_a_id})
 	if not result["ok"]:
 		push_error("Surrender failed")
 		return false
-	if session.winner != "BLUE":
-		push_error("Expected BLUE to win by surrender")
+	if session.winner != team_b_id:
+		push_error("Expected %s to win by surrender" % team_b_id)
 		return false
-	if session.phase != MinigameSession.Phase.ENDED:
+	if session.phase != MinigameSessionScript.Phase.ENDED:
 		push_error("Expected ENDED phase")
 		return false
 	return true
 
-func _test_victory_by_elimination() -> bool:
-	var session := _prepare_session()
-	var green_slots: Array = session.get_deploy_slots("GREEN")
-	var blue_slots: Array = session.get_deploy_slots("BLUE")
-	session.apply({
-		"type": "draft_set_legion",
-		"team": "GREEN",
-		"coords": green_slots[0],
-		"unit_type": "DEMON",
-		"unit_count": 1,
-	})
-	session.apply({"type": "draft_ready", "team": "GREEN"})
-	session.apply({
-		"type": "draft_set_legion",
-		"team": "BLUE",
-		"coords": blue_slots[0],
-		"unit_type": "GOBLIN",
-		"unit_count": 1,
-	})
-	session.apply({"type": "draft_ready", "team": "BLUE"})
-
-	var green_legion: Legion = null
-	var blue_legion: Legion = null
-	for legion in session.legions:
-		if legion.team_id == "GREEN":
-			green_legion = legion
-		else:
-			blue_legion = legion
-	if green_legion == null or blue_legion == null:
-		push_error("Missing legions")
-		return false
-
-	_move_legion_to(session, green_legion, Vector2i(0, -1))
-	_move_legion_to(session, blue_legion, Vector2i(1, -1))
-
-	for u in green_legion.units:
-		u.attack = 100
-	for u in blue_legion.units:
-		u.max_health = 1
-		u.current_health = 1
-
-	var attack := session.apply({
-		"type": "attack",
-		"from": green_legion.tile_coords,
-		"to": blue_legion.tile_coords,
-		"rng_seed": 99,
-	})
-	if not attack["ok"]:
-		push_error("Attack failed: %s" % attack["error"])
-		return false
-	if session.phase != MinigameSession.Phase.ENDED:
-		push_error("Expected match to end after elimination")
-		return false
-	if session.winner != "GREEN":
-		push_error("Expected GREEN to win")
-		return false
-	return true
-
-func _move_legion_to(session: MinigameSession, legion: Legion, coords: Vector2i) -> void:
+func _teleport_legion(session, legion: Legion, coords: Vector2i) -> void:
 	var old_tile: Tile = session.grid.get(legion.tile_coords)
 	if old_tile:
 		old_tile.legion = null
@@ -157,3 +72,61 @@ func _move_legion_to(session: MinigameSession, legion: Legion, coords: Vector2i)
 	var new_tile: Tile = session.grid.get(coords)
 	if new_tile:
 		new_tile.legion = legion
+
+func _test_victory_by_elimination() -> bool:
+	var session := MinigameTestHelpersScript.prepare_session()
+	var team_a_id: String = MinigameTestHelpersScript.team_a(session)
+	var team_b_id: String = MinigameTestHelpersScript.team_b(session)
+	var slots_a: Array = session.get_deploy_slots(team_a_id)
+	var slots_b: Array = session.get_deploy_slots(team_b_id)
+	session.apply({
+		"type": "draft_set_legion",
+		"team": team_a_id,
+		"coords": slots_a[0],
+		"unit_type": "DEMON",
+		"unit_count": 1,
+	})
+	session.apply({"type": "draft_ready", "team": team_a_id})
+	session.apply({
+		"type": "draft_set_legion",
+		"team": team_b_id,
+		"coords": slots_b[0],
+		"unit_type": "GOBLIN",
+		"unit_count": 1,
+	})
+	session.apply({"type": "draft_ready", "team": team_b_id})
+
+	var demon: Legion = null
+	var goblin: Legion = null
+	for legion in session.legions:
+		if legion.team_id == team_a_id:
+			demon = legion
+		elif legion.team_id == team_b_id:
+			goblin = legion
+	if demon == null or goblin == null:
+		push_error("Expected demon and goblin legions")
+		return false
+
+	var demon_coords := Vector2i(0, -1)
+	var goblin_coords := Vector2i(1, -1)
+	_teleport_legion(session, demon, demon_coords)
+	_teleport_legion(session, goblin, goblin_coords)
+
+	var target: Vector2i = goblin_coords
+
+	var attack: Dictionary = session.apply({
+		"type": "attack",
+		"from": demon_coords,
+		"to": target,
+		"rng_seed": 42,
+	})
+	if not attack["ok"]:
+		push_error("Attack failed: %s" % attack["error"])
+		return false
+	if session.phase != MinigameSessionScript.Phase.ENDED:
+		push_error("Expected match to end after elimination")
+		return false
+	if session.winner != team_a_id:
+		push_error("Expected %s to win by elimination" % team_a_id)
+		return false
+	return true

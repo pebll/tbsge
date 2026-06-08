@@ -1,8 +1,6 @@
 extends RefCounted
 
-const MinigameSession = preload("res://scripts/minigame/minigame_session.gd")
-const MinigameConfig = preload("res://scripts/minigame/minigame_config.gd")
-const ActionResolverScript = preload("res://scripts/actions/action_resolver.gd")
+const MinigameTestHelpersScript = preload("res://tests/minigame_test_helpers.gd")
 const ActionTargetingScript = preload("res://scripts/actions/action_targeting.gd")
 
 func run(_tree: SceneTree) -> bool:
@@ -19,49 +17,10 @@ func run(_tree: SceneTree) -> bool:
 	print("Success: Action system tests")
 	return true
 
-func _load_config() -> MinigameConfig:
-	return load("res://data/minigame/duel_r3.tres") as MinigameConfig
-
-func _prepare_session() -> MinigameSession:
-	var session := MinigameSession.new(_load_config())
-	for tile in session.grid.values():
-		tile.terrain_type = "GRASS"
-		tile.walkable = true
-	session.refresh_deploy_slots()
-	return session
-
-func _start_battle(session: MinigameSession) -> Dictionary:
-	var green_slots: Array = session.get_deploy_slots("GREEN")
-	var blue_slots: Array = session.get_deploy_slots("BLUE")
-	session.apply({
-		"type": "draft_set_legion",
-		"team": "GREEN",
-		"coords": green_slots[0],
-		"unit_type": "GOBLIN",
-		"unit_count": 2,
-	})
-	session.apply({"type": "draft_ready", "team": "GREEN"})
-	session.apply({
-		"type": "draft_set_legion",
-		"team": "BLUE",
-		"coords": blue_slots[0],
-		"unit_type": "RAT_SPEAR",
-		"unit_count": 2,
-	})
-	session.apply({"type": "draft_ready", "team": "BLUE"})
-	var green_legion: Legion = null
-	var blue_legion: Legion = null
-	for legion in session.legions:
-		if legion.team_id == "GREEN":
-			green_legion = legion
-		else:
-			blue_legion = legion
-	return {"green": green_legion, "blue": blue_legion}
-
 func _test_self_heal_costs_two_ap_and_ends_turn() -> bool:
-	var session := _prepare_session()
-	var legions := _start_battle(session)
-	var green: Legion = legions["green"]
+	var session := MinigameTestHelpersScript.prepare_session()
+	var legions: Dictionary = MinigameTestHelpersScript.start_two_legion_battle(session)
+	var green: Legion = legions["a"]
 	for u in green.units:
 		u.current_health = max(1, u.max_health - 4)
 
@@ -83,9 +42,9 @@ func _test_self_heal_costs_two_ap_and_ends_turn() -> bool:
 	return true
 
 func _test_move_then_heal_impossible() -> bool:
-	var session := _prepare_session()
-	var legions := _start_battle(session)
-	var green: Legion = legions["green"]
+	var session := MinigameTestHelpersScript.prepare_session()
+	var legions: Dictionary = MinigameTestHelpersScript.start_two_legion_battle(session)
+	var green: Legion = legions["a"]
 	var move_targets := session.get_action_targets(green, "move")
 	if move_targets.is_empty():
 		push_error("Expected a move target")
@@ -109,17 +68,18 @@ func _test_move_then_heal_impossible() -> bool:
 	return true
 
 func _test_swap_via_move_action() -> bool:
-	var session := _prepare_session()
-	var legions := _start_battle(session)
-	var green_a: Legion = legions["green"]
-	var green_slots: Array = session.get_deploy_slots("GREEN")
+	var session := MinigameTestHelpersScript.prepare_session()
+	var legions: Dictionary = MinigameTestHelpersScript.start_two_legion_battle(session)
+	var team_a_id: String = MinigameTestHelpersScript.team_a(session)
+	var green_a: Legion = legions["a"]
+	var green_slots: Array = session.get_deploy_slots(team_a_id)
 	if green_slots.size() < 2:
 		return true
 	var swap_coords: Vector2i = green_slots[1]
 	var swap_tile: Tile = session.grid.get(swap_coords)
 	if swap_tile == null or swap_tile.has_legion():
 		return true
-	var green_b := Legion.new("GOBLIN", 2, swap_coords, "GREEN")
+	var green_b := Legion.new("GOBLIN", 2, swap_coords, team_a_id)
 	swap_tile.legion = green_b
 	session.legions.append(green_b)
 
@@ -138,9 +98,9 @@ func _test_swap_via_move_action() -> bool:
 	return true
 
 func _test_stale_legion_not_actionable() -> bool:
-	var session := _prepare_session()
-	var legions := _start_battle(session)
-	var green: Legion = legions["green"]
+	var session := MinigameTestHelpersScript.prepare_session()
+	var legions: Dictionary = MinigameTestHelpersScript.start_two_legion_battle(session)
+	var green: Legion = legions["a"]
 	var coords := green.tile_coords
 	var tile: Tile = session.grid.get(coords)
 	tile.legion = null
@@ -154,9 +114,9 @@ func _test_stale_legion_not_actionable() -> bool:
 	return true
 
 func _test_self_heal_unavailable_at_full_hp() -> bool:
-	var session := _prepare_session()
-	var legions := _start_battle(session)
-	var green: Legion = legions["green"]
+	var session := MinigameTestHelpersScript.prepare_session()
+	var legions: Dictionary = MinigameTestHelpersScript.start_two_legion_battle(session)
+	var green: Legion = legions["a"]
 	var heal_def: ActionDefinition = ActionDefs.get_def("self_heal")
 	if ActionTargetingScript.can_use(session.battle_state(), green, heal_def):
 		push_error("Self heal should be unavailable at full HP")

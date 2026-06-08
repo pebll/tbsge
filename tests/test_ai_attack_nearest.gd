@@ -1,7 +1,7 @@
 extends RefCounted
 
-const MinigameSession = preload("res://scripts/minigame/minigame_session.gd")
-const MinigameConfig = preload("res://scripts/minigame/minigame_config.gd")
+const MinigameSessionScript = preload("res://scripts/minigame/minigame_session.gd")
+const MinigameTestHelpersScript = preload("res://tests/minigame_test_helpers.gd")
 const AttackNearestEnemyBehavior = preload("res://scripts/ai/behaviors/attack_nearest_enemy.gd")
 
 func run(_tree: SceneTree) -> bool:
@@ -16,50 +16,41 @@ func run(_tree: SceneTree) -> bool:
 	print("Success: AI attack-nearest tests")
 	return true
 
-func _load_config() -> MinigameConfig:
-	return load("res://data/minigame/duel_r3.tres") as MinigameConfig
-
-func _prepare_session() -> MinigameSession:
-	var session := MinigameSession.new(_load_config())
-	for tile in session.grid.values():
-		tile.terrain_type = "GRASS"
-		tile.walkable = true
-	session.refresh_deploy_slots()
-	return session
-
 func _start_battle_with_legions(
-	session: MinigameSession,
-	green_coords: Vector2i,
-	blue_coords: Vector2i
+	session,
+	team_a_coords: Vector2i,
+	team_b_coords: Vector2i
 ) -> Dictionary:
-	var green_slots: Array = session.get_deploy_slots("GREEN")
-	var blue_slots: Array = session.get_deploy_slots("BLUE")
+	var team_a_id: String = MinigameTestHelpersScript.team_a(session)
+	var team_b_id: String = MinigameTestHelpersScript.team_b(session)
+	var slots_a: Array = session.get_deploy_slots(team_a_id)
+	var slots_b: Array = session.get_deploy_slots(team_b_id)
 	session.apply({
 		"type": "draft_set_legion",
-		"team": "GREEN",
-		"coords": green_coords if green_coords != Vector2i.ZERO else green_slots[0],
+		"team": team_a_id,
+		"coords": team_a_coords if team_a_coords != Vector2i.ZERO else slots_a[0],
 		"unit_type": "GOBLIN",
 		"unit_count": 2,
 	})
-	session.apply({"type": "draft_ready", "team": "GREEN"})
+	session.apply({"type": "draft_ready", "team": team_a_id})
 	session.apply({
 		"type": "draft_set_legion",
-		"team": "BLUE",
-		"coords": blue_coords if blue_coords != Vector2i.ZERO else blue_slots[0],
+		"team": team_b_id,
+		"coords": team_b_coords if team_b_coords != Vector2i.ZERO else slots_b[0],
 		"unit_type": "RAT_SPEAR",
 		"unit_count": 2,
 	})
-	session.apply({"type": "draft_ready", "team": "BLUE"})
-	var green_legion: Legion = null
-	var blue_legion: Legion = null
+	session.apply({"type": "draft_ready", "team": team_b_id})
+	var legion_a: Legion = null
+	var legion_b: Legion = null
 	for legion in session.legions:
-		if legion.team_id == "GREEN":
-			green_legion = legion
+		if legion.team_id == team_a_id:
+			legion_a = legion
 		else:
-			blue_legion = legion
-	return {"green": green_legion, "blue": blue_legion}
+			legion_b = legion
+	return {"a": legion_a, "b": legion_b}
 
-func _teleport_legion(session: MinigameSession, legion: Legion, coords: Vector2i) -> void:
+func _teleport_legion(session, legion: Legion, coords: Vector2i) -> void:
 	var old_tile: Tile = session.grid.get(legion.tile_coords)
 	if old_tile:
 		old_tile.legion = null
@@ -69,10 +60,10 @@ func _teleport_legion(session: MinigameSession, legion: Legion, coords: Vector2i
 		new_tile.legion = legion
 
 func _test_attacks_adjacent_enemy() -> bool:
-	var session := _prepare_session()
-	var legions := _start_battle_with_legions(session, Vector2i.ZERO, Vector2i.ZERO)
-	var green: Legion = legions["green"]
-	var blue: Legion = legions["blue"]
+	var session := MinigameTestHelpersScript.prepare_session()
+	var legions: Dictionary = _start_battle_with_legions(session, Vector2i.ZERO, Vector2i.ZERO)
+	var green: Legion = legions["a"]
+	var blue: Legion = legions["b"]
 	_teleport_legion(session, green, Vector2i(0, -1))
 	_teleport_legion(session, blue, Vector2i(1, -1))
 
@@ -86,10 +77,10 @@ func _test_attacks_adjacent_enemy() -> bool:
 	return true
 
 func _test_moves_toward_nearest_enemy() -> bool:
-	var session := _prepare_session()
-	var legions := _start_battle_with_legions(session, Vector2i.ZERO, Vector2i.ZERO)
-	var green: Legion = legions["green"]
-	var blue: Legion = legions["blue"]
+	var session := MinigameTestHelpersScript.prepare_session()
+	var legions: Dictionary = _start_battle_with_legions(session, Vector2i.ZERO, Vector2i.ZERO)
+	var green: Legion = legions["a"]
+	var blue: Legion = legions["b"]
 	_teleport_legion(session, green, Vector2i(0, -2))
 	_teleport_legion(session, blue, Vector2i(2, -2))
 
@@ -107,9 +98,9 @@ func _test_moves_toward_nearest_enemy() -> bool:
 	return true
 
 func _test_passes_when_no_action() -> bool:
-	var session := _prepare_session()
-	var legions := _start_battle_with_legions(session, Vector2i.ZERO, Vector2i.ZERO)
-	var green: Legion = legions["green"]
+	var session := MinigameTestHelpersScript.prepare_session()
+	var legions: Dictionary = _start_battle_with_legions(session, Vector2i.ZERO, Vector2i.ZERO)
+	var green: Legion = legions["a"]
 	green.spend_all_ap()
 	var cmd: Dictionary = AttackNearestEnemyBehavior.decide(session, green)
 	if cmd.get("type") != "pass":
@@ -118,38 +109,40 @@ func _test_passes_when_no_action() -> bool:
 	return true
 
 func _test_ai_draft_and_battle_turn() -> bool:
-	var session := _prepare_session()
-	var green_slots: Array = session.get_deploy_slots("GREEN")
+	var session := MinigameTestHelpersScript.prepare_session()
+	var team_a_id: String = MinigameTestHelpersScript.team_a(session)
+	var team_b_id: String = MinigameTestHelpersScript.team_b(session)
+	var slots_a: Array = session.get_deploy_slots(team_a_id)
 	session.apply({
 		"type": "draft_set_legion",
-		"team": "GREEN",
-		"coords": green_slots[0],
+		"team": team_a_id,
+		"coords": slots_a[0],
 		"unit_type": "GOBLIN",
 		"unit_count": 1,
 	})
-	session.apply({"type": "draft_ready", "team": "GREEN"})
+	session.apply({"type": "draft_ready", "team": team_a_id})
 
 	var AiDrafter = preload("res://scripts/ai/ai_drafter.gd")
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 42
-	var draft_cmds: Array = AiDrafter.build_draft_commands(session, "BLUE", rng)
+	var draft_cmds: Array = AiDrafter.build_draft_commands(session, team_b_id, rng)
 	for cmd in draft_cmds:
-		var result := session.apply(cmd)
+		var result: Dictionary = session.apply(cmd)
 		if not result["ok"]:
 			push_error("AI draft command failed: %s" % result["error"])
 			return false
-	if session.phase != MinigameSession.Phase.BATTLE:
+	if session.phase != MinigameSessionScript.Phase.BATTLE:
 		push_error("Expected battle after AI draft")
 		return false
 
 	session.apply({"type": "end_turn"})
-	if session.turn_manager.active_team_id != "BLUE":
-		push_error("Expected BLUE turn")
+	if session.turn_manager.active_team_id != team_b_id:
+		push_error("Expected %s turn" % team_b_id)
 		return false
 
 	var blue_legion: Legion = null
 	for legion in session.legions:
-		if legion.team_id == "BLUE":
+		if legion.team_id == team_b_id:
 			blue_legion = legion
 			break
 	if blue_legion == null:

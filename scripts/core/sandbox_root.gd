@@ -1,4 +1,4 @@
-class_name GameManager
+class_name SandboxRoot
 extends Node2D
 
 const SandboxConfigScript = preload("res://scripts/match/sandbox_config.gd")

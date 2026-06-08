@@ -1,7 +1,7 @@
 extends RefCounted
 
-const MinigameSession = preload("res://scripts/minigame/minigame_session.gd")
-const MinigameConfig = preload("res://scripts/minigame/minigame_config.gd")
+const MinigameSessionScript = preload("res://scripts/minigame/minigame_session.gd")
+const MinigameTestHelpersScript = preload("res://tests/minigame_test_helpers.gd")
 const DraftState = preload("res://scripts/minigame/draft_state.gd")
 const MinigameRulesScript = preload("res://scripts/minigame/minigame_rules.gd")
 
@@ -17,28 +17,18 @@ func run(_tree: SceneTree) -> bool:
 	print("Success: Minigame draft tests")
 	return true
 
-func _load_config():
-	return load("res://data/minigame/duel_r3.tres") as MinigameConfig
-
-func _prepare_session() -> MinigameSession:
-	var session := MinigameSession.new(_load_config())
-	for tile in session.grid.values():
-		tile.terrain_type = "GRASS"
-		tile.walkable = true
-	session.refresh_deploy_slots()
-	return session
-
 func _test_budget_and_validation() -> bool:
-	var session := _prepare_session()
-	var slots: Array = session.get_deploy_slots("GREEN")
+	var session := MinigameTestHelpersScript.prepare_session()
+	var team_a_id: String = MinigameTestHelpersScript.team_a(session)
+	var slots: Array = session.get_deploy_slots(team_a_id)
 	if slots.is_empty():
-		push_error("Expected GREEN deploy slots")
+		push_error("Expected deploy slots for %s" % team_a_id)
 		return false
 	var coords: Vector2i = slots[0]
 
-	var too_many := session.apply({
+	var too_many: Dictionary = session.apply({
 		"type": "draft_set_legion",
-		"team": "GREEN",
+		"team": team_a_id,
 		"coords": coords,
 		"unit_type": "GOBLIN",
 		"unit_count": 13,
@@ -47,9 +37,9 @@ func _test_budget_and_validation() -> bool:
 		push_error("Expected failure when exceeding legion size")
 		return false
 
-	var ok := session.apply({
+	var ok: Dictionary = session.apply({
 		"type": "draft_set_legion",
-		"team": "GREEN",
+		"team": team_a_id,
 		"coords": coords,
 		"unit_type": "GOBLIN",
 		"unit_count": 4,
@@ -58,14 +48,14 @@ func _test_budget_and_validation() -> bool:
 		push_error("Expected valid goblin placement: %s" % ok["error"])
 		return false
 
-	var draft = session.drafts["GREEN"] as DraftState
+	var draft = session.drafts[team_a_id] as DraftState
 	if draft.remaining_budget != 50 - 12:
 		push_error("Expected remaining budget 38, got %d" % draft.remaining_budget)
 		return false
 
-	var overspend := session.apply({
+	var overspend: Dictionary = session.apply({
 		"type": "draft_set_legion",
-		"team": "GREEN",
+		"team": team_a_id,
 		"coords": slots[1],
 		"unit_type": "GOLEM",
 		"unit_count": 4,
@@ -76,18 +66,20 @@ func _test_budget_and_validation() -> bool:
 	return true
 
 func _test_hidden_opponent_draft() -> bool:
-	var session := _prepare_session()
-	var green_slots: Array = session.get_deploy_slots("GREEN")
+	var session := MinigameTestHelpersScript.prepare_session()
+	var team_a_id: String = MinigameTestHelpersScript.team_a(session)
+	var team_b_id: String = MinigameTestHelpersScript.team_b(session)
+	var slots_a: Array = session.get_deploy_slots(team_a_id)
 	session.apply({
 		"type": "draft_set_legion",
-		"team": "GREEN",
-		"coords": green_slots[0],
+		"team": team_a_id,
+		"coords": slots_a[0],
 		"unit_type": "ASSASSIN",
 		"unit_count": 2,
 	})
 
-	var blue_view := session.get_view_state("BLUE")
-	var opponent: Dictionary = blue_view.get("opponent_GREEN", {})
+	var blue_view: Dictionary = session.get_view_state(team_b_id)
+	var opponent: Dictionary = blue_view.get("opponent_%s" % team_a_id, {})
 	if opponent.has("placements"):
 		push_error("Opponent draft details should be hidden")
 		return false
@@ -97,37 +89,39 @@ func _test_hidden_opponent_draft() -> bool:
 	return true
 
 func _test_both_ready_starts_battle() -> bool:
-	var session := _prepare_session()
-	var green_slots: Array = session.get_deploy_slots("GREEN")
-	var blue_slots: Array = session.get_deploy_slots("BLUE")
+	var session := MinigameTestHelpersScript.prepare_session()
+	var team_a_id: String = MinigameTestHelpersScript.team_a(session)
+	var team_b_id: String = MinigameTestHelpersScript.team_b(session)
+	var slots_a: Array = session.get_deploy_slots(team_a_id)
+	var slots_b: Array = session.get_deploy_slots(team_b_id)
 
 	session.apply({
 		"type": "draft_set_legion",
-		"team": "GREEN",
-		"coords": green_slots[0],
+		"team": team_a_id,
+		"coords": slots_a[0],
 		"unit_type": "GOBLIN",
 		"unit_count": 3,
 	})
-	var green_ready := session.apply({"type": "draft_ready", "team": "GREEN"})
+	var green_ready: Dictionary = session.apply({"type": "draft_ready", "team": team_a_id})
 	if not green_ready["ok"]:
-		push_error("GREEN ready failed: %s" % green_ready["error"])
+		push_error("%s ready failed: %s" % [team_a_id, green_ready["error"]])
 		return false
-	if session.phase != MinigameSession.Phase.DRAFT:
-		push_error("Expected draft to continue for BLUE")
+	if session.phase != MinigameSessionScript.Phase.DRAFT:
+		push_error("Expected draft to continue for %s" % team_b_id)
 		return false
 
 	session.apply({
 		"type": "draft_set_legion",
-		"team": "BLUE",
-		"coords": blue_slots[0],
+		"team": team_b_id,
+		"coords": slots_b[0],
 		"unit_type": "RAT_SPEAR",
 		"unit_count": 2,
 	})
-	var blue_ready := session.apply({"type": "draft_ready", "team": "BLUE"})
+	var blue_ready: Dictionary = session.apply({"type": "draft_ready", "team": team_b_id})
 	if not blue_ready["ok"]:
-		push_error("BLUE ready failed: %s" % blue_ready["error"])
+		push_error("%s ready failed: %s" % [team_b_id, blue_ready["error"]])
 		return false
-	if session.phase != MinigameSession.Phase.BATTLE:
+	if session.phase != MinigameSessionScript.Phase.BATTLE:
 		push_error("Expected battle phase after both ready")
 		return false
 	if session.legions.size() != 2:
@@ -136,28 +130,30 @@ func _test_both_ready_starts_battle() -> bool:
 	return true
 
 func _test_ai_spends_all_gold() -> bool:
-	var session := _prepare_session()
-	var green_slots: Array = session.get_deploy_slots("GREEN")
+	var session := MinigameTestHelpersScript.prepare_session()
+	var team_a_id: String = MinigameTestHelpersScript.team_a(session)
+	var team_b_id: String = MinigameTestHelpersScript.team_b(session)
+	var slots_a: Array = session.get_deploy_slots(team_a_id)
 	session.apply({
 		"type": "draft_set_legion",
-		"team": "GREEN",
-		"coords": green_slots[0],
+		"team": team_a_id,
+		"coords": slots_a[0],
 		"unit_type": "GOBLIN",
 		"unit_count": 1,
 	})
-	session.apply({"type": "draft_ready", "team": "GREEN"})
+	session.apply({"type": "draft_ready", "team": team_a_id})
 
 	var AiDrafter = preload("res://scripts/ai/ai_drafter.gd")
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
-	var cmds: Array = AiDrafter.build_draft_commands(session, "BLUE", rng)
+	var cmds: Array = AiDrafter.build_draft_commands(session, team_b_id, rng)
 	for cmd in cmds:
-		var result := session.apply(cmd)
+		var result: Dictionary = session.apply(cmd)
 		if not result["ok"]:
 			push_error("AI draft command failed: %s" % result["error"])
 			return false
 
-	var draft: DraftState = session.drafts["BLUE"] as DraftState
+	var draft: DraftState = session.drafts[team_b_id] as DraftState
 	var cheapest := 999999
 	for unit_type in UnitDefs.get_all_ids():
 		cheapest = mini(cheapest, MinigameRulesScript.unit_price(unit_type))

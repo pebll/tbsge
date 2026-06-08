@@ -3,8 +3,6 @@
 [ext_resource type="Script" uid="uid://ch5xa3bpd1nlu" path="res://scripts/visu/tile_visu.gd" id="1_mqk3g"]
 [ext_resource type="Texture2D" uid="uid://ccglgt7ixtyd8" path="res://assets/tiles_sliced/tiles_bottom/base.png" id="2_2p32v"]
 [ext_resource type="Texture2D" uid="uid://c3ogiyafsl7e" path="res://assets/tiles_sliced/tiles_terrain/water.png" id="3_qpit4"]
-[ext_resource type="PackedScene" uid="uid://df7hx5dby2ks0" path="res://scenes/single_unit.tscn" id="3_w8e6o"]
-
 [sub_resource type="CircleShape2D" id="CircleShape2D_10c5b"]
 radius = 48.010418
 
@@ -45,10 +43,6 @@ text = "(q,r,s)"
 label_settings = SubResource("LabelSettings_10c5b")
 horizontal_alignment = 1
 vertical_alignment = 1
-
-[node name="Unit" parent="." unique_id=122075626 instance=ExtResource("3_w8e6o")]
-visible = false
-position = Vector2(0, -20)
 
 [connection signal="input_event" from="Area2D" to="." method="_on_clicked"]
 [connection signal="mouse_entered" from="Area2D" to="." method="_on_mouse_entered"]
