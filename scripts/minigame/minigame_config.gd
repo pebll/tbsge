@@ -7,4 +7,5 @@ extends Resource
 @export var budget: int = 50
 @export var deploy_slot_count: int = 7
 @export var team_ids: Array[String] = ["GREEN", "BLUE"]
+@export var ai_team_ids: Array[String] = ["BLUE"]
 @export var max_legion_fill: float = 12.0

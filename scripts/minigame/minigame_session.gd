@@ -130,6 +130,8 @@ func _apply_battle(cmd_type: String, cmd: Dictionary) -> Dictionary:
 			return _battle_attack(cmd)
 		"end_turn":
 			return _battle_end_turn()
+		"pass_legion":
+			return _battle_pass_legion(cmd)
 		"surrender":
 			return _battle_surrender(cmd)
 		_:
@@ -313,6 +315,17 @@ func _battle_end_turn() -> Dictionary:
 		return _fail("Not in battle")
 	var next_team: String = turn_manager.end_team_turn(_typed_legions())
 	return _ok(["turn_changed"], {"active_team": next_team})
+
+func _battle_pass_legion(cmd: Dictionary) -> Dictionary:
+	var coords: Vector2i = cmd.get("coords", Vector2i.ZERO)
+	var tile: Tile = _tile_at(coords)
+	if tile == null or not tile.has_legion():
+		return _fail("No legion at tile")
+	var legion: Legion = tile.legion
+	if not can_act_legion(legion):
+		return _fail("Legion cannot pass")
+	turn_manager.wait_legion(coords)
+	return _ok(["legion_passed"], {"coords": coords})
 
 func _walkable_deploy_slots(zone_coords: Array) -> Array[Vector2i]:
 	var out: Array[Vector2i] = []

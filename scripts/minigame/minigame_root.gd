@@ -10,6 +10,10 @@ const COMBAT_REPOSITION_BEAT := 0.45
 
 const ICON_DEATHS := preload("res://assets/icons/base_icons_sprites/skull.png")
 const ICON_HP_LOST := preload("res://assets/icons/base_icons_sprites/heart.png")
+const AttackNearestEnemyBehavior = preload("res://scripts/ai/behaviors/attack_nearest_enemy.gd")
+const AiDrafter = preload("res://scripts/ai/ai_drafter.gd")
+
+const AI_LEGION_DELAY := 0.5
 
 @export var config_path: String = CONFIG_PATH
 
@@ -17,6 +21,7 @@ var session: MinigameSession
 var presenter: MinigamePresenter
 var battle_ui: MinigameBattleUI
 var input_locked: bool = false
+var _ai_running: bool = false
 
 var _ui_layer: CanvasLayer
 var _setup_panel: MinigameSetupPanel
@@ -49,7 +54,7 @@ func _ready() -> void:
 	EventBus.legion_ap_changed.connect(_on_legion_ap_changed)
 
 func _input(event: InputEvent) -> void:
-	if input_locked or _unit_picker.visible:
+	if input_locked or _ai_running or _unit_picker.visible:
 		return
 	if session.phase != MinigameSession.Phase.BATTLE:
 		return
@@ -315,6 +320,13 @@ func _on_draft_ready() -> void:
 		return
 	if session.phase == MinigameSession.Phase.BATTLE:
 		_begin_battle()
+		_maybe_start_ai_turn()
+		return
+	if _is_ai_team(session.active_draft_team):
+		_apply_ai_draft(session.active_draft_team)
+		if session.phase == MinigameSession.Phase.BATTLE:
+			_begin_battle()
+			_maybe_start_ai_turn()
 		return
 	_show_pass_overlay()
 
@@ -351,22 +363,87 @@ func _begin_battle() -> void:
 	_turn_hud.show()
 	_turn_hud.show_active_team(session.turn_manager.active_team_id)
 
+func _is_ai_team(team_id: String) -> bool:
+	return team_id in session.config.ai_team_ids
+
+func _apply_ai_draft(team_id: String) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	for cmd in AiDrafter.build_draft_commands(session, team_id, rng):
+		var draft_result := session.apply(cmd)
+		if not draft_result["ok"]:
+			push_error("AI draft failed: %s" % draft_result["error"])
+			return
+
+func _maybe_start_ai_turn() -> void:
+	if session.phase != MinigameSession.Phase.BATTLE:
+		return
+	if not _is_ai_team(session.turn_manager.active_team_id):
+		return
+	if _ai_running:
+		return
+	_run_ai_turn()
+
+func _run_ai_turn() -> void:
+	_run_ai_turn_async()
+
+func _run_ai_turn_async() -> void:
+	_ai_running = true
+	input_locked = true
+	battle_ui.deselect()
+	while (
+		session.phase == MinigameSession.Phase.BATTLE
+		and _is_ai_team(session.turn_manager.active_team_id)
+	):
+		var actionable := session.turn_manager.get_actionable_coords(session._typed_legions())
+		if actionable.is_empty():
+			var end_result := session.apply({"type": "end_turn"})
+			if end_result["ok"]:
+				_turn_hud.show_active_team(session.turn_manager.active_team_id)
+			break
+
+		var coords: Vector2i = actionable[0]
+		var legion: Legion = session.grid.get(coords).legion
+		var cmd: Dictionary = AttackNearestEnemyBehavior.decide(session, legion)
+		match String(cmd.get("type", "")):
+			"move":
+				await _perform_move(cmd.get("from", coords), cmd.get("to", coords))
+			"attack":
+				await _perform_attack(cmd.get("from", coords), cmd.get("to", coords))
+			_:
+				session.apply({"type": "pass_legion", "coords": coords})
+
+		await get_tree().create_timer(AI_LEGION_DELAY).timeout
+		if session.phase == MinigameSession.Phase.ENDED:
+			break
+
+	_ai_running = false
+	input_locked = false
+	_check_match_end()
+	if session.phase == MinigameSession.Phase.BATTLE and _is_ai_team(session.turn_manager.active_team_id):
+		_maybe_start_ai_turn()
+
 func _on_end_turn() -> void:
-	if input_locked:
+	if input_locked or _ai_running:
 		return
 	battle_ui.deselect()
 	var result := session.apply({"type": "end_turn"})
 	if result["ok"]:
 		_turn_hud.show_active_team(session.turn_manager.active_team_id)
+		_maybe_start_ai_turn()
 
 func request_move(from_coords: Vector2i, to_coords: Vector2i) -> void:
-	if input_locked:
+	if input_locked or _ai_running:
 		return
+	await _perform_move(from_coords, to_coords)
+
+func _perform_move(from_coords: Vector2i, to_coords: Vector2i) -> void:
 	var legion: Legion = session.grid.get(from_coords).legion
 	var result := session.apply({"type": "move", "from": from_coords, "to": to_coords})
 	if not result["ok"]:
 		return
-	input_locked = true
+	if not _ai_running:
+		input_locked = true
 	battle_ui.clear_overlays()
 	presenter.rewire_legion_tile(legion, from_coords, to_coords)
 	var tween := presenter.tween_legion_move(legion, to_coords)
@@ -375,7 +452,8 @@ func request_move(from_coords: Vector2i, to_coords: Vector2i) -> void:
 	EventBus.legion_ap_changed.emit(legion)
 	presenter.remove_dead_legions(session)
 	battle_ui.refresh_after_action(to_coords)
-	input_locked = false
+	if not _ai_running:
+		input_locked = false
 	_check_match_end()
 
 func request_swap(from_coords: Vector2i, to_coords: Vector2i) -> void:
@@ -400,8 +478,11 @@ func request_swap(from_coords: Vector2i, to_coords: Vector2i) -> void:
 	input_locked = false
 
 func request_attack(from_coords: Vector2i, to_coords: Vector2i) -> void:
-	if input_locked:
+	if input_locked or _ai_running:
 		return
+	await _perform_attack(from_coords, to_coords)
+
+func _perform_attack(from_coords: Vector2i, to_coords: Vector2i) -> void:
 	var from_visu: TileVisu = presenter.tile_visu_at(from_coords)
 	var to_visu: TileVisu = presenter.tile_visu_at(to_coords)
 	if not from_visu or not to_visu or not from_visu.legion_visu or not to_visu.legion_visu:
@@ -415,7 +496,8 @@ func request_attack(from_coords: Vector2i, to_coords: Vector2i) -> void:
 	var result := session.apply({"type": "attack", "from": from_coords, "to": to_coords})
 	if not result["ok"]:
 		return
-	input_locked = true
+	if not _ai_running:
+		input_locked = true
 	battle_ui.deselect()
 
 	var combat: Dictionary = result["payload"].get("combat", {})
@@ -428,7 +510,8 @@ func request_attack(from_coords: Vector2i, to_coords: Vector2i) -> void:
 	presenter.cleanup_dead_legion_at(from_coords, session)
 	presenter.cleanup_dead_legion_at(to_coords, session)
 	presenter.remove_dead_legions(session)
-	input_locked = false
+	if not _ai_running:
+		input_locked = false
 	_check_match_end()
 
 func _play_combat_visuals(

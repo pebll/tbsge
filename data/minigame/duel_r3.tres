@@ -10,4 +10,5 @@ map_radius = 3
 budget = 50
 deploy_slot_count = 7
 team_ids = Array[String](["GREEN", "BLUE"])
+ai_team_ids = Array[String](["BLUE"])
 max_legion_fill = 12.0
