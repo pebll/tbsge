@@ -7,12 +7,11 @@ signal ready_pressed
 @onready var team_label: Label = %TeamLabel
 @onready var gold_value: Label = %GoldValue
 @onready var gold_total: Label = %GoldTotal
-@onready var ready_button: Button = %ReadyButton
+@onready var ready_button: GameButton = %ReadyButton
 
 const COLOR_BG := Color(0.91, 0.86, 0.78)
 const COLOR_BORDER := Color(0.78, 0.70, 0.58)
 const COLOR_TEXT := Color(0.12, 0.10, 0.08)
-const COLOR_BLOCK_BG := Color(0.93, 0.89, 0.82)
 const BORDER_THICK := 4
 const RADIUS := 16
 
@@ -41,27 +40,6 @@ func _apply_style() -> void:
 
 	for label in [team_label, gold_value, gold_total]:
 		label.add_theme_color_override("font_color", COLOR_TEXT)
-
-	ready_button.text = "Ready for battle"
-	ready_button.custom_minimum_size = Vector2(360, 72)
-	ready_button.add_theme_font_size_override("font_size", 30)
-	var btn_sb := StyleBoxFlat.new()
-	btn_sb.bg_color = COLOR_BLOCK_BG
-	btn_sb.border_color = COLOR_BORDER
-	btn_sb.border_width_left = BORDER_THICK
-	btn_sb.border_width_right = BORDER_THICK
-	btn_sb.border_width_top = BORDER_THICK
-	btn_sb.border_width_bottom = BORDER_THICK
-	btn_sb.corner_radius_top_left = RADIUS
-	btn_sb.corner_radius_top_right = RADIUS
-	btn_sb.corner_radius_bottom_left = RADIUS
-	btn_sb.corner_radius_bottom_right = RADIUS
-	btn_sb.content_margin_top = 14
-	btn_sb.content_margin_bottom = 14
-	ready_button.add_theme_stylebox_override("normal", btn_sb)
-	ready_button.add_theme_stylebox_override("hover", btn_sb)
-	ready_button.add_theme_stylebox_override("pressed", btn_sb)
-	ready_button.add_theme_color_override("font_color", COLOR_TEXT)
 
 func show_for_team(team_id: String, draft_data: Dictionary) -> void:
 	_apply_team_accent(team_id)

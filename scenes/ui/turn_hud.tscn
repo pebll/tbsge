@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://bturnhud7k2m1"]
 
 [ext_resource type="Script" path="res://scripts/ui/turn_hud.gd" id="1_turn"]
+[ext_resource type="PackedScene" path="res://scenes/ui/game_button.tscn" id="2_gb"]
 
 [node name="TurnHud" type="PanelContainer"]
 anchors_preset = 5
@@ -15,6 +16,7 @@ script = ExtResource("1_turn")
 
 [node name="VBox" type="VBoxContainer" parent="."]
 layout_mode = 2
+alignment = 1
 theme_override_constants/separation = 8
 
 [node name="TurnTeamHeader" type="PanelContainer" parent="VBox"]
@@ -28,11 +30,12 @@ theme_override_font_sizes/font_size = 28
 text = "Green's turn"
 horizontal_alignment = 1
 
-[node name="NextTurnButton" type="Button" parent="VBox"]
+[node name="NextTurnButton" parent="VBox" instance=ExtResource("2_gb")]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 22
 text = "Next turn"
+font_size = 22
+preferred_width = 260
 
 [node name="TurnTeamFooter" type="PanelContainer" parent="VBox"]
 unique_name_in_owner = true

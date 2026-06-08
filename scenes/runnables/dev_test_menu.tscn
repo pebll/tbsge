@@ -1,6 +1,7 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/dev_test_menu.gd" id="1_menu"]
+[ext_resource type="PackedScene" path="res://scenes/ui/game_button.tscn" id="2_gb"]
 
 [node name="DevTestMenu" type="Node2D"]
 
@@ -41,17 +42,20 @@ layout_mode = 2
 text = "Dev Test"
 horizontal_alignment = 1
 
-[node name="SandboxButton" type="Button" parent="UI/Menu/CenterContainer/MenuPanel/VBox"]
+[node name="SandboxButton" parent="UI/Menu/CenterContainer/MenuPanel/VBox" instance=ExtResource("2_gb")]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Sandbox (spawn & fight)"
+preferred_width = 320
 
-[node name="DuelButton" type="Button" parent="UI/Menu/CenterContainer/MenuPanel/VBox"]
+[node name="DuelButton" parent="UI/Menu/CenterContainer/MenuPanel/VBox" instance=ExtResource("2_gb")]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Duel Minigame"
+preferred_width = 320
 
-[node name="BackButton" type="Button" parent="UI/Menu/CenterContainer/MenuPanel/VBox"]
+[node name="BackButton" parent="UI/Menu/CenterContainer/MenuPanel/VBox" instance=ExtResource("2_gb")]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Back to menu"
+preferred_width = 320

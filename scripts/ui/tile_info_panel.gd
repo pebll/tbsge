@@ -26,12 +26,12 @@ const MinigameRulesScript = preload("res://scripts/minigame/minigame_rules.gd")
 @onready var ap_value: Label = %ApValue
 @onready var units_list: VBoxContainer = %UnitsList
 @onready var draft_controls: VBoxContainer = %DraftControls
-@onready var minus_button: Button = %MinusButton
-@onready var plus_button: Button = %PlusButton
+@onready var minus_button: GameButton = %MinusButton
+@onready var plus_button: GameButton = %PlusButton
 @onready var count_value: Label = %CountValue
 @onready var cost_value: Label = %CostValue
-@onready var change_type_button: Button = %ChangeTypeButton
-@onready var clear_button: Button = %ClearButton
+@onready var change_type_button: GameButton = %ChangeTypeButton
+@onready var clear_button: GameButton = %ClearButton
 
 var _draft_mode: bool = false
 var _draft_unit_type: String = ""
@@ -55,7 +55,6 @@ const ICON_AP := preload("res://assets/icons/base_icons_sprites/boot.png")
 
 func _ready() -> void:
 	_apply_style()
-	_style_draft_buttons()
 	minus_button.pressed.connect(func(): draft_count_decrease_pressed.emit())
 	plus_button.pressed.connect(func(): draft_count_increase_pressed.emit())
 	change_type_button.pressed.connect(func(): draft_change_type_pressed.emit())
@@ -155,53 +154,14 @@ func _refresh_draft_controls() -> void:
 	var fill := MinigameRulesScript.legion_fill(_draft_unit_type, _draft_unit_count)
 	count_value.text = "%d / %d" % [_draft_unit_count, max_count]
 	cost_value.text = "Legion cost: %d gold  •  Size %.1f / 12" % [cost, fill]
-	minus_button.disabled = _draft_unit_count <= 1
-	plus_button.disabled = not _can_add_draft_unit()
+	minus_button.button_disabled = _draft_unit_count <= 1
+	plus_button.button_disabled = not _can_add_draft_unit()
 
 func _can_add_draft_unit() -> bool:
 	var max_count := MinigameRulesScript.max_units_in_legion(_draft_unit_type)
 	if _draft_unit_count >= max_count:
 		return false
 	return MinigameRulesScript.unit_price(_draft_unit_type) <= _remaining_budget
-
-func _style_draft_buttons() -> void:
-	for btn in [minus_button, plus_button]:
-		btn.custom_minimum_size = Vector2(64, 64)
-		btn.add_theme_font_size_override("font_size", 36)
-		var sb := StyleBoxFlat.new()
-		sb.bg_color = COLOR_BLOCK_BG
-		sb.border_color = COLOR_BORDER
-		sb.border_width_left = BORDER_THICK
-		sb.border_width_right = BORDER_THICK
-		sb.border_width_top = BORDER_THICK
-		sb.border_width_bottom = BORDER_THICK
-		sb.corner_radius_top_left = RADIUS
-		sb.corner_radius_top_right = RADIUS
-		sb.corner_radius_bottom_left = RADIUS
-		sb.corner_radius_bottom_right = RADIUS
-		btn.add_theme_stylebox_override("normal", sb)
-		btn.add_theme_stylebox_override("hover", sb)
-		btn.add_theme_stylebox_override("pressed", sb)
-		btn.add_theme_color_override("font_color", COLOR_TEXT)
-	for btn in [change_type_button, clear_button]:
-		btn.add_theme_font_size_override("font_size", 20)
-		var sb := StyleBoxFlat.new()
-		sb.bg_color = COLOR_BLOCK_BG
-		sb.border_color = COLOR_BORDER
-		sb.border_width_left = BORDER_THICK
-		sb.border_width_right = BORDER_THICK
-		sb.border_width_top = BORDER_THICK
-		sb.border_width_bottom = BORDER_THICK
-		sb.corner_radius_top_left = RADIUS
-		sb.corner_radius_top_right = RADIUS
-		sb.corner_radius_bottom_left = RADIUS
-		sb.corner_radius_bottom_right = RADIUS
-		sb.content_margin_top = 10
-		sb.content_margin_bottom = 10
-		btn.add_theme_stylebox_override("normal", sb)
-		btn.add_theme_stylebox_override("hover", sb)
-		btn.add_theme_stylebox_override("pressed", sb)
-		btn.add_theme_color_override("font_color", COLOR_TEXT)
 
 func _render_legion(legion: Legion) -> void:
 	_apply_team_accent(legion.team_id)

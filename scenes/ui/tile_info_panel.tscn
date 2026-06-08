@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://d0u8h6kq5u0ui"]
 
 [ext_resource type="Script" uid="uid://cd2ghb2ywyiv5" path="res://scripts/ui/tile_info_panel.gd" id="1_8p8fn"]
+[ext_resource type="PackedScene" path="res://scenes/ui/game_button.tscn" id="2_gb"]
 
 [node name="TileInfoPanel" type="PanelContainer" unique_id=1522463708]
 anchors_preset = 11
@@ -171,6 +172,7 @@ theme_override_constants/separation = 8
 [node name="DraftControls" type="VBoxContainer" parent="VBox/LegionBlock"]
 unique_name_in_owner = true
 layout_mode = 2
+alignment = 1
 theme_override_constants/separation = 10
 
 [node name="CountRow" type="HBoxContainer" parent="VBox/LegionBlock/DraftControls"]
@@ -178,10 +180,12 @@ layout_mode = 2
 alignment = 1
 theme_override_constants/separation = 16
 
-[node name="MinusButton" type="Button" parent="VBox/LegionBlock/DraftControls/CountRow"]
+[node name="MinusButton" parent="VBox/LegionBlock/DraftControls/CountRow" instance=ExtResource("2_gb")]
 unique_name_in_owner = true
 layout_mode = 2
 text = "−"
+size_preset = 1
+preferred_width = 64
 
 [node name="CountValue" type="Label" parent="VBox/LegionBlock/DraftControls/CountRow"]
 unique_name_in_owner = true
@@ -190,10 +194,12 @@ theme_override_font_sizes/font_size = 32
 text = "4 / 8"
 vertical_alignment = 1
 
-[node name="PlusButton" type="Button" parent="VBox/LegionBlock/DraftControls/CountRow"]
+[node name="PlusButton" parent="VBox/LegionBlock/DraftControls/CountRow" instance=ExtResource("2_gb")]
 unique_name_in_owner = true
 layout_mode = 2
 text = "+"
+size_preset = 1
+preferred_width = 64
 
 [node name="CostValue" type="Label" parent="VBox/LegionBlock/DraftControls"]
 unique_name_in_owner = true
@@ -202,15 +208,19 @@ theme_override_font_sizes/font_size = 20
 text = "Legion cost: 12 gold"
 horizontal_alignment = 1
 
-[node name="ChangeTypeButton" type="Button" parent="VBox/LegionBlock/DraftControls"]
+[node name="ChangeTypeButton" parent="VBox/LegionBlock/DraftControls" instance=ExtResource("2_gb")]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Change unit type"
+font_size = 20
+preferred_width = 280
 
-[node name="ClearButton" type="Button" parent="VBox/LegionBlock/DraftControls"]
+[node name="ClearButton" parent="VBox/LegionBlock/DraftControls" instance=ExtResource("2_gb")]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Remove legion"
+font_size = 20
+preferred_width = 280
 
 [node name="TeamFooter" type="PanelContainer" parent="VBox/LegionBlock" unique_id=2847193053]
 unique_name_in_owner = true

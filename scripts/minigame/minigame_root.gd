@@ -2,6 +2,8 @@ class_name MinigameRoot
 extends Node2D
 
 const CONFIG_PATH := "res://data/minigame/duel_r3.tres"
+const MINIGAME_SCENE := "res://scenes/runnables/minigame.tscn"
+const MENU_SCENE := "res://scenes/runnables/menu.tscn"
 const INVALID_COORDS := Vector2i(2147483646, 2147483646)
 
 const COMBAT_HIT_BEAT := 0.4
@@ -31,6 +33,7 @@ var _tile_info_panel: TileInfoPanel
 var _combat_fx_layer: CanvasLayer
 var _pass_overlay: PanelContainer
 var _status_label: Label
+var _game_over_panel: GameOverPanel
 var _selected_deploy_coords: Vector2i = INVALID_COORDS
 var _viewing_team: String = "GREEN"
 var _picker_for_change_type: bool = false
@@ -106,17 +109,25 @@ func _setup_ui() -> void:
 	_pass_overlay.visible = false
 	_pass_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	var pass_vbox := VBoxContainer.new()
+	pass_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	pass_vbox.set_anchors_preset(Control.PRESET_CENTER)
 	_status_label = Label.new()
 	_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_status_label.add_theme_font_size_override("font_size", 36)
-	var continue_btn := Button.new()
+	var continue_btn: GameButton = preload("res://scenes/ui/game_button.tscn").instantiate()
 	continue_btn.text = "Continue"
+	continue_btn.size_preset = GameButton.SizePreset.LARGE
+	continue_btn.preferred_width = 280
 	continue_btn.pressed.connect(_on_pass_continue)
 	pass_vbox.add_child(_status_label)
 	pass_vbox.add_child(continue_btn)
 	_pass_overlay.add_child(pass_vbox)
 	_ui_layer.add_child(_pass_overlay)
+
+	_game_over_panel = preload("res://scenes/ui/game_over_panel.tscn").instantiate()
+	_ui_layer.add_child(_game_over_panel)
+	_game_over_panel.new_game_pressed.connect(_on_game_over_new_game)
+	_game_over_panel.main_menu_pressed.connect(_on_game_over_main_menu)
 
 func _refresh_draft_view() -> void:
 	var view := session.get_view_state(_viewing_team)
@@ -213,7 +224,7 @@ func _on_legion_ap_changed(legion: Legion) -> void:
 
 func _on_tile_right_clicked(coords: Vector2i) -> void:
 	if session.phase == MinigameSession.Phase.DRAFT:
-		if input_locked or _pass_overlay.visible or _unit_picker.visible:
+		if input_locked or _overlay_blocking_input() or _unit_picker.visible:
 			return
 		if session.active_draft_team != _viewing_team:
 			return
@@ -222,7 +233,7 @@ func _on_tile_right_clicked(coords: Vector2i) -> void:
 func _on_draft_tile_clicked(coords: Vector2i) -> void:
 	if session.phase != MinigameSession.Phase.DRAFT:
 		return
-	if input_locked or _pass_overlay.visible or _unit_picker.visible:
+	if input_locked or _overlay_blocking_input() or _unit_picker.visible:
 		return
 	if session.active_draft_team != _viewing_team:
 		return
@@ -698,10 +709,21 @@ func _spawn_losses_popup(world_pos: Vector2, deaths_count: int, hp_lost: int) ->
 	tween.tween_property(block, "modulate:a", 0.0, 0.28)
 	tween.tween_callback(block.queue_free)
 
+func _overlay_blocking_input() -> bool:
+	return _pass_overlay.visible or _game_over_panel.visible
+
 func _check_match_end() -> void:
 	if session.phase != MinigameSession.Phase.ENDED:
 		return
 	battle_ui.deselect()
 	_turn_hud.hide()
-	_status_label.text = "%s wins!" % session.winner
-	_pass_overlay.show()
+	_setup_panel.hide()
+	_unit_picker.hide()
+	_tile_info_panel.hide()
+	_game_over_panel.show_for_winner(session.winner)
+
+func _on_game_over_new_game() -> void:
+	get_tree().change_scene_to_file(MINIGAME_SCENE)
+
+func _on_game_over_main_menu() -> void:
+	get_tree().change_scene_to_file(MENU_SCENE)

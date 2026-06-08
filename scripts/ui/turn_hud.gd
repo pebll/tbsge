@@ -6,7 +6,7 @@ signal next_turn_pressed
 @onready var team_header: PanelContainer = %TurnTeamHeader
 @onready var team_label: Label = %TurnTeamLabel
 @onready var team_footer: PanelContainer = %TurnTeamFooter
-@onready var next_turn_button: Button = %NextTurnButton
+@onready var next_turn_button: GameButton = %NextTurnButton
 
 const COLOR_BG := Color(0.91, 0.86, 0.78)
 const COLOR_BORDER := Color(0.78, 0.70, 0.58)
@@ -16,7 +16,6 @@ const RADIUS := 16
 
 func _ready() -> void:
 	_apply_panel_style()
-	next_turn_button.focus_mode = Control.FOCUS_NONE
 	next_turn_button.pressed.connect(func(): next_turn_pressed.emit())
 	show_active_team("")
 

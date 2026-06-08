@@ -15,7 +15,7 @@ const RADIUS := 16
 
 @onready var grid: GridContainer = %UnitGrid
 @onready var title_label: Label = %TitleLabel
-@onready var cancel_button: Button = %CancelButton
+@onready var cancel_button: GameButton = %CancelButton
 @onready var panel: PanelContainer = %PickerPanel
 
 func _ready() -> void:
@@ -44,7 +44,6 @@ func _apply_style() -> void:
 
 	title_label.add_theme_color_override("font_color", COLOR_TEXT)
 	title_label.add_theme_font_size_override("font_size", 34)
-	cancel_button.add_theme_font_size_override("font_size", 22)
 
 func _build_cards() -> void:
 	var db: UnitDatabase = load("res://data/unit_db.tres")

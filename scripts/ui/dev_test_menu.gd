@@ -9,9 +9,9 @@ const COLOR_TEXT := Color(0.12, 0.10, 0.08)
 const BORDER_THICK := 4
 const RADIUS := 16
 
-@onready var sandbox_button: Button = %SandboxButton
-@onready var duel_button: Button = %DuelButton
-@onready var back_button: Button = %BackButton
+@onready var sandbox_button: GameButton = %SandboxButton
+@onready var duel_button: GameButton = %DuelButton
+@onready var back_button: GameButton = %BackButton
 
 func _ready() -> void:
 	_apply_styles()
@@ -24,16 +24,6 @@ func _apply_styles() -> void:
 	%MenuPanel.add_theme_stylebox_override("panel", panel_sb)
 	%TitleLabel.add_theme_color_override("font_color", COLOR_TEXT)
 	%TitleLabel.add_theme_font_size_override("font_size", 36)
-	for btn in [sandbox_button, duel_button, back_button]:
-		_style_button(btn)
-
-func _style_button(btn: Button) -> void:
-	var sb := _make_stylebox(Color(0.93, 0.89, 0.82))
-	btn.add_theme_stylebox_override("normal", sb)
-	btn.add_theme_stylebox_override("hover", sb)
-	btn.add_theme_stylebox_override("pressed", sb)
-	btn.add_theme_color_override("font_color", COLOR_TEXT)
-	btn.add_theme_font_size_override("font_size", 24)
 
 func _make_stylebox(bg: Color = COLOR_BG) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
