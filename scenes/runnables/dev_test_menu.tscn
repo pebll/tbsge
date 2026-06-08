@@ -54,6 +54,12 @@ layout_mode = 2
 text = "Duel Minigame"
 preferred_width = 320
 
+[node name="BigButton" parent="UI/Menu/CenterContainer/MenuPanel/VBox" instance=ExtResource("2_gb")]
+unique_name_in_owner = true
+layout_mode = 2
+text = "BIG (radius 4, 100 gold)"
+preferred_width = 320
+
 [node name="BackButton" parent="UI/Menu/CenterContainer/MenuPanel/VBox" instance=ExtResource("2_gb")]
 unique_name_in_owner = true
 layout_mode = 2
