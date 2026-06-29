@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://xdkpld8vue81" path="res://scripts/resources/unit_definition.gd" id="1_def"]
 [ext_resource type="Texture2D" uid="uid://dokuy8v6j5tlf" path="res://assets/units_v2/done/sand_sprites/golem.png" id="2_icon"]
+[ext_resource type="AudioStream" path="res://assets/sfx/unit/move_stone.mp3" id="3_move"]
 
 [resource]
 script = ExtResource("1_def")
@@ -14,3 +15,4 @@ image_size = 1.12
 size = 3.0
 price = 10
 icon = ExtResource("2_icon")
+sfx_move = ExtResource("3_move")

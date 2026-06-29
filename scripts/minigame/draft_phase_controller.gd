@@ -43,6 +43,7 @@ func handle_tile_clicked(coords: Vector2i) -> void:
 		return
 	if not _is_deploy_slot(coords):
 		return
+	_play_draft_click_sound(coords)
 
 	selected_coords = coords
 	if _slot_is_occupied(coords):
@@ -266,6 +267,14 @@ func _show_draft_tile_info(coords: Vector2i) -> void:
 func _show_error_toast(message: String) -> void:
 	if deps.tile_info_panel and deps.tile_info_panel.visible:
 		deps.tile_info_panel.show_draft_message(message)
+
+func _play_draft_click_sound(coords: Vector2i) -> void:
+	var draft: Dictionary = deps.session.get_view_state(viewing_team).get("draft", {})
+	var placement := _find_placement(draft, coords)
+	if placement.is_empty():
+		AudioManager.play_sfx("tile_click")
+		return
+	AudioManager.play_unit_click(String(placement.get("unit_type", "")))
 
 func _find_placement(draft: Dictionary, coords: Vector2i) -> Dictionary:
 	for p in draft.get("placements", []):

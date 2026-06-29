@@ -19,5 +19,10 @@ extends Resource
 @export var price: int = 5
 
 @export var icon: Texture2D
+## Optional per-unit legion SFX; empty uses the global default for that action.
+@export var sfx_select: AudioStream
+@export var sfx_move: AudioStream
+@export var sfx_hit: AudioStream
+@export var sfx_death: AudioStream
 ## Empty = legion uses default move / melee_attack / self_heal.
 @export var action_ids: Array[String] = []

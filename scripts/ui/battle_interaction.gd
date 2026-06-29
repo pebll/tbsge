@@ -154,6 +154,11 @@ func cycle_legion_tab() -> void:
 		return
 	deselect()
 	select_tile(coords)
+	var state: BattleStateScript = battle_state_fn.call()
+	if state:
+		var legion: Legion = _legion_at(state, coords)
+		if legion:
+			AudioManager.play_unit_click(legion.unit_type)
 
 func pass_current_legion() -> void:
 	if not can_accept_command():
@@ -167,7 +172,12 @@ func pass_current_legion() -> void:
 func _on_action_bar_pressed(action: ActionDefinitionScript) -> void:
 	if not can_accept_command() or not has_selected:
 		return
-	AudioManager.play_sfx("tile_click")
+	var state: BattleStateScript = battle_state_fn.call()
+	var legion: Legion = _legion_at(state, selected_coords) if state else null
+	if legion:
+		AudioManager.play_unit_click(legion.unit_type)
+	else:
+		AudioManager.play_sfx("tile_click")
 	select_action(action)
 
 func _on_tile_clicked(coords: Vector2i) -> void:
@@ -175,8 +185,19 @@ func _on_tile_clicked(coords: Vector2i) -> void:
 		return
 	if not can_accept_command():
 		return
-	AudioManager.play_sfx("tile_click")
+	_play_click_sound_for_tile(coords)
 	_dispatch_click(coords)
+
+func _play_click_sound_for_tile(coords: Vector2i) -> void:
+	var state: BattleStateScript = battle_state_fn.call()
+	if state == null:
+		AudioManager.play_sfx("tile_click")
+		return
+	var legion: Legion = _legion_at(state, coords)
+	if legion:
+		AudioManager.play_unit_click(legion.unit_type)
+	else:
+		AudioManager.play_sfx("tile_click")
 
 func _on_tile_right_clicked(coords: Vector2i) -> void:
 	if not battle_phase_fn.is_valid() or not bool(battle_phase_fn.call()):

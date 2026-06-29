@@ -83,6 +83,7 @@ func play_combat(from_coords: Vector2i, to_coords: Vector2i, combat: Dictionary,
 
 		var direction: Vector2 = (def_visu.global_position - atk_visu.global_position).normalized()
 		atk_visu.animate_unit_attack(atk_unit, direction)
+		AudioManager.play_unit_hit(atk_unit.unit_type)
 
 		var hit_idx: int = h["hit_index"]
 		var died_on_hit := false
@@ -90,6 +91,7 @@ func play_combat(from_coords: Vector2i, to_coords: Vector2i, combat: Dictionary,
 			var death_entry = deaths_by_hit[hit_idx]
 			if death_entry.get("legion") == def_legion and death_entry.get("unit") == def_unit:
 				died_on_hit = true
+				AudioManager.play_unit_death(def_unit.unit_type)
 				def_visu.animate_unit_death(def_unit, direction)
 
 		if not died_on_hit:
@@ -148,6 +150,7 @@ func play_heal(coords: Vector2i, payload: Dictionary, options: Dictionary = {}) 
 			float(entry.get("hp_after", 0)),
 			float(unit.max_health)
 		)
+		AudioManager.play_heal_sfx()
 		await _beat(COMBAT_HIT_BEAT)
 
 	legion_visu.update_local_positions()

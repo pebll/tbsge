@@ -93,6 +93,7 @@ func tween_legion_move(legion: Legion, to_coords: Vector2i) -> Tween:
 	if not visu or not target:
 		return null
 	_orient_legion_toward(visu, target.position)
+	AudioManager.play_unit_move(legion.unit_type)
 	return visu.juice_move(target.position)
 
 func tween_legion_swap(legion_a: Legion, legion_b: Legion, to_a: Vector2i, to_b: Vector2i) -> Array:
@@ -103,9 +104,11 @@ func tween_legion_swap(legion_a: Legion, legion_b: Legion, to_a: Vector2i, to_b:
 	var tile_b: TileVisu = grid_visu.get(to_b)
 	if visu_a and tile_a:
 		_orient_legion_toward(visu_a, tile_a.position)
+		AudioManager.play_unit_move(legion_a.unit_type)
 		tweens.append(visu_a.juice_move(tile_a.position))
 	if visu_b and tile_b:
 		_orient_legion_toward(visu_b, tile_b.position)
+		AudioManager.play_unit_move(legion_b.unit_type)
 		tweens.append(visu_b.juice_move(tile_b.position))
 	return tweens
 
