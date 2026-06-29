@@ -51,7 +51,9 @@ var _button_disabled: bool = false
 
 const COLOR_BORDER := Color(0.78, 0.70, 0.58)
 const COLOR_TEXT := Color(0.12, 0.10, 0.08)
+const COLOR_TEXT_DISABLED := Color(0.42, 0.38, 0.34)
 const COLOR_BLOCK_BG := Color(0.93, 0.89, 0.82)
+const COLOR_BLOCK_BG_DISABLED := Color(0.84, 0.79, 0.72)
 const BORDER_THICK := 4
 const RADIUS := 16
 
@@ -187,9 +189,10 @@ func _apply_font_size() -> void:
 func _apply_theme() -> void:
 	for color_name in [
 		"font_color", "font_hover_color", "font_pressed_color",
-		"font_focus_color", "font_hover_pressed_color",
+		"font_focus_color", "font_hover_pressed_color", "font_disabled_color",
 	]:
-		_button.add_theme_color_override(color_name, COLOR_TEXT)
+		var color := COLOR_TEXT_DISABLED if color_name == "font_disabled_color" else COLOR_TEXT
+		_button.add_theme_color_override(color_name, color)
 
 	_button.clip_text = true
 	_button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
@@ -201,7 +204,7 @@ func _apply_theme() -> void:
 	_button.add_theme_stylebox_override("hover", hover_sb)
 	_button.add_theme_stylebox_override("pressed", pressed_sb)
 	_button.add_theme_stylebox_override("focus", normal_sb)
-	_button.add_theme_stylebox_override("disabled", _make_stylebox(Color(0.86, 0.81, 0.74)))
+	_button.add_theme_stylebox_override("disabled", _make_stylebox(COLOR_BLOCK_BG_DISABLED))
 
 func _make_stylebox(bg: Color) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()

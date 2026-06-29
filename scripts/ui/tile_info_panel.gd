@@ -1,6 +1,8 @@
 class_name TileInfoPanel
 extends PanelContainer
 
+signal draft_count_min_pressed
+signal draft_count_max_pressed
 signal draft_count_increase_pressed
 signal draft_count_decrease_pressed
 signal draft_change_type_pressed
@@ -33,8 +35,10 @@ const MinigameRulesScript = preload("res://scripts/minigame/minigame_rules.gd")
 @onready var ap_value: Label = %ApValue
 @onready var units_list: VBoxContainer = %UnitsList
 @onready var draft_controls: VBoxContainer = %DraftControls
+@onready var min_button: GameButton = %MinButton
 @onready var minus_button: GameButton = %MinusButton
 @onready var plus_button: GameButton = %PlusButton
+@onready var max_button: GameButton = %MaxButton
 @onready var count_value: Label = %CountValue
 @onready var cost_value: Label = %CostValue
 @onready var change_type_button: GameButton = %ChangeTypeButton
@@ -65,8 +69,10 @@ const ICON_SHIELD := preload("res://assets/icons/base_icons_sprites/shield.png")
 
 func _ready() -> void:
 	_apply_style()
+	min_button.pressed.connect(func(): draft_count_min_pressed.emit())
 	minus_button.pressed.connect(func(): draft_count_decrease_pressed.emit())
 	plus_button.pressed.connect(func(): draft_count_increase_pressed.emit())
+	max_button.pressed.connect(func(): draft_count_max_pressed.emit())
 	change_type_button.pressed.connect(func(): draft_change_type_pressed.emit())
 	clear_button.pressed.connect(func(): draft_clear_slot_pressed.emit())
 	_set_empty_state()
@@ -168,19 +174,24 @@ func show_draft_message(text: String) -> void:
 		cost_value.text = text
 
 func _refresh_draft_controls() -> void:
-	var max_count := MinigameRulesScript.max_units_in_legion(_draft_unit_type)
+	var legion_cap := MinigameRulesScript.max_units_in_legion(_draft_unit_type)
+	var affordable_max := _max_draft_unit_count()
 	var cost := MinigameRulesScript.legion_cost(_draft_unit_type, _draft_unit_count)
 	var fill := MinigameRulesScript.legion_fill(_draft_unit_type, _draft_unit_count)
-	count_value.text = "%d / %d" % [_draft_unit_count, max_count]
+	count_value.text = "%d / %d" % [_draft_unit_count, legion_cap]
 	cost_value.text = "Legion cost: %d gold  •  Size %.1f / 12" % [cost, fill]
+	min_button.button_disabled = _draft_unit_count <= 1
 	minus_button.button_disabled = _draft_unit_count <= 1
-	plus_button.button_disabled = not _can_add_draft_unit()
+	plus_button.button_disabled = _draft_unit_count >= affordable_max
+	max_button.button_disabled = _draft_unit_count >= affordable_max
+
+func _max_draft_unit_count() -> int:
+	return MinigameRulesScript.max_affordable_unit_count(
+		_draft_unit_type, _draft_unit_count, _remaining_budget
+	)
 
 func _can_add_draft_unit() -> bool:
-	var max_count := MinigameRulesScript.max_units_in_legion(_draft_unit_type)
-	if _draft_unit_count >= max_count:
-		return false
-	return MinigameRulesScript.unit_price(_draft_unit_type) <= _remaining_budget
+	return _draft_unit_count < _max_draft_unit_count()
 
 func _render_legion(legion: Legion) -> void:
 	_apply_team_accent(legion.team_id)

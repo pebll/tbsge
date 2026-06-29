@@ -25,6 +25,19 @@ static func max_units_in_legion(unit_type: String, max_fill: float = 12.0) -> in
 		return 1
 	return maxi(1, int(floor(max_fill / size)))
 
+static func max_affordable_unit_count(
+	unit_type: String,
+	current_count: int,
+	remaining_budget: int,
+	max_fill: float = 12.0
+) -> int:
+	var cap := max_units_in_legion(unit_type, max_fill)
+	var price := unit_price(unit_type)
+	if price <= 0:
+		return cap
+	var available := remaining_budget + legion_cost(unit_type, current_count)
+	return clampi(available / price, 1, cap)
+
 static func legion_cost(unit_type: String, count: int) -> int:
 	return unit_price(unit_type) * count
 

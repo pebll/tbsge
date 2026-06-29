@@ -237,6 +237,14 @@ layout_mode = 2
 alignment = 1
 theme_override_constants/separation = 16
 
+[node name="MinButton" parent="VBox/LegionBlock/DraftControls/CountRow" instance=ExtResource("2_gb")]
+unique_name_in_owner = true
+layout_mode = 2
+text = "MIN"
+font_size = 18
+size_preset = 1
+preferred_width = 72
+
 [node name="MinusButton" parent="VBox/LegionBlock/DraftControls/CountRow" instance=ExtResource("2_gb")]
 unique_name_in_owner = true
 layout_mode = 2
@@ -257,6 +265,14 @@ layout_mode = 2
 text = "+"
 size_preset = 1
 preferred_width = 64
+
+[node name="MaxButton" parent="VBox/LegionBlock/DraftControls/CountRow" instance=ExtResource("2_gb")]
+unique_name_in_owner = true
+layout_mode = 2
+text = "MAX"
+font_size = 18
+size_preset = 1
+preferred_width = 72
 
 [node name="CostValue" type="Label" parent="VBox/LegionBlock/DraftControls"]
 unique_name_in_owner = true

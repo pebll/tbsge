@@ -2,6 +2,7 @@ class_name DraftPhaseController
 extends RefCounted
 
 const MinigameSessionScript = preload("res://scripts/minigame/minigame_session.gd")
+const MinigameRulesScript = preload("res://scripts/minigame/minigame_rules.gd")
 const AiDrafter = preload("res://scripts/ai/ai_drafter.gd")
 
 const INVALID_COORDS := Vector2i(2147483646, 2147483646)
@@ -148,6 +149,28 @@ func handle_count_decrease() -> void:
 		return
 	var unit_type: String = String(placement.get("unit_type", ""))
 	var count: int = maxi(1, int(placement.get("unit_count", 1)) - 1)
+	_apply_placement(unit_type, count)
+
+func handle_count_min() -> void:
+	if selected_coords == INVALID_COORDS:
+		return
+	var draft: Dictionary = deps.session.get_view_state(viewing_team).get("draft", {})
+	var placement := _find_placement(draft, selected_coords)
+	if placement.is_empty():
+		return
+	_apply_placement(String(placement.get("unit_type", "")), 1)
+
+func handle_count_max() -> void:
+	if selected_coords == INVALID_COORDS:
+		return
+	var draft: Dictionary = deps.session.get_view_state(viewing_team).get("draft", {})
+	var placement := _find_placement(draft, selected_coords)
+	if placement.is_empty():
+		return
+	var unit_type: String = String(placement.get("unit_type", ""))
+	var current: int = int(placement.get("unit_count", 1))
+	var remaining: int = int(draft.get("remaining_budget", 0))
+	var count := MinigameRulesScript.max_affordable_unit_count(unit_type, current, remaining)
 	_apply_placement(unit_type, count)
 
 func handle_clear_slot() -> void:
