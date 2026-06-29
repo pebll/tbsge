@@ -25,6 +25,7 @@ var _damage_hp_bar: ProgressBar
 const FLASH_SHADER := preload("res://assets/shaders/sprite_white_flash.gdshader")
 const ICON_SHIELD := preload("res://assets/icons/base_icons_sprites/shield.png")
 const COLOR_SHIELD_FLASH := Color(0.45, 0.82, 1.0)
+const COLOR_HEAL_FLASH := Color(0.35, 0.95, 0.45)
 const BASE_SPRITE_SCALE := Vector2(0.2, 0.2)
 ## Most unit sheets are ~352x384; vermine sheets are ~690x752 and need auto-normalizing.
 const REFERENCE_SPRITE_HEIGHT := 384.0
@@ -437,15 +438,22 @@ func _stop_motion_tweens() -> void:
 
 func juice_heal_jump() -> Tween:
 	_stop_motion_tweens()
+	_play_color_flash(COLOR_HEAL_FLASH, 0.5)
+
 	var start_pos := sprite.position
-	var jump_up := start_pos + Vector2(0, -10)
+	var jump_up := start_pos + Vector2(0, -16)
 	var base_scale := _get_base_scale()
-	var squish_scale := Vector2(base_scale.x * 1.06, base_scale.y * 0.94)
+	var stretch_rise := Vector2(base_scale.x * 0.9, base_scale.y * 1.14)
+	var squash_land := Vector2(base_scale.x * 1.16, base_scale.y * 0.84)
+	var stretch_rebound := Vector2(base_scale.x * 0.94, base_scale.y * 1.08)
+
 	active_tween = create_tween()
-	active_tween.tween_property(sprite, "position", jump_up, 0.1).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	active_tween.parallel().tween_property(sprite, "scale", squish_scale, 0.08).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
-	active_tween.tween_property(sprite, "position", start_pos, 0.15).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	active_tween.parallel().tween_property(sprite, "scale", base_scale, 0.15).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+	active_tween.tween_property(sprite, "position", jump_up, 0.11).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	active_tween.parallel().tween_property(sprite, "scale", stretch_rise, 0.11).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	active_tween.tween_property(sprite, "position", start_pos, 0.14).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	active_tween.parallel().tween_property(sprite, "scale", squash_land, 0.09).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	active_tween.tween_property(sprite, "scale", stretch_rebound, 0.1).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	active_tween.tween_property(sprite, "scale", base_scale, 0.14).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
 	active_tween.tween_callback(start_idle_animation)
 	return active_tween
 
