@@ -4,6 +4,10 @@ extends RefCounted
 const MinigameRulesScript = preload("res://scripts/minigame/minigame_rules.gd")
 const DraftPlacementScript = preload("res://scripts/minigame/draft_placement.gd")
 
+const MIN_LEGIONS := 2
+const RANDOM_PLACEMENT_ATTEMPTS := 24
+const RANDOM_EXTRA_SPEND_ATTEMPTS := 32
+
 static func build_draft_commands(
 	session,
 	team_id: String,
@@ -20,22 +24,57 @@ static func build_draft_commands(
 		return commands
 
 	var snapshot := _snapshot_draft(draft)
-	var budget_left := int(draft.remaining_budget)
 	var placements: Dictionary = {}
+	var budget_left := int(draft.remaining_budget)
+	var shuffled_slots := slots.duplicate()
+	_shuffle(shuffled_slots, rng)
 
-	while budget_left >= _cheapest_unit_price():
-		_sync_draft_simulation(draft, placements, budget_left, snapshot)
-		var action := _find_best_spend_action(
-			session, team_id, slots, placements, draft, rng, budget_left
-		)
-		if action.is_empty():
+	var cheapest := _cheapest_unit_price()
+	var max_legions := mini(
+		shuffled_slots.size(),
+		maxi(MIN_LEGIONS, budget_left / maxi(1, cheapest))
+	)
+	var legion_count := rng.randi_range(MIN_LEGIONS, max_legions)
+
+	for coords in shuffled_slots:
+		if placements.size() >= legion_count:
 			break
-		var coords: Vector2i = action["coords"]
-		placements[coords] = {
-			"unit_type": action["unit_type"],
-			"unit_count": action["unit_count"],
-		}
-		budget_left -= int(action["spend"])
+		var placement := _try_random_placement(
+			session, team_id, coords, draft, slots, placements, budget_left, rng, false
+		)
+		if placement.is_empty():
+			continue
+		budget_left = _apply_simulated_placement(placements, placement, draft, budget_left, snapshot)
+
+	if placements.size() < MIN_LEGIONS:
+		placements.clear()
+		budget_left = int(snapshot["remaining_budget"])
+		_sync_draft_simulation(draft, placements, budget_left, snapshot)
+		for coords in shuffled_slots:
+			if placements.size() >= MIN_LEGIONS:
+				break
+			var placement := _try_minimal_placement(
+				session, team_id, coords, draft, slots, placements, budget_left
+			)
+			if placement.is_empty():
+				continue
+			budget_left = _apply_simulated_placement(placements, placement, draft, budget_left, snapshot)
+
+	var extra_attempts := RANDOM_EXTRA_SPEND_ATTEMPTS
+	while budget_left >= cheapest and extra_attempts > 0:
+		extra_attempts -= 1
+		if placements.size() >= shuffled_slots.size() and rng.randf() > 0.35:
+			break
+		if rng.randf() > 0.55:
+			continue
+		var coords: Vector2i = shuffled_slots[rng.randi() % shuffled_slots.size()]
+		var allow_replace := placements.has(coords) or rng.randf() < 0.65
+		var placement := _try_random_placement(
+			session, team_id, coords, draft, slots, placements, budget_left, rng, allow_replace
+		)
+		if placement.is_empty():
+			continue
+		budget_left = _apply_simulated_placement(placements, placement, draft, budget_left, snapshot)
 
 	_restore_draft(draft, snapshot)
 
@@ -62,135 +101,161 @@ static func _cheapest_unit_price() -> int:
 			cheapest = price
 	return cheapest
 
-static func _find_best_spend_action(
+static func _try_random_placement(
 	session,
 	team_id: String,
+	coords: Vector2i,
+	draft,
 	slots: Array,
 	placements: Dictionary,
-	draft,
+	budget_left: int,
 	rng: RandomNumberGenerator,
-	budget_left: int
+	allow_replace: bool
 ) -> Dictionary:
-	var best_spend := 0
-	var candidates: Array[Dictionary] = []
-
-	for coords in slots:
-		if not placements.has(coords):
-			for unit_type in UnitDefs.get_all_ids():
-				var placement := _best_new_placement(
-					session, team_id, coords, unit_type, draft, slots, budget_left
-				)
-				if placement.is_empty():
-					continue
-				var spend: int = placement["spend"]
-				if spend > best_spend:
-					best_spend = spend
-					candidates.clear()
-					candidates.append(placement)
-				elif spend == best_spend:
-					candidates.append(placement)
-		else:
-			var current: Dictionary = placements[coords]
-			var current_cost := MinigameRulesScript.legion_cost(
-				current["unit_type"], current["unit_count"]
-			)
-			for unit_type in UnitDefs.get_all_ids():
-				var placement := _best_upgrade_placement(
-					session,
-					team_id,
-					coords,
-					unit_type,
-					current_cost,
-					draft,
-					slots,
-					budget_left
-				)
-				if placement.is_empty():
-					continue
-				var spend: int = placement["spend"]
-				if spend > best_spend:
-					best_spend = spend
-					candidates.clear()
-					candidates.append(placement)
-				elif spend == best_spend:
-					candidates.append(placement)
-
-	if candidates.is_empty():
+	if placements.has(coords) and not allow_replace:
 		return {}
 
-	return candidates[rng.randi() % candidates.size()]
+	var unit_types := UnitDefs.get_all_ids()
+	_shuffle(unit_types, rng)
+	for _attempt in range(RANDOM_PLACEMENT_ATTEMPTS):
+		var unit_type: String = unit_types[rng.randi() % unit_types.size()]
+		var placement := _random_count_placement(
+			session,
+			team_id,
+			coords,
+			unit_type,
+			draft,
+			slots,
+			placements,
+			budget_left,
+			rng
+		)
+		if not placement.is_empty():
+			return placement
+	return {}
 
-static func _best_new_placement(
+static func _try_minimal_placement(
+	session,
+	team_id: String,
+	coords: Vector2i,
+	draft,
+	slots: Array,
+	placements: Dictionary,
+	budget_left: int
+) -> Dictionary:
+	if placements.has(coords):
+		return {}
+
+	var best_price := 0
+	var candidates: Array[String] = []
+	for unit_type in UnitDefs.get_all_ids():
+		var price := MinigameRulesScript.unit_price(unit_type)
+		if price <= 0 or price > budget_left:
+			continue
+		if best_price == 0 or price < best_price:
+			best_price = price
+			candidates = [unit_type]
+		elif price == best_price:
+			candidates.append(unit_type)
+
+	for unit_type in candidates:
+		var placement := _random_count_placement(
+			session,
+			team_id,
+			coords,
+			unit_type,
+			draft,
+			slots,
+			placements,
+			budget_left,
+			null,
+			1,
+			1
+		)
+		if not placement.is_empty():
+			return placement
+	return {}
+
+static func _random_count_placement(
 	session,
 	team_id: String,
 	coords: Vector2i,
 	unit_type: String,
 	draft,
 	slots: Array,
-	budget_left: int
+	placements: Dictionary,
+	budget_left: int,
+	rng: RandomNumberGenerator = null,
+	min_count: int = 1,
+	max_count_override: int = -1
 ) -> Dictionary:
-	var max_count := MinigameRulesScript.max_units_in_legion(
-		unit_type, session.config.max_legion_fill
-	)
-	for count in range(max_count, 0, -1):
-		var cost := MinigameRulesScript.legion_cost(unit_type, count)
-		if cost > budget_left:
-			continue
-		var err := MinigameRulesScript.validate_draft_placement(
-			team_id,
-			coords,
-			unit_type,
-			count,
-			draft,
-			slots,
-			session.config.max_legion_fill,
-			session.grid
-		)
-		if err.is_empty():
-			return {
-				"coords": coords,
-				"unit_type": unit_type,
-				"unit_count": count,
-				"spend": cost,
-			}
-	return {}
+	var current_cost := 0
+	if placements.has(coords):
+		var current: Dictionary = placements[coords]
+		current_cost = MinigameRulesScript.legion_cost(current["unit_type"], current["unit_count"])
 
-static func _best_upgrade_placement(
-	session,
-	team_id: String,
-	coords: Vector2i,
-	unit_type: String,
-	current_cost: int,
-	draft,
-	slots: Array,
-	budget_left: int
-) -> Dictionary:
 	var max_count := MinigameRulesScript.max_units_in_legion(
 		unit_type, session.config.max_legion_fill
 	)
-	for count in range(max_count, 0, -1):
-		var new_cost := MinigameRulesScript.legion_cost(unit_type, count)
-		var spend := new_cost - current_cost
-		if spend <= 0 or spend > budget_left:
-			continue
-		var err := MinigameRulesScript.validate_draft_placement(
-			team_id,
-			coords,
-			unit_type,
-			count,
-			draft,
-			slots,
-			session.config.max_legion_fill,
-			session.grid
+	if max_count_override > 0:
+		max_count = mini(max_count, max_count_override)
+
+	var price := MinigameRulesScript.unit_price(unit_type)
+	if price <= 0:
+		return {}
+
+	var affordable_max := (budget_left + current_cost) / price
+	max_count = mini(max_count, affordable_max)
+	var lowest := maxi(1, min_count)
+	if max_count < lowest:
+		return {}
+
+	var count := lowest
+	if max_count > lowest:
+		count = (
+			lowest
+			if rng == null
+			else rng.randi_range(lowest, max_count)
 		)
-		if err.is_empty():
-			return {
-				"coords": coords,
-				"unit_type": unit_type,
-				"unit_count": count,
-				"spend": spend,
-			}
-	return {}
+
+	var spend := MinigameRulesScript.legion_cost(unit_type, count) - current_cost
+	if spend <= 0 or spend > budget_left:
+		return {}
+
+	var err := MinigameRulesScript.validate_draft_placement(
+		team_id,
+		coords,
+		unit_type,
+		count,
+		draft,
+		slots,
+		session.config.max_legion_fill,
+		session.grid
+	)
+	if not err.is_empty():
+		return {}
+
+	return {
+		"coords": coords,
+		"unit_type": unit_type,
+		"unit_count": count,
+		"spend": spend,
+	}
+
+static func _apply_simulated_placement(
+	placements: Dictionary,
+	placement: Dictionary,
+	draft,
+	budget_left: int,
+	snapshot: Dictionary
+) -> int:
+	placements[placement["coords"]] = {
+		"unit_type": placement["unit_type"],
+		"unit_count": placement["unit_count"],
+	}
+	var new_budget := budget_left - int(placement["spend"])
+	_sync_draft_simulation(draft, placements, new_budget, snapshot)
+	return new_budget
 
 static func _snapshot_draft(draft) -> Dictionary:
 	var placement_snapshots: Array = []
@@ -228,3 +293,10 @@ static func _sync_draft_simulation(
 				placement["unit_count"]
 			)
 		)
+
+static func _shuffle(items: Array, rng: RandomNumberGenerator) -> void:
+	for i in range(items.size() - 1, 0, -1):
+		var j := rng.randi() % (i + 1)
+		var tmp = items[i]
+		items[i] = items[j]
+		items[j] = tmp

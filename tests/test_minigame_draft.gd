@@ -12,7 +12,7 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_both_ready_starts_battle():
 		return false
-	if not _test_ai_spends_all_gold():
+	if not _test_ai_drafts_multiple_legions():
 		return false
 	print("Success: Minigame draft tests")
 	return true
@@ -129,7 +129,7 @@ func _test_both_ready_starts_battle() -> bool:
 		return false
 	return true
 
-func _test_ai_spends_all_gold() -> bool:
+func _test_ai_drafts_multiple_legions() -> bool:
 	var session := MinigameTestHelpersScript.prepare_session()
 	var team_a_id: String = MinigameTestHelpersScript.team_a(session)
 	var team_b_id: String = MinigameTestHelpersScript.team_b(session)
@@ -154,15 +154,7 @@ func _test_ai_spends_all_gold() -> bool:
 			return false
 
 	var draft: DraftState = session.drafts[team_b_id] as DraftState
-	var cheapest := 999999
-	for unit_type in UnitDefs.get_all_ids():
-		cheapest = mini(cheapest, MinigameRulesScript.unit_price(unit_type))
-	if draft.remaining_budget >= cheapest:
-		push_error(
-			"AI should spend down to less than cheapest unit (%d left)" % draft.remaining_budget
-		)
-		return false
-	if draft.placements.is_empty():
-		push_error("AI should draft at least one legion")
+	if draft.placements.size() < 2:
+		push_error("AI should draft at least two legions (got %d)" % draft.placements.size())
 		return false
 	return true
