@@ -23,6 +23,8 @@ var _damage_hp_root: Control
 var _damage_hp_bar: ProgressBar
 
 const FLASH_SHADER := preload("res://assets/shaders/sprite_white_flash.gdshader")
+const ICON_SHIELD := preload("res://assets/icons/base_icons_sprites/shield.png")
+const COLOR_SHIELD_FLASH := Color(0.45, 0.82, 1.0)
 const BASE_SPRITE_SCALE := Vector2(0.2, 0.2)
 ## Most unit sheets are ~352x384; vermine sheets are ~690x752 and need auto-normalizing.
 const REFERENCE_SPRITE_HEIGHT := 384.0
@@ -447,10 +449,14 @@ func juice_heal_jump() -> Tween:
 	active_tween.tween_callback(start_idle_animation)
 	return active_tween
 
-func juice_hitted(_direction: Vector2) -> Tween:
+func juice_hitted(_direction: Vector2, shield_absorbed: float = 0.0) -> Tween:
 	_stop_motion_tweens()
 
-	_play_white_flash(0.55)
+	if shield_absorbed > 0.0:
+		_play_color_flash(COLOR_SHIELD_FLASH, 0.55)
+		_spawn_shield_hit_icon()
+	else:
+		_play_white_flash(0.55)
 
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
@@ -467,6 +473,29 @@ func juice_hitted(_direction: Vector2) -> Tween:
 	active_tween.parallel().tween_property(sprite, "rotation", 0.0, 0.28).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	active_tween.tween_callback(start_idle_animation)
 	return active_tween
+
+func _spawn_shield_hit_icon() -> void:
+	var icon := TextureRect.new()
+	icon.texture = ICON_SHIELD
+	icon.custom_minimum_size = Vector2(36, 36)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.modulate = Color(0.55, 0.88, 1.0, 0.0)
+	icon.z_index = 3600
+	add_child(icon)
+	var start_pos := _hp_bar_anchor_position() + Vector2(18, -8)
+	var jump_up := start_pos + Vector2(0, -26)
+	icon.position = start_pos
+	icon.scale = Vector2(0.65, 0.65)
+	icon.pivot_offset = icon.custom_minimum_size * 0.5
+
+	var tween := icon.create_tween()
+	tween.tween_property(icon, "modulate:a", 1.0, 0.08)
+	tween.parallel().tween_property(icon, "scale", Vector2(1.0, 1.0), 0.1)
+	tween.tween_property(icon, "position", jump_up, 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(icon, "position", start_pos, 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tween.parallel().tween_property(icon, "modulate:a", 0.0, 0.2)
+	tween.tween_callback(icon.queue_free)
 
 func juice_die(direction: Vector2) -> Tween:
 	if idle_tween and idle_tween.is_running():

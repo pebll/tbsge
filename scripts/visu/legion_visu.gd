@@ -215,7 +215,14 @@ func animate_unit_attack(unit: Unit, direction: Vector2) -> Tween:
 	uv.update_direction(direction)
 	return uv.juice_attack(direction)
 
-func animate_unit_hitted(unit: Unit, direction: Vector2, hp_before: float = -1.0, hp_after: float = -1.0, hp_max: float = -1.0) -> Tween:
+func animate_unit_hitted(
+	unit: Unit,
+	direction: Vector2,
+	hp_before: float = -1.0,
+	hp_after: float = -1.0,
+	hp_max: float = -1.0,
+	shield_absorbed: float = 0.0
+) -> Tween:
 	var uv: UnitVisu = get_unit_visu(unit)
 	if not uv:
 		return null
@@ -224,7 +231,7 @@ func animate_unit_hitted(unit: Unit, direction: Vector2, hp_before: float = -1.0
 		uv.show_combat_hp_chip(hp_before, hp_after, hp_max)
 	else:
 		uv.sync_damage_hp_bar()
-	return uv.juice_hitted(direction)
+	return uv.juice_hitted(direction, shield_absorbed)
 
 func animate_unit_healed(unit: Unit, hp_before: float, hp_after: float, hp_max: float) -> Tween:
 	var uv: UnitVisu = get_unit_visu(unit)

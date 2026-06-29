@@ -93,8 +93,14 @@ func play_combat(from_coords: Vector2i, to_coords: Vector2i, combat: Dictionary,
 				def_visu.animate_unit_death(def_unit, direction)
 
 		if not died_on_hit:
+			var shield_absorbed := float(h.get("shield_absorbed", 0.0))
 			def_visu.animate_unit_hitted(
-				def_unit, direction, def_hp_before, def_hp_after, float(def_unit.max_health)
+				def_unit,
+				direction,
+				def_hp_before,
+				def_hp_after,
+				float(def_unit.max_health),
+				shield_absorbed
 			)
 
 		var beat := COMBAT_DEATH_BEAT if died_on_hit else COMBAT_HIT_BEAT
