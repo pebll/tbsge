@@ -26,6 +26,13 @@ const FLASH_SHADER := preload("res://assets/shaders/sprite_white_flash.gdshader"
 const BASE_SPRITE_SCALE := Vector2(0.2, 0.2)
 ## Most unit sheets are ~352x384; vermine sheets are ~690x752 and need auto-normalizing.
 const REFERENCE_SPRITE_HEIGHT := 384.0
+const HP_BAR_WIDTH_PX := 74.0
+## Base downward offset from texture top in world units (tuned at image_size 1.0).
+const HP_BAR_WORLD_DROP_BELOW_TOP := 9.0
+## Extra world drop as image_size goes below 1.0 (smaller units sit lower on the body).
+const HP_BAR_DROP_PER_MISSING_IMAGE_SIZE := 14.0
+## Fixed world size for HP UI — independent of per-unit sprite scale and idle juice.
+const HP_BAR_DISPLAY_SCALE := BASE_SPRITE_SCALE
 
 var _flash_mat: ShaderMaterial
 var _flash_tween: Tween
@@ -38,6 +45,44 @@ func _ready() -> void:
 	_build_hp_fx()
 	_build_persistent_hp_bar()
 	sync_damage_hp_bar()
+	set_process(true)
+
+func _process(_delta: float) -> void:
+	_sync_hp_bar_transform()
+
+func _hp_bar_world_drop() -> float:
+	var def := _get_unit_def()
+	var image_scale := def.image_size if def else 1.0
+	var small_unit_extra := maxf(0.0, 1.0 - image_scale) * HP_BAR_DROP_PER_MISSING_IMAGE_SIZE
+	return HP_BAR_WORLD_DROP_BELOW_TOP + small_unit_extra
+
+func _hp_bar_anchor_position() -> Vector2:
+	# Texture top tracks art bounds; drop is world-space so small units aren't left floating high.
+	if not sprite:
+		return Vector2.ZERO
+	var tex: Texture2D = sprite.texture
+	if tex == null:
+		return sprite.position
+	var base_scale := _get_base_scale()
+	var tex_size := tex.get_size()
+	var bar_visual_width := HP_BAR_WIDTH_PX * HP_BAR_DISPLAY_SCALE.x
+	var top_center_x := sprite.offset.x
+	var texture_top_world_y := sprite.position.y + (sprite.offset.y - tex_size.y * 0.5) * base_scale.y
+	return Vector2(
+		sprite.position.x + top_center_x * base_scale.x - bar_visual_width * 0.5,
+		texture_top_world_y + _hp_bar_world_drop()
+	)
+
+func _sync_hp_bar_transform() -> void:
+	if not sprite:
+		return
+	var anchor := _hp_bar_anchor_position()
+	if _hp_fx_root:
+		_hp_fx_root.position = anchor
+		_hp_fx_root.scale = HP_BAR_DISPLAY_SCALE
+	if _damage_hp_root:
+		_damage_hp_root.position = anchor
+		_damage_hp_root.scale = HP_BAR_DISPLAY_SCALE
 
 func _setup_flash_shader() -> void:
 	_flash_mat = ShaderMaterial.new()
@@ -100,11 +145,8 @@ func _build_hp_fx() -> void:
 	_hp_fx_root.modulate = Color(1, 1, 1, 0)
 	# Needs to render above tiles/units; keep below CANVAS_ITEM_Z_MAX.
 	_hp_fx_root.z_index = 3500
-	# Attach to the sprite so it follows per-unit hit/move "juice" motion.
-	sprite.add_child(_hp_fx_root)
+	add_child(_hp_fx_root)
 
-	# Position roughly "over the head". Sprite has an offset, so a fixed local offset works well enough.
-	_hp_fx_root.position = Vector2(-37, -148)
 	_hp_fx_root.custom_minimum_size = Vector2(74, 14)
 
 	_hp_bar_chip = ProgressBar.new()
@@ -187,8 +229,7 @@ func _build_persistent_hp_bar() -> void:
 	_damage_hp_root = Control.new()
 	_damage_hp_root.visible = false
 	_damage_hp_root.z_index = 3400
-	sprite.add_child(_damage_hp_root)
-	_damage_hp_root.position = Vector2(-37, -148)
+	add_child(_damage_hp_root)
 	_damage_hp_root.custom_minimum_size = Vector2(74, 10)
 
 	_damage_hp_bar = ProgressBar.new()

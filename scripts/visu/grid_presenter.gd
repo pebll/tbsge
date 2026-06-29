@@ -92,6 +92,7 @@ func tween_legion_move(legion: Legion, to_coords: Vector2i) -> Tween:
 	var target: TileVisu = grid_visu.get(to_coords)
 	if not visu or not target:
 		return null
+	_orient_legion_toward(visu, target.position)
 	return visu.juice_move(target.position)
 
 func tween_legion_swap(legion_a: Legion, legion_b: Legion, to_a: Vector2i, to_b: Vector2i) -> Array:
@@ -101,10 +102,17 @@ func tween_legion_swap(legion_a: Legion, legion_b: Legion, to_a: Vector2i, to_b:
 	var tile_a: TileVisu = grid_visu.get(to_a)
 	var tile_b: TileVisu = grid_visu.get(to_b)
 	if visu_a and tile_a:
+		_orient_legion_toward(visu_a, tile_a.position)
 		tweens.append(visu_a.juice_move(tile_a.position))
 	if visu_b and tile_b:
+		_orient_legion_toward(visu_b, tile_b.position)
 		tweens.append(visu_b.juice_move(tile_b.position))
 	return tweens
+
+func _orient_legion_toward(legion_visu: LegionVisu, target_world_pos: Vector2) -> void:
+	var dir := target_world_pos - legion_visu.position
+	if dir.length_squared() > 0.0001:
+		legion_visu.update_direction(dir.normalized())
 
 func remove_dead_legions(session: MatchSessionScript) -> void:
 	for legion in legion_to_visu.keys():
