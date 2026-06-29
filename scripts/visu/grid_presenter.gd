@@ -113,12 +113,13 @@ func remove_dead_legions(session: MatchSessionScript) -> void:
 
 func _remove_legion_visu(legion: Legion) -> void:
 	var visu: LegionVisu = legion_to_visu.get(legion)
-	if visu:
-		visu.queue_free()
 	legion_to_visu.erase(legion)
+	if visu == null:
+		return
 	var tile_visu: TileVisu = grid_visu.get(legion.tile_coords)
 	if tile_visu and tile_visu.legion_visu == visu:
 		tile_visu.legion_visu = null
+	visu.queue_free()
 
 func _clear_map() -> void:
 	for child in tiles_container.get_children():

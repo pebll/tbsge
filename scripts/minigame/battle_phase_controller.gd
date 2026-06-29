@@ -103,11 +103,15 @@ func maybe_start_ai_turn() -> void:
 func check_match_end() -> void:
 	if deps.session.phase != MinigameSessionScript.Phase.ENDED:
 		return
+	deps.action_playback.dismiss_fx_tail()
 	deps.battle_ui.deselect()
+	deps.battle_ui.clear_overlays()
 	deps.turn_hud.hide()
 	deps.setup_panel.hide()
 	deps.unit_picker.hide()
 	deps.tile_info_panel.hide()
+	if deps.action_bar:
+		deps.action_bar.hide()
 	deps.game_over_panel.show_for_winner(deps.session.winner)
 
 func inspect_tile(coords: Vector2i) -> void:

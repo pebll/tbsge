@@ -1,6 +1,11 @@
 class_name ActionPlayback
 extends RefCounted
 
+## Visual playback for battle actions. Each play_* method awaits only blocking
+## animation (attacks, tweens, reposition). Non-blocking report popups and lingering
+## HP FX go through ActionFxTail.release() at the end.
+
+const ActionFxTailScript = preload("res://scripts/battle/action_fx_tail.gd")
 const CombatFxPresenterScript = preload("res://scripts/visu/combat_fx_presenter.gd")
 
 const COMBAT_HIT_BEAT := 0.4
@@ -10,7 +15,8 @@ const COMBAT_REPOSITION_BEAT := 0.45
 var _host: Node
 var _tile_visu_at: Callable
 var _legion_visu_at: Callable
-var _combat_fx: RefCounted
+var _combat_fx: CombatFxPresenter
+var _fx_tail: ActionFxTail
 
 func _init(
 	host: Node,
@@ -22,9 +28,13 @@ func _init(
 	_tile_visu_at = tile_visu_fn
 	_legion_visu_at = legion_visu_fn
 	_combat_fx = CombatFxPresenterScript.new(host, fx_layer)
+	_fx_tail = ActionFxTailScript.new(_combat_fx)
 
-func get_combat_fx() -> RefCounted:
+func get_combat_fx() -> CombatFxPresenter:
 	return _combat_fx
+
+func dismiss_fx_tail() -> void:
+	_combat_fx.dismiss_all()
 
 func play_combat(from_coords: Vector2i, to_coords: Vector2i, combat: Dictionary, options: Dictionary = {}) -> void:
 	var from_visu: TileVisu = _tile_visu_at.call(from_coords)
@@ -105,10 +115,13 @@ func play_combat(from_coords: Vector2i, to_coords: Vector2i, combat: Dictionary,
 		if on_ap_changed.is_valid() and attacker:
 			on_ap_changed.call(attacker)
 
-	_combat_fx.show_combat_losses(
-		hits, deaths, attacker, defender, attacker_world_pos, defender_world_pos
+	_fx_tail.release(
+		func() -> void:
+			_combat_fx.show_combat_losses(
+				hits, deaths, attacker, defender, attacker_world_pos, defender_world_pos
+			),
+		legion_to_visu.values()
 	)
-	await _combat_fx.hide_hp_fx_later(legion_to_visu.values())
 
 func play_heal(coords: Vector2i, payload: Dictionary, options: Dictionary = {}) -> void:
 	var tile_visu: TileVisu = _tile_visu_at.call(coords)
@@ -147,8 +160,11 @@ func play_heal(coords: Vector2i, payload: Dictionary, options: Dictionary = {}) 
 		if deselect.is_valid():
 			deselect.call()
 
-	_combat_fx.spawn_heal_popup(world_pos, int(payload.get("healed_total", 0)))
-	await _combat_fx.hide_hp_fx_later([legion_visu])
+	_fx_tail.release(
+		func() -> void:
+			_combat_fx.spawn_heal_popup(world_pos, int(payload.get("healed_total", 0))),
+		[legion_visu]
+	)
 
 func _build_legion_visu_map(attacker: Legion, defender: Legion, hits: Array) -> Dictionary:
 	var legion_to_visu: Dictionary = {}

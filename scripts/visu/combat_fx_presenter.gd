@@ -9,6 +9,7 @@ const POPUP_LINGER := 3.3
 
 var _host: Node
 var _fx_layer: CanvasLayer
+var _hp_fx_tail_epoch: int = 0
 
 func _init(host: Node, fx_layer: CanvasLayer) -> void:
 	_host = host
@@ -70,13 +71,32 @@ func spawn_heal_popup(world_pos: Vector2, healed_total: int) -> void:
 	)
 
 func hide_hp_fx_later(legion_visus: Array) -> void:
+	## Async cleanup — call via ActionFxTail.release(), not awaited by action playback.
 	if _host == null or not _host.is_inside_tree():
 		return
-	await _host.get_tree().create_timer(POPUP_LINGER).timeout
+	_hp_fx_tail_epoch += 1
+	var epoch := _hp_fx_tail_epoch
+	var snapshot: Array = []
 	for lv in legion_visus:
-		var legion_visu: LegionVisu = lv
-		if legion_visu and is_instance_valid(legion_visu):
-			legion_visu.hide_all_combat_hp_fx()
+		if is_instance_valid(lv):
+			snapshot.append(lv)
+	await _host.get_tree().create_timer(POPUP_LINGER).timeout
+	if epoch != _hp_fx_tail_epoch:
+		return
+	for lv in snapshot:
+		if not is_instance_valid(lv):
+			continue
+		(lv as LegionVisu).hide_all_combat_hp_fx()
+
+func dismiss_all() -> void:
+	_hp_fx_tail_epoch += 1
+	_clear_floating_popups()
+
+func _clear_floating_popups() -> void:
+	if _fx_layer == null:
+		return
+	for child in _fx_layer.get_children():
+		child.queue_free()
 
 func _spawn_floating_popup(world_pos: Vector2, rows: Array) -> void:
 	if _fx_layer == null or _host == null or not _host.is_inside_tree():

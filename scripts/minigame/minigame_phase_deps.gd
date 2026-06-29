@@ -14,6 +14,7 @@ var tile_info_panel
 var pass_overlay
 var status_label
 var game_over_panel
+var action_bar
 
 func config():
 	return session.config if session else null

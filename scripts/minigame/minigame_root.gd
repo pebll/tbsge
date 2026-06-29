@@ -27,6 +27,7 @@ var draft: DraftPhaseControllerScript
 var battle: BattlePhaseControllerScript
 
 var _ui_layer: CanvasLayer
+var _overlay_layer: CanvasLayer
 var _setup_panel: MinigameSetupPanel
 var _unit_picker: MinigameUnitPicker
 var _turn_hud: TurnHud
@@ -111,6 +112,7 @@ func _setup_phase_controllers() -> void:
 	deps.pass_overlay = _pass_overlay
 	deps.status_label = _status_label
 	deps.game_over_panel = _game_over_panel
+	deps.action_bar = _action_bar
 
 	draft = DraftPhaseControllerScript.new(deps)
 	battle = BattlePhaseControllerScript.new(deps)
@@ -143,6 +145,11 @@ func _setup_ui() -> void:
 	_ui_layer = CanvasLayer.new()
 	_ui_layer.name = "UI"
 	add_child(_ui_layer)
+
+	_overlay_layer = CanvasLayer.new()
+	_overlay_layer.name = "OverlayUI"
+	_overlay_layer.layer = 10
+	add_child(_overlay_layer)
 
 	_setup_panel = preload("res://scenes/ui/minigame_setup_panel.tscn").instantiate()
 	_ui_layer.add_child(_setup_panel)
@@ -191,7 +198,7 @@ func _setup_ui() -> void:
 	_ui_layer.add_child(_pass_overlay)
 
 	_game_over_panel = preload("res://scenes/ui/game_over_panel.tscn").instantiate()
-	_ui_layer.add_child(_game_over_panel)
+	_overlay_layer.add_child(_game_over_panel)
 	_game_over_panel.new_game_pressed.connect(_on_game_over_new_game)
 	_game_over_panel.main_menu_pressed.connect(_on_game_over_main_menu)
 
