@@ -81,6 +81,8 @@ static func _execute_move(
 	legion.tile_coords = to_coords
 	legion.spend_ap(action.ap_cost)
 	_apply_terminal(state, legion, action, from_coords)
+	# Moving onto a tile must not inherit a wait left by a destroyed previous occupant.
+	state.turn_manager.clear_wait(to_coords)
 	return _ok(["legion_moved"], {
 		"action_id": action.id,
 		"from": from_coords,
@@ -223,6 +225,8 @@ static func _cleanup_empty_legion(state: BattleStateScript, coords: Vector2i) ->
 		return
 	if tile.legion and tile.legion.units.is_empty():
 		tile.legion = null
+		# Don't leave a wait stain on a vacated tile — another ally may move in.
+		state.turn_manager.clear_wait(coords)
 
 static func _ok(events: Array, payload: Dictionary = {}) -> Dictionary:
 	return {"ok": true, "events": events, "payload": payload}

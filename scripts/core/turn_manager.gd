@@ -57,6 +57,9 @@ func wait_legion(coords: Vector2i) -> void:
 	if coords not in waited_coords:
 		waited_coords.append(coords)
 
+func clear_wait(coords: Vector2i) -> void:
+	waited_coords.erase(coords)
+
 func _next_team_id() -> String:
 	if team_order.is_empty():
 		return active_team_id

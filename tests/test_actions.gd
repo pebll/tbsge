@@ -14,6 +14,8 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_self_heal_unavailable_at_full_hp():
 		return false
+	if not _test_move_onto_wiped_attacker_tile_can_still_act():
+		return false
 	print("Success: Action system tests")
 	return true
 
@@ -123,5 +125,91 @@ func _test_self_heal_unavailable_at_full_hp() -> bool:
 		return false
 	if not session.get_action_targets(green, "self_heal").is_empty():
 		push_error("Self heal should have no targets at full HP")
+		return false
+	return true
+
+func _test_move_onto_wiped_attacker_tile_can_still_act() -> bool:
+	## Terminal combat that wipes the attacker used to leave a waited-coords stain.
+	## A follow-up ally moving onto that tile must still be allowed to act.
+	var session := MinigameTestHelpersScript.prepare_session()
+	var started: Dictionary = MinigameTestHelpersScript.start_two_legion_battle(session)
+	var team_a: String = MinigameTestHelpersScript.team_a(session)
+	var attacker: Legion = started["a"]
+	var defender: Legion = started["b"]
+
+	var old_a := attacker.tile_coords
+	var old_b := defender.tile_coords
+	if session.grid.get(old_a):
+		session.grid[old_a].legion = null
+	if session.grid.get(old_b):
+		session.grid[old_b].legion = null
+
+	var atk_coords := Vector2i(0, 0)
+	var def_coords := Vector2i(1, 0)
+	var ally_from := Vector2i(0, -1)
+	if session.grid.get(atk_coords) == null or session.grid.get(def_coords) == null:
+		return true
+	if session.grid.get(ally_from) == null:
+		return true
+
+	attacker.tile_coords = atk_coords
+	defender.tile_coords = def_coords
+	session.grid[atk_coords].legion = attacker
+	session.grid[def_coords].legion = defender
+
+	# Keep team A alive after the wipe so the match does not end.
+	var ally := Legion.new("GOBLIN", 2, ally_from, team_a)
+	session.grid[ally_from].legion = ally
+	session.legions.append(ally)
+
+	for u in attacker.units:
+		u.current_health = 1
+		u.attack = 1
+	for u in defender.units:
+		u.current_health = 100
+		u.attack = 100
+
+	var result := session.apply({
+		"type": "use_action",
+		"action_id": "melee_attack",
+		"from": atk_coords,
+		"to": def_coords,
+		"rng_seed": 1,
+	})
+	if not result["ok"]:
+		push_error("Setup attack failed: %s" % result.get("error"))
+		return false
+	if session.grid[atk_coords].legion != null:
+		push_error("Expected attacker tile to be empty after wipe")
+		return false
+	if atk_coords in session.turn_manager.waited_coords:
+		push_error("Wait stain should clear when attacker tile is vacated")
+		return false
+
+	var move := session.apply({
+		"type": "use_action",
+		"action_id": "move",
+		"from": ally_from,
+		"to": atk_coords,
+	})
+	if not move["ok"]:
+		push_error("Ally move onto wiped tile failed: %s" % move.get("error"))
+		return false
+	if ally.tile_coords != atk_coords:
+		push_error("Ally should occupy wiped tile")
+		return false
+	if atk_coords not in session.get_actionable_coords():
+		push_error("Ally on former wipe tile should still be actionable with remaining AP")
+		return false
+
+	var melee := session.apply({
+		"type": "use_action",
+		"action_id": "melee_attack",
+		"from": atk_coords,
+		"to": def_coords,
+		"rng_seed": 2,
+	})
+	if not melee["ok"]:
+		push_error("Ally melee from former wipe tile rejected: %s" % melee.get("error"))
 		return false
 	return true

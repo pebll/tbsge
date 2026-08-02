@@ -143,13 +143,18 @@ func _remove_legion_from_grid(legion: Legion) -> void:
 
 func _cleanup_empty_legion(coords: Vector2i) -> void:
 	var tile: Tile = _tile_at(coords)
-	if tile == null or tile.legion == null:
+	if tile == null:
 		return
-	if tile.legion.units.size() > 0:
+	if tile.legion != null and tile.legion.units.size() > 0:
 		return
-	var legion: Legion = tile.legion
-	legions.erase(legion)
-	tile.legion = null
+	if tile.legion != null:
+		legions.erase(tile.legion)
+		tile.legion = null
+	# Resolver may already have nulled the tile; still drop wait stain + prune empties.
+	turn_manager.clear_wait(coords)
+	for legion in legions.duplicate():
+		if legion.units.is_empty():
+			legions.erase(legion)
 
 func _tile_at(coords: Vector2i) -> Tile:
 	return grid.get(coords)

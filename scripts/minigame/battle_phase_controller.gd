@@ -11,6 +11,7 @@ signal ai_turn_finished
 var deps: MinigamePhaseDeps
 var input_locked: bool = false
 var ai_running: bool = false
+var _action_in_flight: bool = false
 
 func _init(phase_deps: MinigamePhaseDeps) -> void:
 	deps = phase_deps
@@ -27,7 +28,7 @@ func exit() -> void:
 	deps.turn_hud.hide()
 
 func is_input_locked() -> bool:
-	return input_locked or ai_running
+	return input_locked or ai_running or _action_in_flight
 
 func is_blocking_input() -> bool:
 	return deps.game_over_panel.visible
@@ -52,6 +53,10 @@ func perform_use_action(
 	to_coords: Vector2i,
 	rng_seed: int = 0
 ) -> bool:
+	if _action_in_flight:
+		return false
+	_action_in_flight = true
+
 	var cmd := {
 		"type": "use_action",
 		"action_id": action_id,
@@ -63,6 +68,7 @@ func perform_use_action(
 
 	var from_tile: Tile = deps.session.grid.get(from_coords)
 	if from_tile == null or not from_tile.has_legion():
+		_action_in_flight = false
 		return false
 
 	var result: Dictionary = deps.session.apply(cmd)
@@ -72,12 +78,14 @@ func perform_use_action(
 				"[AI] action rejected: %s %s -> %s (%s)"
 				% [action_id, from_coords, to_coords, result.get("error", "?")]
 			)
+		_action_in_flight = false
 		return false
 
 	if not ai_running:
 		input_locked = true
 
-	var played: bool = await deps.action_runner.play_result(
+	# Model already committed — treat as success even if visuals cannot play.
+	await deps.action_runner.play_result(
 		deps.host,
 		deps.session,
 		deps.presenter,
@@ -88,8 +96,12 @@ func perform_use_action(
 	)
 	if not ai_running:
 		input_locked = false
+		# Ensure selection/overlays never stick after a resolved action.
+		deps.battle_ui.deselect()
+		deps.battle_ui.clear_overlays()
 	check_match_end()
-	return played
+	_action_in_flight = false
+	return true
 
 func maybe_start_ai_turn() -> void:
 	if deps.session.phase != MinigameSessionScript.Phase.BATTLE:
