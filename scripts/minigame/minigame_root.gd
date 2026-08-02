@@ -43,6 +43,7 @@ var _action_bar: Control
 @onready var _camera: Camera2D = $Camera2D
 
 func _ready() -> void:
+	AudioManager.ensure_music()
 	var config: MinigameConfig = load(config_path)
 	if config == null:
 		push_error("Failed to load minigame config: %s" % config_path)

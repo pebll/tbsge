@@ -16,6 +16,7 @@ const RADIUS := 16
 @onready var back_button: GameButton = %BackButton
 
 func _ready() -> void:
+	AudioManager.ensure_music()
 	_apply_styles()
 	sandbox_button.pressed.connect(func(): get_tree().change_scene_to_file(SANDBOX_SCENE))
 	duel_button.pressed.connect(func(): get_tree().change_scene_to_file(DUEL_R3_SCENE))
