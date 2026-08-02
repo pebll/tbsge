@@ -215,6 +215,21 @@ func animate_unit_attack(unit: Unit, direction: Vector2) -> Tween:
 	uv.update_direction(direction)
 	return uv.juice_attack(direction)
 
+func animate_unit_ranged_attack(unit: Unit, direction: Vector2, on_release: Callable = Callable()) -> Tween:
+	var uv: UnitVisu = get_unit_visu(unit)
+	if not uv:
+		return null
+	uv.update_direction(direction)
+	return uv.juice_ranged_attack(direction, on_release)
+
+func get_unit_sprite_global_position(unit: Unit) -> Vector2:
+	var uv: UnitVisu = get_unit_visu(unit)
+	if uv == null:
+		return global_position
+	if uv.sprite:
+		return uv.sprite.global_position
+	return uv.global_position
+
 func animate_unit_hitted(
 	unit: Unit,
 	direction: Vector2,

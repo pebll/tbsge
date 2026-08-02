@@ -163,6 +163,7 @@ func _setup_battle_context() -> void:
 	battle_context.spawn_fn = func(coords: Vector2i) -> void: spawn_unit(coords)
 	battle_context.inspect_fn = func(coords: Vector2i) -> void: inspect_tile(coords)
 	battle_context.clear_inspect_fn = func() -> void: clear_inspect()
+	battle_context.overlay_ui_fn = func() -> Node: return tile_info_layer
 
 func _action_hooks(unlock_on_finish: bool) -> Dictionary:
 	return {

@@ -27,6 +27,8 @@ func _wire_interaction() -> void:
 	interaction.legions_fn = func() -> Array: return context.legions()
 	interaction._inspect_fn = func(coords: Vector2i) -> void: context.inspect_tile(coords)
 	interaction._clear_inspect_fn = func() -> void: context.clear_inspect()
+	if context.overlay_ui_fn.is_valid():
+		interaction.overlay_ui_fn = context.overlay_ui_fn
 
 func attach_action_bar(bar: Control) -> void:
 	interaction.action_bar = bar

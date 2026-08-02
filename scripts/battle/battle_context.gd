@@ -14,6 +14,7 @@ var allows_spawn_fn: Callable = func(_coords: Vector2i) -> bool: return false
 var spawn_fn: Callable = func(_coords: Vector2i) -> void: pass
 var inspect_fn: Callable = func(_coords: Vector2i) -> void: pass
 var clear_inspect_fn: Callable = func() -> void: pass
+var overlay_ui_fn: Callable = Callable()
 
 func battle_state() -> BattleStateScript:
 	if session == null:

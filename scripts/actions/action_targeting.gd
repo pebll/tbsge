@@ -19,6 +19,8 @@ static func can_use(state: BattleStateScript, legion: Legion, action: ActionDefi
 		return false
 	if not legion.can_afford(action.ap_cost):
 		return false
+	if action.id == "ranged_attack" and not _legion_has_ranged(legion):
+		return false
 	return not get_targets(state, legion, action).is_empty()
 
 static func get_targets(
@@ -42,6 +44,10 @@ static func get_targets(
 			return _move_targets(state, from_tile, legion)
 		ActionDefinitionScript.TargetingKind.ADJACENT_ENEMY:
 			return _coords_from_tiles(Utils.get_attackable_tiles(from_tile, state.grid))
+		ActionDefinitionScript.TargetingKind.ENEMY_IN_RANGE:
+			return _coords_from_tiles(
+				Utils.get_ranged_attackable_tiles(from_tile, state.grid, _legion_attack_range(legion))
+			)
 	return []
 
 static func _move_targets(state: BattleStateScript, from_tile: Tile, legion: Legion) -> Array[Vector2i]:
@@ -66,6 +72,18 @@ static func _legion_needs_heal(legion: Legion) -> bool:
 		if unit != null and int(unit.current_health) < int(unit.max_health):
 			return true
 	return false
+
+static func _legion_has_ranged(legion: Legion) -> bool:
+	if legion == null or legion.units.is_empty():
+		return false
+	var u: Unit = legion.units[0]
+	return u != null and u.has_ranged()
+
+static func _legion_attack_range(legion: Legion) -> int:
+	if legion == null or legion.units.is_empty():
+		return 0
+	var u: Unit = legion.units[0]
+	return u.attack_range if u else 0
 
 static func is_swap_target(state: BattleStateScript, from_coords: Vector2i, to_coords: Vector2i) -> bool:
 	var to_tile: Tile = state.tile_at(to_coords)

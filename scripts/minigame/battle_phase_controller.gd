@@ -58,7 +58,7 @@ func perform_use_action(
 		"from": from_coords,
 		"to": to_coords,
 	}
-	if action_id == "melee_attack":
+	if action_id == "melee_attack" or action_id == "ranged_attack":
 		cmd["rng_seed"] = rng_seed
 
 	var from_tile: Tile = deps.session.grid.get(from_coords)

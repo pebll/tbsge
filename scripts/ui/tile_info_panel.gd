@@ -60,6 +60,7 @@ const BORDER_THICK := 4
 const RADIUS := 16
 
 const ICON_ATTACK := preload("res://assets/icons/base_icons_sprites/sword.png")
+const ICON_BOW := preload("res://assets/icons/base_icons_sprites/bow.png")
 const ICON_HEALTH := preload("res://assets/icons/base_icons_sprites/heart.png")
 const ICON_UNIT_COUNT := preload("res://assets/icons/base_icons_sprites/torso.png")
 const ICON_AP := preload("res://assets/icons/base_icons_sprites/boot.png")
@@ -67,8 +68,14 @@ const ICON_SIZE := preload("res://assets/icons/base_icons_sprites/strong.png")
 const ICON_PRICE := preload("res://assets/icons/base_icons_sprites/coin.png")
 const ICON_SHIELD := preload("res://assets/icons/base_icons_sprites/shield.png")
 
+var _ranged_stat: HBoxContainer
+var _ranged_value: Label
+var _range_stat: HBoxContainer
+var _range_value: Label
+
 func _ready() -> void:
 	_apply_style()
+	_ensure_ranged_stat_rows()
 	min_button.pressed.connect(func(): draft_count_min_pressed.emit())
 	minus_button.pressed.connect(func(): draft_count_decrease_pressed.emit())
 	plus_button.pressed.connect(func(): draft_count_increase_pressed.emit())
@@ -129,6 +136,10 @@ func _configure_stat_icon(icon: TextureRect, min_size: Vector2 = Vector2(72, 72)
 
 func _set_empty_state() -> void:
 	legion_block.hide()
+	if _ranged_stat:
+		_ranged_stat.hide()
+	if _range_stat:
+		_range_stat.hide()
 
 func show_tile(tile: Tile) -> void:
 	if tile == null or not tile.has_legion():
@@ -202,9 +213,11 @@ func _render_legion(legion: Legion) -> void:
 	if unit0:
 		attack_value.text = "%d" % int(unit0.attack)
 		health_value.text = "%d" % int(unit0.max_health)
+		_update_ranged_stat_rows(unit0)
 	else:
 		attack_value.text = ""
 		health_value.text = ""
+		_update_ranged_stat_rows(null)
 
 	unit_count_value.text = "%d" % legion.units.size()
 	ap_value.text = "%d/%d" % [legion.current_ap, legion.max_ap]
@@ -356,6 +369,7 @@ func _render_unit_type_stats(unit0: Unit, unit_type: String) -> void:
 		size_value.text = ""
 		price_value.text = ""
 		shield_stat.hide()
+		_update_ranged_stat_rows(null)
 		return
 
 	size_value.text = "%.1f" % def.size
@@ -365,6 +379,62 @@ func _render_unit_type_stats(unit0: Unit, unit_type: String) -> void:
 		shield_value.text = "%d" % def.shield
 	else:
 		shield_stat.hide()
+	_update_ranged_stat_rows(unit0 if unit0 else null, def)
+
+func _ensure_ranged_stat_rows() -> void:
+	if _ranged_stat != null:
+		return
+	var stats: HBoxContainer = %LegionStats
+	_ranged_stat = _make_stat_row(ICON_BOW)
+	_ranged_value = _ranged_stat.get_child(1) as Label
+	_ranged_stat.hide()
+	stats.add_child(_ranged_stat)
+	stats.move_child(_ranged_stat, 1)
+
+	_range_stat = _make_stat_row(null, true)
+	_range_value = _range_stat.get_child(1) as Label
+	_range_stat.hide()
+	stats.add_child(_range_stat)
+	stats.move_child(_range_stat, 2)
+
+func _make_stat_row(icon_tex: Texture2D, text_prefix_icon: bool = false) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 2)
+	if icon_tex:
+		var icon := TextureRect.new()
+		icon.custom_minimum_size = Vector2(72, 72)
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.texture = icon_tex
+		row.add_child(icon)
+	elif text_prefix_icon:
+		var prefix := Label.new()
+		prefix.text = "Rng"
+		prefix.add_theme_color_override("font_color", COLOR_TEXT)
+		prefix.add_theme_font_size_override("font_size", 22)
+		row.add_child(prefix)
+	var value := Label.new()
+	value.add_theme_color_override("font_color", COLOR_TEXT)
+	value.add_theme_font_size_override("font_size", 32)
+	value.text = "0"
+	row.add_child(value)
+	return row
+
+func _update_ranged_stat_rows(unit0: Unit, def: UnitDefinition = null) -> void:
+	_ensure_ranged_stat_rows()
+	if def == null and unit0:
+		def = unit0.definition
+	var has_ranged := def != null and def.has_ranged()
+	if not has_ranged:
+		_ranged_stat.hide()
+		_range_stat.hide()
+		return
+	_ranged_stat.show()
+	_range_stat.show()
+	var ranged_dmg := int(unit0.ranged_attack) if unit0 else def.ranged_attack
+	var rng := int(unit0.attack_range) if unit0 else def.attack_range
+	_ranged_value.text = "%d" % ranged_dmg
+	_range_value.text = "%d" % rng
 
 func _load_unit_icon(unit_type: String) -> Texture2D:
 	var def := UnitDefs.get_def(unit_type)

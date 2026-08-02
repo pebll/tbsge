@@ -52,6 +52,24 @@ static func _decide_internal(session: MatchSessionScript, legion: Legion) -> Dic
 	var nearest_coords := nearest.tile_coords
 	var from_coords := legion.tile_coords
 
+	var ranged_targets := session.get_action_targets(legion, "ranged_attack")
+	if nearest_coords in ranged_targets:
+		var dist := HexPathfinder.hex_distance(from_coords, nearest_coords)
+		# Prefer ranged when out of melee, or when defender cannot shoot back at this distance.
+		var melee_targets := session.get_attackable_coords(from_coords)
+		var defender_can_return := false
+		if not nearest.units.is_empty():
+			var du: Unit = nearest.units[0]
+			defender_can_return = du != null and du.attack_range >= dist and du.ranged_attack > 0
+		if dist > 1 or nearest_coords not in melee_targets or not defender_can_return:
+			return {
+				"type": "use_action",
+				"action_id": "ranged_attack",
+				"from": from_coords,
+				"to": nearest_coords,
+				"reason": "ranged shot at nearest enemy @ %s (d=%d)" % [nearest_coords, dist],
+			}
+
 	var attackable := session.get_attackable_coords(from_coords)
 	if nearest_coords in attackable:
 		return {
@@ -60,6 +78,23 @@ static func _decide_internal(session: MatchSessionScript, legion: Legion) -> Dic
 			"from": from_coords,
 			"to": nearest_coords,
 			"reason": "adjacent to nearest enemy @ %s" % nearest_coords,
+		}
+
+	# If nearest is not in melee but another enemy is in ranged range, take the shot.
+	if not ranged_targets.is_empty():
+		var best_ranged: Vector2i = ranged_targets[0]
+		var best_d := HexPathfinder.hex_distance(from_coords, best_ranged)
+		for c in ranged_targets:
+			var d := HexPathfinder.hex_distance(from_coords, c)
+			if d < best_d:
+				best_d = d
+				best_ranged = c
+		return {
+			"type": "use_action",
+			"action_id": "ranged_attack",
+			"from": from_coords,
+			"to": best_ranged,
+			"reason": "ranged shot at enemy in range @ %s" % best_ranged,
 		}
 
 	if not legion.can_afford(1):

@@ -11,6 +11,10 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_shield_absorbs_first_hit_only():
 		return false
+	if not _test_ranged_no_return_when_defender_out_of_range():
+		return false
+	if not _test_ranged_both_sides_when_eligible():
+		return false
 	print("Success: Combat logic tests")
 	return true
 
@@ -127,6 +131,57 @@ func _test_shield_absorbs_first_hit_only() -> bool:
 	target.reset_turn_state()
 	if target.shield_remaining != 2:
 		push_error("reset_turn_state should restore shield at turn start")
+		return false
+	return true
+
+func _mk_ranged_legion(unit_type: String, count: int, hp: int, ranged_atk: int, atk_range: int) -> Legion:
+	var l := Legion.new(unit_type, count, Vector2i.ZERO, "GREEN")
+	for u in l.units:
+		u.max_health = hp
+		u.current_health = hp
+		u.attack = 1
+		u.ranged_attack = ranged_atk
+		u.attack_range = atk_range
+	return l
+
+func _test_ranged_no_return_when_defender_out_of_range() -> bool:
+	# Range-2 shooter vs melee-only: only attacker side should hit.
+	var a := _mk_ranged_legion("ARCHER", 2, 100, 4, 2)
+	var b := _mk_legion("GOBLIN", 2, 100, 1)
+	for u in b.units:
+		u.attack_range = 0
+		u.ranged_attack = 0
+
+	var result: Dictionary = CombatResolver.resolve_combat(
+		a, b, 11, {"mode": CombatResolver.MODE_RANGED, "distance": 2}
+	)
+	var hits: Array = result["hits"]
+	if hits.size() != 2:
+		push_error("Expected 2 ranged hits (attacker drain only), got %d" % hits.size())
+		return false
+	for h in hits:
+		if h["attacker_legion"] != a:
+			push_error("Defender should not return fire from range 2")
+			return false
+		if int(h["raw_damage"]) != 4:
+			push_error("Ranged hits should use ranged_attack damage")
+			return false
+	return true
+
+func _test_ranged_both_sides_when_eligible() -> bool:
+	var a := _mk_ranged_legion("ARCHER", 1, 100, 3, 2)
+	var b := _mk_ranged_legion("RAT_ARCHER", 1, 100, 2, 2)
+	b.team_id = "BLUE"
+
+	var result: Dictionary = CombatResolver.resolve_combat(
+		a, b, 5, {"mode": CombatResolver.MODE_RANGED, "distance": 2}
+	)
+	var hits: Array = result["hits"]
+	if hits.size() != 2:
+		push_error("Expected 2 hits when both can shoot, got %d" % hits.size())
+		return false
+	if hits[0]["attacker_legion"] != a or hits[1]["attacker_legion"] != b:
+		push_error("Expected A then B for mutual ranged combat")
 		return false
 	return true
 

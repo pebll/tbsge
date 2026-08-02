@@ -4,6 +4,10 @@ extends RefCounted
 var unit_type: String
 var max_health: float
 var attack: float
+var attack_range: int = 0
+var ranged_attack: float = 0.0
+var projectile_id: String = ""
+var projectile_motion: int = UnitDefinition.ProjectileMotion.ARROW
 var current_health: float
 var shield_max: int = 0
 var shield_remaining: int = 0
@@ -15,6 +19,10 @@ func _init(unit_type: String) -> void:
 	if definition:
 		max_health = definition.max_health
 		attack = definition.attack
+		attack_range = maxi(0, definition.attack_range)
+		ranged_attack = definition.ranged_attack
+		projectile_id = definition.projectile_id
+		projectile_motion = definition.projectile_motion
 		shield_max = maxi(0, definition.shield)
 	else:
 		# Safe defaults if unit type not found in DB.
@@ -23,6 +31,9 @@ func _init(unit_type: String) -> void:
 		shield_max = 0
 	current_health = max_health
 	reset_turn_state()
+
+func has_ranged() -> bool:
+	return attack_range > 0 and ranged_attack > 0
 
 func reset_turn_state() -> void:
 	shield_remaining = shield_max
@@ -34,4 +45,3 @@ func absorb_damage(raw_damage: float) -> Dictionary:
 	var absorbed := minf(raw, float(shield_remaining))
 	shield_remaining = 0
 	return {"applied": raw - absorbed, "absorbed": absorbed}
-	

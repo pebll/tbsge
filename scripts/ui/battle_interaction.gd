@@ -10,7 +10,13 @@ const LIFT_OPTION := 2.0
 const LIFT_SELECTED := 4.0
 
 ## Shown automatically when a legion is selected (no action button picked).
-const DEFAULT_HIGHLIGHT_ACTION_IDS: Array[String] = ["move", "melee_attack"]
+const DEFAULT_HIGHLIGHT_ACTION_IDS: Array[String] = ["move", "melee_attack", "ranged_attack"]
+
+const COLOR_POPUP_BG := Color(0.91, 0.86, 0.78)
+const COLOR_POPUP_BORDER := Color(0.78, 0.70, 0.58)
+const COLOR_POPUP_TEXT := Color(0.12, 0.10, 0.08)
+const COLOR_ICON_BTN_BG := Color(0.93, 0.89, 0.82)
+const ICON_BTN_SIZE := Vector2(96, 96)
 
 var battle_state_fn: Callable
 var tile_visu_fn: Callable
@@ -20,12 +26,14 @@ var apply_action_fn: Callable
 var allows_spawn_fn: Callable = func(_coords: Vector2i) -> bool: return false
 var spawn_fn: Callable = func(_coords: Vector2i) -> void: pass
 var battle_phase_fn: Callable = func() -> bool: return true
+var overlay_ui_fn: Callable = Callable()
 var action_bar: Control
 
 var selected_coords: Vector2i
 var has_selected: bool = false
 var selected_action: ActionDefinitionScript = null
 var target_coords: Array[Vector2i] = []
+## coords -> Array[String] of action ids that can target this tile in default highlight mode.
 var default_target_actions: Dictionary = {}
 var _overlay_coords: Array[Vector2i] = []
 var _info_tile_coords: Vector2i
@@ -35,6 +43,7 @@ var _clear_inspect_fn: Callable = func() -> void: pass
 var turn_manager_fn: Callable
 var legions_fn: Callable
 var _events_bound: bool = false
+var _attack_choice_popup: Control = null
 
 func bind_events() -> void:
 	if _events_bound:
@@ -65,6 +74,7 @@ func can_accept_command() -> bool:
 	return not bool(is_locked_fn.call())
 
 func deselect() -> void:
+	_hide_attack_choice_popup()
 	_clear_overlay_visuals()
 	has_selected = false
 	selected_action = null
@@ -80,6 +90,7 @@ func select_tile(coords: Vector2i) -> void:
 	var legion: Legion = _legion_at(state, coords)
 	if legion == null or not bool(can_act_fn.call(legion)):
 		return
+	_hide_attack_choice_popup()
 	_clear_overlay_visuals()
 	has_selected = true
 	selected_coords = coords
@@ -100,6 +111,7 @@ func select_action(action: ActionDefinitionScript) -> void:
 	var legion: Legion = _legion_at(state, selected_coords)
 	if legion == null:
 		return
+	_hide_attack_choice_popup()
 	if selected_action and selected_action.id == action.id:
 		selected_action = null
 		target_coords.clear()
@@ -233,6 +245,10 @@ func _on_tile_hover_exited(coords: Vector2i) -> void:
 			selected_visu.legion_visu.juice_direct_reset()
 
 func _dispatch_click(coords: Vector2i) -> void:
+	if _attack_choice_popup != null and is_instance_valid(_attack_choice_popup):
+		_hide_attack_choice_popup()
+		return
+
 	if has_selected and selected_action:
 		var is_self_target := (
 			selected_action.targeting == ActionDefinitionScript.TargetingKind.SELF
@@ -243,7 +259,16 @@ func _dispatch_click(coords: Vector2i) -> void:
 			return
 		return
 	if has_selected and default_target_actions.has(coords):
-		apply_action_fn.call(String(default_target_actions[coords]), selected_coords, coords)
+		var actions: Array = default_target_actions[coords]
+		var attack_ids: Array[String] = []
+		for action_id in actions:
+			if String(action_id) == "melee_attack" or String(action_id) == "ranged_attack":
+				attack_ids.append(String(action_id))
+		if attack_ids.size() >= 2:
+			_show_attack_choice_popup(coords, attack_ids)
+			return
+		if not actions.is_empty():
+			apply_action_fn.call(String(actions[0]), selected_coords, coords)
 		return
 	if has_selected and coords == selected_coords:
 		deselect()
@@ -273,8 +298,29 @@ func _paint_default_targets(state: BattleStateScript, legion: Legion) -> void:
 		for c in ActionTargetingScript.get_targets(state, legion, action):
 			if c == selected_coords:
 				continue
-			default_target_actions[c] = action_id
-			_paint_tile(c, action.overlay_state, LIFT_OPTION)
+			if not default_target_actions.has(c):
+				default_target_actions[c] = []
+			var list: Array = default_target_actions[c]
+			if action_id not in list:
+				list.append(action_id)
+			default_target_actions[c] = list
+
+	for c in default_target_actions.keys():
+		_paint_tile(c, _overlay_for_default_actions(default_target_actions[c]), LIFT_OPTION)
+
+func _overlay_for_default_actions(action_ids: Array) -> String:
+	var has_melee := "melee_attack" in action_ids
+	var has_ranged := "ranged_attack" in action_ids
+	if has_melee and has_ranged:
+		return "attack_choice"
+	if has_ranged:
+		return "ranged_attackable"
+	if has_melee:
+		return "attackable"
+	# move / other
+	var first := String(action_ids[0]) if not action_ids.is_empty() else "movable"
+	var def: ActionDefinitionScript = ActionDefs.get_def(first)
+	return def.overlay_state if def else "movable"
 
 func _paint_action_targets(action: ActionDefinitionScript) -> void:
 	for c in target_coords:
@@ -288,6 +334,124 @@ func _paint_tile(coords: Vector2i, state: String, lift: float) -> void:
 	var t: TileVisu = tile_visu_fn.call(coords)
 	if t:
 		t.set_gameplay_overlay(state, lift)
+
+func _show_attack_choice_popup(to_coords: Vector2i, attack_ids: Array[String]) -> void:
+	_hide_attack_choice_popup()
+	if not overlay_ui_fn.is_valid():
+		apply_action_fn.call(attack_ids[0], selected_coords, to_coords)
+		return
+
+	var parent: Node = overlay_ui_fn.call()
+	if parent == null:
+		apply_action_fn.call(attack_ids[0], selected_coords, to_coords)
+		return
+
+	var root := Control.new()
+	root.name = "AttackChoicePopup"
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.mouse_filter = Control.MOUSE_FILTER_STOP
+	root.gui_input.connect(func(event: InputEvent) -> void:
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			_hide_attack_choice_popup()
+			root.accept_event()
+	)
+
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(center)
+
+	var panel := PanelContainer.new()
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = COLOR_POPUP_BG
+	sb.border_color = COLOR_POPUP_BORDER
+	sb.border_width_left = 4
+	sb.border_width_right = 4
+	sb.border_width_top = 4
+	sb.border_width_bottom = 4
+	sb.corner_radius_top_left = 16
+	sb.corner_radius_top_right = 16
+	sb.corner_radius_bottom_left = 16
+	sb.corner_radius_bottom_right = 16
+	sb.content_margin_left = 20
+	sb.content_margin_right = 20
+	sb.content_margin_top = 16
+	sb.content_margin_bottom = 16
+	panel.add_theme_stylebox_override("panel", sb)
+	center.add_child(panel)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 12)
+	vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(vbox)
+
+	var title := Label.new()
+	title.text = "Choose attack"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_color_override("font_color", COLOR_POPUP_TEXT)
+	title.add_theme_font_size_override("font_size", 28)
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_child(title)
+
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 16)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_child(row)
+
+	for action_id in attack_ids:
+		var def: ActionDefinitionScript = ActionDefs.get_def(action_id)
+		var btn := _make_attack_icon_button(def.icon if def else null)
+		var chosen := action_id
+		btn.pressed.connect(func() -> void:
+			_hide_attack_choice_popup()
+			apply_action_fn.call(chosen, selected_coords, to_coords)
+		)
+		row.add_child(btn)
+
+	parent.add_child(root)
+	_attack_choice_popup = root
+
+func _make_attack_icon_button(icon: Texture2D) -> Button:
+	var btn := Button.new()
+	btn.custom_minimum_size = ICON_BTN_SIZE
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.flat = true
+	btn.expand_icon = true
+	btn.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	if icon:
+		btn.icon = icon
+
+	var normal := StyleBoxFlat.new()
+	normal.bg_color = COLOR_ICON_BTN_BG
+	normal.border_color = COLOR_POPUP_BORDER
+	normal.border_width_left = 3
+	normal.border_width_right = 3
+	normal.border_width_top = 3
+	normal.border_width_bottom = 3
+	normal.corner_radius_top_left = 12
+	normal.corner_radius_top_right = 12
+	normal.corner_radius_bottom_left = 12
+	normal.corner_radius_bottom_right = 12
+	normal.content_margin_left = 14
+	normal.content_margin_right = 14
+	normal.content_margin_top = 14
+	normal.content_margin_bottom = 14
+	var hover := normal.duplicate()
+	hover.bg_color = Color(0.96, 0.92, 0.85)
+	var pressed := normal.duplicate()
+	pressed.bg_color = Color(0.86, 0.80, 0.70)
+	btn.add_theme_stylebox_override("normal", normal)
+	btn.add_theme_stylebox_override("hover", hover)
+	btn.add_theme_stylebox_override("pressed", pressed)
+	btn.add_theme_stylebox_override("focus", normal)
+	return btn
+
+func _hide_attack_choice_popup() -> void:
+	if _attack_choice_popup != null and is_instance_valid(_attack_choice_popup):
+		_attack_choice_popup.queue_free()
+	_attack_choice_popup = null
 
 func _legion_at(state: BattleStateScript, coords: Vector2i) -> Legion:
 	var tile: Tile = state.tile_at(coords)

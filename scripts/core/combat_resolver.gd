@@ -1,19 +1,49 @@
 class_name CombatResolver
 extends RefCounted
 
+const MODE_MELEE := "melee"
+const MODE_RANGED := "ranged"
+
 static var quiet: bool = false
 
-static func _pick_next_attacker(legion: Legion, attacked: Dictionary) -> Unit:
+static func _pick_next_attacker(
+	legion: Legion,
+	attacked: Dictionary,
+	mode: String,
+	distance: int
+) -> Unit:
 	if legion == null:
 		return null
 	for u in legion.units:
-		if not attacked.has(u):
+		if attacked.has(u):
+			continue
+		if _unit_can_strike(u, mode, distance):
 			return u
 	return null
 
-static func resolve_combat(attacking_legion: Legion, defending_legion: Legion, rng_seed: int = 0) -> Dictionary:
+static func _unit_can_strike(unit: Unit, mode: String, distance: int) -> bool:
+	if unit == null:
+		return false
+	if mode == MODE_RANGED:
+		return unit.attack_range >= distance and unit.ranged_attack > 0
+	return true
+
+static func _strike_damage(unit: Unit, mode: String) -> float:
+	if mode == MODE_RANGED:
+		return float(unit.ranged_attack)
+	return float(unit.attack)
+
+static func resolve_combat(
+	attacking_legion: Legion,
+	defending_legion: Legion,
+	rng_seed: int = 0,
+	options: Dictionary = {}
+) -> Dictionary:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = int(rng_seed)
+
+	var mode: String = String(options.get("mode", MODE_MELEE))
+	var distance: int = int(options.get("distance", 1))
 
 	var hits: Array = []
 	var deaths: Array = []
@@ -34,10 +64,10 @@ static func resolve_combat(attacking_legion: Legion, defending_legion: Legion, r
 			break
 
 		# Pick attacker; if this side is exhausted, let the other side "drain" its remaining attackers.
-		var attacker_unit := _pick_next_attacker(current_attacker_legion, attacked)
+		var attacker_unit := _pick_next_attacker(current_attacker_legion, attacked, mode, distance)
 		if attacker_unit == null:
 			# Current side has no remaining attackers. If the other side can still attack, keep it as attacker.
-			var other_next := _pick_next_attacker(current_defender_legion, attacked)
+			var other_next := _pick_next_attacker(current_defender_legion, attacked, mode, distance)
 			if other_next == null:
 				break
 			# Swap roles (drain).
@@ -53,7 +83,7 @@ static func resolve_combat(attacking_legion: Legion, defending_legion: Legion, r
 		var target_index := rng.randi_range(0, current_defender_legion.units.size() - 1)
 		var target_unit: Unit = current_defender_legion.units[target_index]
 
-		var raw_damage := float(attacker_unit.attack)
+		var raw_damage := _strike_damage(attacker_unit, mode)
 		var shield_result := target_unit.absorb_damage(raw_damage)
 		var damage: float = shield_result["applied"]
 		var shield_absorbed: float = shield_result["absorbed"]
@@ -68,6 +98,8 @@ static func resolve_combat(attacking_legion: Legion, defending_legion: Legion, r
 			current_defender_legion.unit_type,
 			int(damage),
 		]
+		if mode == MODE_RANGED:
+			hit_log += " [ranged d=%d]" % distance
 		if shield_absorbed > 0.0:
 			hit_log += " (%d absorbed by shield)" % int(shield_absorbed)
 		hit_log += " (target hp %d/%d)" % [
@@ -89,6 +121,8 @@ static func resolve_combat(attacking_legion: Legion, defending_legion: Legion, r
 			"target_hp_before": hp_before,
 			"target_hp_after": hp_after,
 			"hp_lost": hp_lost,
+			"combat_mode": mode,
+			"distance": distance,
 		})
 
 		attacked[attacker_unit] = true
@@ -114,5 +148,6 @@ static func resolve_combat(attacking_legion: Legion, defending_legion: Legion, r
 	return {
 		"hits": hits,
 		"deaths": deaths,
+		"combat_mode": mode,
+		"distance": distance,
 	}
-

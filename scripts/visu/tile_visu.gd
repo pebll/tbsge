@@ -8,6 +8,8 @@ var qr_label: Label
 @export var color_movable: Color = Color.GREEN
 @export var color_selected: Color = Color.YELLOW
 @export var color_attackable: Color = Color.RED
+@export var color_ranged_attackable: Color = Color(1.0, 0.55, 0.12)
+@export var color_attack_choice: Color = Color(0.95, 0.35, 0.55)
 @export var color_swappable: Color = Color(0.35, 0.65, 0.95)
 @export var color_deployable: Color = Color(0.45, 0.82, 0.55)
 @export var color_deployed: Color = Color(0.55, 0.75, 0.95)
@@ -90,6 +92,10 @@ func _apply_state() -> void:
 		base_sprite.self_modulate = color_selected
 	elif _gameplay_state == "attackable":
 		base_sprite.self_modulate = color_attackable
+	elif _gameplay_state == "ranged_attackable":
+		base_sprite.self_modulate = color_ranged_attackable
+	elif _gameplay_state == "attack_choice":
+		base_sprite.self_modulate = color_attack_choice
 	elif _gameplay_state == "swappable":
 		base_sprite.self_modulate = color_swappable
 	elif _gameplay_state == "movable":

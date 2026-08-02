@@ -129,6 +129,7 @@ func _setup_battle_context() -> void:
 	battle_context.battle_phase_fn = func() -> bool: return session.phase == MinigameSessionScript.Phase.BATTLE
 	battle_context.inspect_fn = func(coords: Vector2i) -> void: inspect_tile(coords)
 	battle_context.clear_inspect_fn = func() -> void: clear_inspect()
+	battle_context.overlay_ui_fn = func() -> Node: return _overlay_layer
 
 func _connect_phase_signals() -> void:
 	_setup_panel.ready_pressed.connect(func() -> void: draft.handle_ready())

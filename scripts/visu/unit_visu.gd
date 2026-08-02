@@ -428,6 +428,33 @@ func juice_attack(direction: Vector2) -> Tween:
 	active_tween.tween_callback(start_idle_animation)
 	return active_tween
 
+## Seconds until projectile should spawn (keep in sync with ActionPlayback).
+const RANGED_WINDUP_SEC := 0.05
+
+## Windup (pull back) then release (forward squish). Calls on_release at the release frame.
+func juice_ranged_attack(direction: Vector2, on_release: Callable = Callable()) -> Tween:
+	_stop_motion_tweens()
+	var base_pos := current_offset + local_position
+	var windup_pos := base_pos - direction * 12.0
+	var release_pos := base_pos + direction * 8.0
+	var base_scale := _get_base_scale()
+	var windup_scale := Vector2(base_scale.x * 0.94, base_scale.y * 1.06)
+	var release_scale := Vector2(base_scale.x * 1.14, base_scale.y * 0.86)
+
+	active_tween = create_tween()
+	active_tween.tween_property(sprite, "position", windup_pos, RANGED_WINDUP_SEC).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	active_tween.parallel().tween_property(sprite, "scale", windup_scale, RANGED_WINDUP_SEC).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	active_tween.tween_callback(func() -> void:
+		if on_release.is_valid():
+			on_release.call()
+	)
+	active_tween.tween_property(sprite, "position", release_pos, 0.05).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	active_tween.parallel().tween_property(sprite, "scale", release_scale, 0.05).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	active_tween.tween_property(sprite, "position", base_pos, 0.08).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	active_tween.parallel().tween_property(sprite, "scale", base_scale, 0.08).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	active_tween.tween_callback(start_idle_animation)
+	return active_tween
+
 func _stop_motion_tweens() -> void:
 	if active_tween and active_tween.is_running():
 		active_tween.kill()

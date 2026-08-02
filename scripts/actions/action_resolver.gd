@@ -4,6 +4,7 @@ extends RefCounted
 const CombatResolver = preload("res://scripts/core/combat_resolver.gd")
 const ActionDefinitionScript = preload("res://scripts/actions/action_definition.gd")
 const BattleStateScript = preload("res://scripts/actions/battle_state.gd")
+const HexPathfinder = preload("res://scripts/ai/hex_pathfinder.gd")
 
 static func resolve(state: BattleStateScript, cmd: Dictionary) -> Dictionary:
 	var action_id: String = String(cmd.get("action_id", ""))
@@ -34,6 +35,8 @@ static func resolve(state: BattleStateScript, cmd: Dictionary) -> Dictionary:
 			return _execute_move(state, from_coords, to_coords, action)
 		ActionDefinitionScript.TargetingKind.ADJACENT_ENEMY:
 			return _execute_melee_attack(state, from_coords, to_coords, action, cmd)
+		ActionDefinitionScript.TargetingKind.ENEMY_IN_RANGE:
+			return _execute_ranged_attack(state, from_coords, to_coords, action, cmd)
 
 	return _fail("Unhandled action targeting")
 
@@ -124,7 +127,43 @@ static func _execute_melee_attack(
 	var rng_seed: int = int(cmd.get("rng_seed", randi()))
 	attacker.spend_ap(action.ap_cost)
 	_apply_terminal(state, attacker, action, from_coords)
-	var result: Dictionary = CombatResolver.resolve_combat(attacker, defender, rng_seed)
+	var result: Dictionary = CombatResolver.resolve_combat(
+		attacker,
+		defender,
+		rng_seed,
+		{"mode": CombatResolver.MODE_MELEE, "distance": 1}
+	)
+	_cleanup_empty_legion(state, from_coords)
+	_cleanup_empty_legion(state, to_coords)
+	return _ok(["combat_resolved"], {
+		"action_id": action.id,
+		"from": from_coords,
+		"to": to_coords,
+		"combat": result,
+	})
+
+static func _execute_ranged_attack(
+	state: BattleStateScript,
+	from_coords: Vector2i,
+	to_coords: Vector2i,
+	action: ActionDefinitionScript,
+	cmd: Dictionary
+) -> Dictionary:
+	var attacker: Legion = state.tile_at(from_coords).legion
+	var defender: Legion = state.tile_at(to_coords).legion
+	if defender == null:
+		return _fail("No defender")
+
+	var distance := HexPathfinder.hex_distance(from_coords, to_coords)
+	var rng_seed: int = int(cmd.get("rng_seed", randi()))
+	attacker.spend_ap(action.ap_cost)
+	_apply_terminal(state, attacker, action, from_coords)
+	var result: Dictionary = CombatResolver.resolve_combat(
+		attacker,
+		defender,
+		rng_seed,
+		{"mode": CombatResolver.MODE_RANGED, "distance": distance}
+	)
 	_cleanup_empty_legion(state, from_coords)
 	_cleanup_empty_legion(state, to_coords)
 	return _ok(["combat_resolved"], {

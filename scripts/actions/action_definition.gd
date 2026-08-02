@@ -5,6 +5,7 @@ enum TargetingKind {
 	SELF,
 	ADJACENT_MOVE,
 	ADJACENT_ENEMY,
+	ENEMY_IN_RANGE,
 }
 
 @export var id: String = ""
