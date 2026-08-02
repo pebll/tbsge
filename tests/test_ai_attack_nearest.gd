@@ -3,6 +3,7 @@ extends RefCounted
 const MinigameSessionScript = preload("res://scripts/minigame/minigame_session.gd")
 const MinigameTestHelpersScript = preload("res://tests/minigame_test_helpers.gd")
 const AttackNearestEnemyBehavior = preload("res://scripts/ai/behaviors/attack_nearest_enemy.gd")
+const HexPathfinder = preload("res://scripts/ai/hex_pathfinder.gd")
 
 func run(_tree: SceneTree) -> bool:
 	if not _test_attacks_adjacent_enemy():
@@ -12,6 +13,14 @@ func run(_tree: SceneTree) -> bool:
 	if not _test_passes_when_no_action():
 		return false
 	if not _test_ai_draft_and_battle_turn():
+		return false
+	if not _test_melees_adjacent_when_nearest_not_attackable():
+		return false
+	if not _test_can_act_after_move_onto_wiped_tile():
+		return false
+	if not _test_still_actionable_after_move():
+		return false
+	if not _test_steps_when_direct_hex_blocked_by_ally():
 		return false
 	print("Success: AI attack-nearest tests")
 	return true
@@ -152,5 +161,176 @@ func _test_ai_draft_and_battle_turn() -> bool:
 	var cmd: Dictionary = AttackNearestEnemyBehavior.decide(session, blue_legion)
 	if cmd.get("type") not in ["use_action", "pass"]:
 		push_error("AI should return a battle command")
+		return false
+	return true
+
+func _test_melees_adjacent_when_nearest_not_attackable() -> bool:
+	## Hex-nearest enemy on a non-walkable tile is not melee-targetable; attack the walkable adjacent instead.
+	var session := MinigameTestHelpersScript.prepare_session()
+	var legions: Dictionary = _start_battle_with_legions(session, Vector2i.ZERO, Vector2i.ZERO)
+	var green: Legion = legions["a"]
+	var blue_blocked: Legion = legions["b"]
+	var team_b: String = MinigameTestHelpersScript.team_b(session)
+
+	_teleport_legion(session, green, Vector2i(0, 0))
+	var blocked_coords := Vector2i(1, 0)
+	var adj_coords := Vector2i(0, -1)
+	if session.grid.get(blocked_coords) == null or session.grid.get(adj_coords) == null:
+		return true
+
+	_teleport_legion(session, blue_blocked, blocked_coords)
+	session.grid[blocked_coords].walkable = false
+
+	var blue_adj := Legion.new("RAT_SPEAR", 2, adj_coords, team_b)
+	session.grid[adj_coords].legion = blue_adj
+	session.legions.append(blue_adj)
+
+	var cmd: Dictionary = AttackNearestEnemyBehavior.decide(session, green)
+	if cmd.get("type") != "use_action" or cmd.get("action_id") != "melee_attack":
+		push_error("Expected melee on walkable adjacent enemy, got %s" % cmd)
+		return false
+	if cmd.get("to") != adj_coords:
+		push_error("Should melee walkable adjacent @ %s, got %s" % [adj_coords, cmd.get("to")])
+		return false
+	return true
+
+func _test_can_act_after_move_onto_wiped_tile() -> bool:
+	## After a wipe+move onto that tile, AI must still be able to spend remaining AP (melee).
+	var session := MinigameTestHelpersScript.prepare_session()
+	var started: Dictionary = MinigameTestHelpersScript.start_two_legion_battle(session)
+	var team_a: String = MinigameTestHelpersScript.team_a(session)
+	var attacker: Legion = started["a"]
+	var defender: Legion = started["b"]
+
+	for c in [attacker.tile_coords, defender.tile_coords]:
+		if session.grid.get(c):
+			session.grid[c].legion = null
+
+	var atk_coords := Vector2i(0, 0)
+	var def_coords := Vector2i(1, 0)
+	var ally_from := Vector2i(0, -1)
+	if session.grid.get(atk_coords) == null or session.grid.get(def_coords) == null:
+		return true
+	if session.grid.get(ally_from) == null:
+		return true
+
+	attacker.tile_coords = atk_coords
+	defender.tile_coords = def_coords
+	session.grid[atk_coords].legion = attacker
+	session.grid[def_coords].legion = defender
+
+	var ally := Legion.new("GOBLIN", 2, ally_from, team_a)
+	session.grid[ally_from].legion = ally
+	session.legions.append(ally)
+
+	for u in attacker.units:
+		u.current_health = 1
+		u.attack = 1
+	for u in defender.units:
+		u.current_health = 100
+		u.attack = 100
+
+	var wipe := session.apply({
+		"type": "use_action",
+		"action_id": "melee_attack",
+		"from": atk_coords,
+		"to": def_coords,
+		"rng_seed": 1,
+	})
+	if not wipe["ok"]:
+		push_error("Wipe attack failed: %s" % wipe.get("error"))
+		return false
+
+	var move := session.apply({
+		"type": "use_action",
+		"action_id": "move",
+		"from": ally_from,
+		"to": atk_coords,
+	})
+	if not move["ok"]:
+		push_error("Ally move failed: %s" % move.get("error"))
+		return false
+
+	if atk_coords in session.turn_manager.waited_coords:
+		push_error("Move onto wiped tile must clear wait stain")
+		return false
+	if not session.can_act_legion(ally):
+		push_error("Ally must be able to act after moving onto wipe tile")
+		return false
+
+	var cmd: Dictionary = AttackNearestEnemyBehavior.decide(session, ally)
+	if cmd.get("type") != "use_action" or cmd.get("action_id") != "melee_attack":
+		push_error("Ally should melee after moving onto wipe tile, got %s" % cmd)
+		return false
+	if cmd.get("to") != def_coords:
+		push_error("Ally should target defender @ %s" % def_coords)
+		return false
+	return true
+
+func _test_still_actionable_after_move() -> bool:
+	## Non-terminal move must leave the legion actionable when AP remains.
+	var session := MinigameTestHelpersScript.prepare_session()
+	var legions: Dictionary = _start_battle_with_legions(session, Vector2i.ZERO, Vector2i.ZERO)
+	var green: Legion = legions["a"]
+	var blue: Legion = legions["b"]
+	_teleport_legion(session, green, Vector2i(0, -2))
+	_teleport_legion(session, blue, Vector2i(2, -2))
+	if green.current_ap < 2:
+		green.max_ap = 2
+		green.current_ap = 2
+
+	var cmd: Dictionary = AttackNearestEnemyBehavior.decide(session, green)
+	if cmd.get("type") != "use_action" or cmd.get("action_id") != "move":
+		push_error("Expected opening move, got %s" % cmd)
+		return false
+	var to_coords: Vector2i = cmd.get("to")
+	var result := session.apply({
+		"type": "use_action",
+		"action_id": "move",
+		"from": green.tile_coords,
+		"to": to_coords,
+	})
+	if not result["ok"]:
+		push_error("Move apply failed: %s" % result.get("error"))
+		return false
+	if green.current_ap < 1:
+		push_error("Expected remaining AP after one move")
+		return false
+	if to_coords not in session.get_actionable_coords():
+		push_error("Legion should remain actionable at %s after move" % to_coords)
+		return false
+	return true
+
+func _test_steps_when_direct_hex_blocked_by_ally() -> bool:
+	## Closer approach hex occupied by an ally — must still take a legal non-worsening step (not PASS).
+	var session := MinigameTestHelpersScript.prepare_session()
+	var legions: Dictionary = _start_battle_with_legions(session, Vector2i.ZERO, Vector2i.ZERO)
+	var green: Legion = legions["a"]
+	var blue: Legion = legions["b"]
+	var team_a: String = MinigameTestHelpersScript.team_a(session)
+
+	# green at (-1,0), enemy at (-2,-1), ally plugs (-2,0) — matches the live PASS repro geometry.
+	var from_coords := Vector2i(-1, 0)
+	var enemy_coords := Vector2i(-2, -1)
+	var ally_coords := Vector2i(-2, 0)
+	for c in [from_coords, enemy_coords, ally_coords]:
+		if session.grid.get(c) == null:
+			return true
+
+	_teleport_legion(session, green, from_coords)
+	_teleport_legion(session, blue, enemy_coords)
+	var ally := Legion.new("GOBLIN", 1, ally_coords, team_a)
+	session.grid[ally_coords].legion = ally
+	session.legions.append(ally)
+
+	var before := HexPathfinder.hex_distance(from_coords, enemy_coords)
+	var cmd: Dictionary = AttackNearestEnemyBehavior.decide(session, green)
+	if cmd.get("type") != "use_action" or cmd.get("action_id") != "move":
+		push_error("Expected flanking/lateral move when blocked, got %s" % cmd)
+		return false
+	var to_coords: Vector2i = cmd.get("to")
+	var after := HexPathfinder.hex_distance(to_coords, enemy_coords)
+	if after > before:
+		push_error("Step should not increase distance (%s -> %s)" % [before, after])
 		return false
 	return true

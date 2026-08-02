@@ -79,16 +79,20 @@ static func _decide_internal(session: MatchSessionScript, legion: Legion) -> Dic
 			"to": nearest_coords,
 			"reason": "adjacent to nearest enemy @ %s" % nearest_coords,
 		}
+	# Prefer any adjacent enemy over passing / walking away from a farther nearest.
+	if not attackable.is_empty():
+		var melee_target := _pick_closest_coords(attackable, from_coords)
+		return {
+			"type": "use_action",
+			"action_id": "melee_attack",
+			"from": from_coords,
+			"to": melee_target,
+			"reason": "adjacent enemy @ %s (nearest was %s)" % [melee_target, nearest_coords],
+		}
 
 	# If nearest is not in melee but another enemy is in ranged range, take the shot.
 	if not ranged_targets.is_empty():
-		var best_ranged: Vector2i = ranged_targets[0]
-		var best_d := HexPathfinder.hex_distance(from_coords, best_ranged)
-		for c in ranged_targets:
-			var d := HexPathfinder.hex_distance(from_coords, c)
-			if d < best_d:
-				best_d = d
-				best_ranged = c
+		var best_ranged: Vector2i = _pick_closest_coords(ranged_targets, from_coords)
 		return {
 			"type": "use_action",
 			"action_id": "ranged_attack",
@@ -105,6 +109,16 @@ static func _decide_internal(session: MatchSessionScript, legion: Legion) -> Dic
 		return _cmd_pass(legion, "no empty adjacent tiles")
 
 	var best_step: Variant = _best_step_toward(session, from_coords, nearest_coords, movable, legion.team_id)
+	var step_enemy_coords := nearest_coords
+	if best_step == null:
+		# Nearest may be walled off by allies/terrain — try any other enemy.
+		for enemy in enemies:
+			if enemy.tile_coords == nearest_coords:
+				continue
+			best_step = _best_step_toward(session, from_coords, enemy.tile_coords, movable, legion.team_id)
+			if best_step != null:
+				step_enemy_coords = enemy.tile_coords
+				break
 	if best_step == null:
 		return _cmd_pass(legion, "no step toward enemy @ %s" % nearest_coords)
 
@@ -113,7 +127,7 @@ static func _decide_internal(session: MatchSessionScript, legion: Legion) -> Dic
 		"action_id": "move",
 		"from": from_coords,
 		"to": best_step,
-		"reason": "step toward enemy @ %s" % nearest_coords,
+		"reason": "step toward enemy @ %s" % step_enemy_coords,
 	}
 
 static func _cmd_pass(legion: Legion, reason: String) -> Dictionary:
@@ -157,6 +171,17 @@ static func _find_nearest_enemy(from_coords: Vector2i, enemies: Array[Legion]) -
 			best_dist = dist
 	return best
 
+static func _pick_closest_coords(candidates: Array[Vector2i], from_coords: Vector2i) -> Vector2i:
+	var best: Vector2i = candidates[0]
+	var best_dist := HexPathfinder.hex_distance(from_coords, best)
+	for i in range(1, candidates.size()):
+		var c: Vector2i = candidates[i]
+		var dist := HexPathfinder.hex_distance(from_coords, c)
+		if dist < best_dist:
+			best = c
+			best_dist = dist
+	return best
+
 static func _min_enemy_distance(from_coords: Vector2i, enemies: Array[Legion]) -> int:
 	var best := 2147483647
 	for enemy in enemies:
@@ -188,7 +213,8 @@ static func _best_step_toward(
 		var goal_tile: Tile = session.grid.get(goal)
 		if goal_tile == null or not goal_tile.walkable:
 			continue
-		if goal_tile.has_legion() and goal_tile.legion.team_id != team_id:
+		# Cannot step onto an occupied surround hex (ally or otherwise).
+		if goal_tile.has_legion():
 			continue
 		var path := HexPathfinder.find_path(session.grid, from_coords, goal, blocked)
 		if path.size() < 2:
@@ -224,18 +250,24 @@ static func _choose_step_toward(
 	if best_closer_dist < current_dist:
 		return best_closer
 
+	# Same-distance flank steps: prefer positive alignment, but accept any.
 	var best_lateral: Vector2i = Vector2i(2147483646, 2147483646)
 	var best_lateral_align := -INF
+	var any_lateral: Variant = null
 	for coords in movable:
 		var dist := HexPathfinder.hex_distance(coords, enemy_coords)
 		if dist != current_dist:
 			continue
+		if any_lateral == null:
+			any_lateral = coords
 		var align := _alignment_toward(from_coords, coords, enemy_coords)
 		if align > best_lateral_align:
 			best_lateral_align = align
 			best_lateral = coords
 	if best_lateral_align > 0.0:
 		return best_lateral
+	if any_lateral != null:
+		return any_lateral
 
 	var best_fallback: Vector2i = Vector2i(2147483646, 2147483646)
 	var best_fallback_align := -INF
@@ -246,6 +278,11 @@ static func _choose_step_toward(
 			best_fallback = coords
 	if best_fallback_align > 0.0:
 		return best_fallback
+
+	# Last resort: any legal step that does not increase distance.
+	for coords in movable:
+		if HexPathfinder.hex_distance(coords, enemy_coords) <= current_dist:
+			return coords
 
 	return null
 

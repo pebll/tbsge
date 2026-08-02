@@ -96,9 +96,6 @@ func perform_use_action(
 	)
 	if not ai_running:
 		input_locked = false
-		# Ensure selection/overlays never stick after a resolved action.
-		deps.battle_ui.deselect()
-		deps.battle_ui.clear_overlays()
 	check_match_end()
 	_action_in_flight = false
 	return true

@@ -45,6 +45,9 @@ func play_result(
 		var played := await _play_combat(
 			host, presenter, playback, from_coords, to_coords, payload.get("combat", {}), hooks
 		)
+		# Combat is terminal — always clear selection/overlays after it resolves.
+		_call_hook(hooks, "deselect")
+		_call_hook(hooks, "clear_overlays")
 		_call_hook(hooks, "on_finished")
 		return played
 	elif "legion_healed" in events:

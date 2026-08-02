@@ -25,6 +25,7 @@ func can_act_legion(legion: Legion) -> bool:
 		and _is_legion_on_grid(legion)
 		and turn_manager.is_legion_active(legion)
 		and legion.has_ap()
+		and legion.tile_coords not in turn_manager.waited_coords
 	)
 
 func get_legion_at(coords: Vector2i) -> Legion:
