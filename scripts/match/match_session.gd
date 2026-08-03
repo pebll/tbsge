@@ -6,15 +6,19 @@ const ActionResolverScript = preload("res://scripts/actions/action_resolver.gd")
 const ActionTargetingScript = preload("res://scripts/actions/action_targeting.gd")
 const BattleStateScript = preload("res://scripts/actions/battle_state.gd")
 const ActionDefinitionScript = preload("res://scripts/actions/action_definition.gd")
+const BattleActionLogScript = preload("res://scripts/battle/battle_action_log.gd")
+const BattleActionLogFormatterScript = preload("res://scripts/battle/battle_action_log_formatter.gd")
 
 var grid: Dictionary = {}
 var legions: Array[Legion] = []
 var turn_manager: TurnManager
 var team_ids: Array[String] = []
+var action_log: BattleActionLogScript
 
 func _init(p_team_ids: Array[String]) -> void:
 	team_ids = p_team_ids.duplicate()
 	turn_manager = TurnManagerRes.new(team_ids)
+	action_log = BattleActionLogScript.new()
 
 func battle_state() -> BattleStateScript:
 	return BattleStateScript.from_session(self)
@@ -79,11 +83,23 @@ func resolve_use_action(cmd: Dictionary) -> Dictionary:
 
 	var payload: Dictionary = result.get("payload", {})
 	_collect_cleanup_coords(payload)
-	return _ok(result.get("events", []).duplicate(), payload)
+	var ok_result := _ok(result.get("events", []).duplicate(), payload)
+	_append_action_log(BattleActionLogFormatterScript.from_use_action(self, ok_result))
+	return ok_result
 
 func apply_end_turn() -> Dictionary:
+	var ending_team: String = turn_manager.active_team_id
+	var ending_turn: int = turn_manager.turn_index
 	var next_team: String = turn_manager.end_team_turn(typed_legions())
-	return _ok(["turn_changed"], {"active_team": next_team})
+	var ok_result := _ok(["turn_changed"], {
+		"active_team": next_team,
+		"ending_team": ending_team,
+		"ending_turn": ending_turn,
+	})
+	_append_action_log(BattleActionLogFormatterScript.from_end_turn(
+		self, ending_team, ending_turn, next_team
+	))
+	return ok_result
 
 func get_movable_coords(from_coords: Vector2i) -> Array[Vector2i]:
 	return get_action_targets(_legion_at(from_coords), "move")
@@ -99,7 +115,15 @@ func apply_pass_legion(coords: Vector2i) -> Dictionary:
 	if not can_act_legion(legion):
 		return _fail("Legion cannot pass")
 	turn_manager.wait_legion(coords)
-	return _ok(["legion_passed"], {"coords": coords})
+	var ok_result := _ok(["legion_passed"], {"coords": coords})
+	_append_action_log(BattleActionLogFormatterScript.from_pass_legion(self, coords))
+	return ok_result
+
+func _append_action_log(entry: Dictionary) -> void:
+	if action_log == null or entry.is_empty():
+		return
+	action_log.append(entry)
+	EventBus.battle_log_entry_added.emit(entry)
 
 func _collect_cleanup_coords(payload: Dictionary) -> void:
 	var cleanup_coords: Array[Vector2i] = []

@@ -23,10 +23,17 @@ func enter() -> void:
 	deps.presenter.sync_legions(deps.session)
 	deps.turn_hud.show()
 	deps.turn_hud.show_active_team(deps.session.turn_manager.active_team_id)
+	if deps.action_log_panel:
+		deps.action_log_panel.clear_entries()
+		if deps.session.action_log:
+			deps.action_log_panel.bind_log(deps.session.action_log)
+		deps.action_log_panel.show()
 	maybe_start_ai_turn()
 
 func exit() -> void:
 	deps.turn_hud.hide()
+	if deps.action_log_panel:
+		deps.action_log_panel.hide()
 
 func is_input_locked() -> bool:
 	return _lock.is_locked() or ai_running
@@ -116,6 +123,8 @@ func check_match_end() -> void:
 	deps.tile_info_panel.hide()
 	if deps.action_bar:
 		deps.action_bar.hide()
+	if deps.action_log_panel:
+		deps.action_log_panel.hide()
 	deps.game_over_panel.show_for_winner(deps.session.winner)
 
 func inspect_tile(coords: Vector2i) -> void:

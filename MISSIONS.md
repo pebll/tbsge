@@ -102,12 +102,12 @@ Ship early so every new feature emits a clear, modular event the UI can render �
 - Hide or collapse in draft; show in battle (+ optional sandbox).
 
 **Engine contract (modular)**
-- [ ] Structured log entries from the session/resolver path (not only `print`):  
+- [x] Structured log entries from the session/resolver path (not only `print`):  
   `{ turn, team, action_id, from, to, caster_summary, target_summary, result_summary, payload? }`  
-- [ ] Append on successful `use_action` / pass / end_turn / combat resolution (one entry per player-facing beat; combat can be one summary line or expand later).  
-- [ ] Cap length (e.g. last 50–100) so memory stays bounded.  
-- [ ] EventBus or session callback so UI/AI/tests subscribe without coupling to `CombatResolver` prints.  
-- [ ] Headless tests: apply move/attack/heal → log contains expected fields.
+- [x] Append on successful `use_action` / pass / end_turn / combat resolution (one entry per player-facing beat; combat can be one summary line or expand later).  
+- [x] Cap length (e.g. last 50–100) so memory stays bounded.  
+- [x] EventBus or session callback so UI/AI/tests subscribe without coupling to `CombatResolver` prints.  
+- [x] Headless tests: apply move/attack/heal → log contains expected fields.
 
 **Why before ally heal**
 - New skills only need to fill the same entry shape.  

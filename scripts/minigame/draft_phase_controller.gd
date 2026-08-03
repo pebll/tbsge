@@ -21,6 +21,8 @@ func enter(first_team_id: String) -> void:
 	viewing_team = first_team_id
 	selected_coords = INVALID_COORDS
 	deps.tile_info_panel.set_draft_mode(true)
+	if deps.action_log_panel:
+		deps.action_log_panel.hide()
 	refresh_view()
 
 func exit() -> void:

@@ -6,6 +6,8 @@ const INVALID_COORDS := Vector2i(2147483647, 2147483647)
 var team_order: Array[String] = []
 var active_team_id: String = ""
 var waited_coords: Array[Vector2i] = []
+## Increments each time a team ends their turn (starts at 1).
+var turn_index: int = 1
 
 var _tab_index: int = 0
 
@@ -18,11 +20,13 @@ func start_match(first_team: String) -> void:
 	active_team_id = first_team
 	waited_coords.clear()
 	_tab_index = 0
+	turn_index = 1
 
 func end_team_turn(legions: Array[Legion]) -> String:
 	active_team_id = _next_team_id()
 	waited_coords.clear()
 	_tab_index = 0
+	turn_index += 1
 	for legion in legions:
 		if legion.team_id == active_team_id:
 			legion.refresh_ap()

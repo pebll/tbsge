@@ -41,6 +41,7 @@ var _status_label: Label
 var _game_over_panel: GameOverPanel
 var _action_bar: Control
 var _tooltip_controller: TooltipController
+var _action_log_panel: BattleActionLogPanel
 
 @onready var _camera: Camera2D = $Camera2D
 
@@ -107,6 +108,7 @@ func _setup_phase_controllers() -> void:
 	deps.status_label = _status_label
 	deps.game_over_panel = _game_over_panel
 	deps.action_bar = _action_bar
+	deps.action_log_panel = _action_log_panel
 
 	draft = DraftPhaseControllerScript.new(deps)
 	battle = BattlePhaseControllerScript.new(deps)
@@ -175,6 +177,12 @@ func _setup_ui() -> void:
 	if _action_bar.has_method("set_tooltip_controller"):
 		_action_bar.set_tooltip_controller(_tooltip_controller)
 
+	_action_log_panel = BattleActionLogPanel.new()
+	_ui_layer.add_child(_action_log_panel)
+	_action_log_panel.set_tooltip_controller(_tooltip_controller)
+	_action_log_panel.hide()
+	EventBus.battle_log_entry_added.connect(_on_battle_log_entry_added)
+
 	_combat_fx_layer = CanvasLayer.new()
 	_combat_fx_layer.name = "CombatFX"
 	_combat_fx_layer.layer = 2
@@ -226,6 +234,10 @@ func _on_battle_started() -> void:
 	EventBus.tile_right_clicked.disconnect(_on_tile_right_clicked)
 	draft.exit()
 	battle.enter()
+
+func _on_battle_log_entry_added(entry: Dictionary) -> void:
+	if _action_log_panel and session and session.phase == MinigameSessionScript.Phase.BATTLE:
+		_action_log_panel.append_entry(entry)
 
 func _on_legion_ap_changed(legion: Legion) -> void:
 	if not _tile_info_panel or not _tile_info_panel.visible:

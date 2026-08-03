@@ -196,6 +196,8 @@ func _draft_ready(cmd: Dictionary) -> Dictionary:
 
 func _begin_battle() -> void:
 	phase = Phase.BATTLE
+	if action_log:
+		action_log.clear()
 	legions.clear()
 	for team_id in config.team_ids:
 		var draft = drafts.get(team_id)

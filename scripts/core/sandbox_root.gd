@@ -39,6 +39,7 @@ var combat_fx_layer: CanvasLayer
 var turn_hud: TurnHud
 var _action_playback: RefCounted
 var _tooltip_controller: TooltipController
+var _action_log_panel: BattleActionLogPanel
 
 func _ready() -> void:
 	var config: SandboxConfigScript = load(config_path)
@@ -97,6 +98,10 @@ func inspect_tile(coords: Vector2i) -> void:
 func clear_inspect() -> void:
 	if tile_info_panel:
 		tile_info_panel.hide()
+
+func _on_battle_log_entry_added(entry: Dictionary) -> void:
+	if _action_log_panel:
+		_action_log_panel.append_entry(entry)
 
 func spawn_unit(coords: Vector2i) -> void:
 	var result := session.spawn_unit_at(coords)
@@ -193,6 +198,14 @@ func _setup_tile_info_ui() -> void:
 		tile_info_panel.set_tooltip_controller(_tooltip_controller)
 	if action_bar.has_method("set_tooltip_controller"):
 		action_bar.set_tooltip_controller(_tooltip_controller)
+
+	_action_log_panel = BattleActionLogPanel.new()
+	tile_info_layer.add_child(_action_log_panel)
+	_action_log_panel.set_tooltip_controller(_tooltip_controller)
+	if session and session.action_log:
+		_action_log_panel.bind_log(session.action_log)
+	_action_log_panel.show()
+	EventBus.battle_log_entry_added.connect(_on_battle_log_entry_added)
 
 func _setup_combat_fx_ui() -> void:
 	combat_fx_layer = CanvasLayer.new()
