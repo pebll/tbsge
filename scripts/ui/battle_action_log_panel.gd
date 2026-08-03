@@ -3,6 +3,7 @@ extends Control
 
 ## Full-height left dock. Fat icon/number cards; coords text only for moves.
 ## Toggle button stays on the left edge to pop the dock in/out.
+## Combat/heal/teleport lines wait in a pending queue until reveal_pending().
 
 const COLOR_BG := Color(0.91, 0.86, 0.78, 0.96)
 const COLOR_BORDER := Color(0.78, 0.70, 0.58)
@@ -10,12 +11,14 @@ const COLOR_CARD_BG := Color(0.94, 0.90, 0.83)
 const COLOR_ACTION_WELL := Color(0.88, 0.83, 0.74)
 const COLOR_TEXT := Color(0.12, 0.10, 0.08)
 const COLOR_HEAL := Color(0.18, 0.52, 0.28)
+const COLOR_WIPE := Color(0.78, 0.12, 0.12)
 const BORDER_THICK := 4
 const RADIUS := 14
 const CARD_RADIUS := 14
 const DOCK_WIDTH := 540.0
 const TOGGLE_WIDTH := 40.0
 const CARD_MIN_HEIGHT := 108.0
+const BANNER_WIDTH := 10.0
 const ICON_UNIT := Vector2(84, 84)
 const ICON_ACTION := Vector2(52, 52)
 const ICON_STAT := Vector2(30, 30)
@@ -27,10 +30,15 @@ const ICON_DEATH := preload("res://assets/icons/base_icons_sprites/skull.png")
 const ICON_HEAL := preload("res://assets/icons/base_icons_sprites/heart.png")
 
 var _dock: PanelContainer
+var _header: VBoxContainer
 var _scroll: ScrollContainer
 var _list: VBoxContainer
 var _toggle_btn: Button
+var _moves_check: CheckBox
+var _end_turns_check: CheckBox
 var _tooltip: TooltipController = null
+var _bound_log: BattleActionLog = null
+var _pending: Array[Dictionary] = []
 var _expanded: bool = true
 var _battle_mode: bool = false
 
@@ -52,6 +60,7 @@ func set_tooltip_controller(controller: TooltipController) -> void:
 
 func enter_battle(action_log: BattleActionLog = null) -> void:
 	_battle_mode = true
+	_pending.clear()
 	show()
 	clear_entries()
 	if action_log:
@@ -60,17 +69,16 @@ func enter_battle(action_log: BattleActionLog = null) -> void:
 
 func exit_battle() -> void:
 	_battle_mode = false
+	_pending.clear()
+	_bound_log = null
 	clear_entries()
 	_set_expanded(false)
 	hide()
 
 func bind_log(action_log: BattleActionLog) -> void:
-	clear_entries()
-	if action_log == null:
-		return
-	for entry in action_log.entries:
-		_add_entry_row(entry)
-	_scroll_to_bottom()
+	_bound_log = action_log
+	_sync_option_checks()
+	_rebuild_visible_entries()
 
 func clear_entries() -> void:
 	if _list == null:
@@ -78,8 +86,31 @@ func clear_entries() -> void:
 	for child in _list.get_children():
 		child.queue_free()
 
+## Hosts call this for live EventBus entries. Combat lines may queue.
+func receive_entry(entry: Dictionary) -> void:
+	if not _battle_mode or entry.is_empty():
+		return
+	if not _is_visible(entry):
+		return
+	if BattleActionLog.should_defer_ui(entry):
+		_pending.append(entry)
+		return
+	append_entry(entry)
+
+## Flush deferred combat/heal/teleport lines after playback finishes.
+func reveal_pending() -> void:
+	if not _battle_mode:
+		_pending.clear()
+		return
+	for entry in _pending:
+		if _is_visible(entry):
+			append_entry(entry)
+	_pending.clear()
+
 func append_entry(entry: Dictionary) -> void:
 	if not _battle_mode:
+		return
+	if not _is_visible(entry):
 		return
 	_add_entry_row(entry)
 	_scroll_to_bottom()
@@ -101,15 +132,51 @@ func _build() -> void:
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 14)
 	margin.add_theme_constant_override("margin_right", 14)
-	margin.add_theme_constant_override("margin_top", 16)
+	margin.add_theme_constant_override("margin_top", 12)
 	margin.add_theme_constant_override("margin_bottom", 16)
 	_dock.add_child(margin)
+
+	var root := VBoxContainer.new()
+	root.add_theme_constant_override("separation", 10)
+	root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	root.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	margin.add_child(root)
+
+	_header = VBoxContainer.new()
+	_header.add_theme_constant_override("separation", 4)
+	root.add_child(_header)
+
+	var title := Label.new()
+	title.text = "Battle log"
+	title.add_theme_color_override("font_color", COLOR_TEXT)
+	title.add_theme_font_size_override("font_size", 22)
+	_header.add_child(title)
+
+	var opts := HBoxContainer.new()
+	opts.add_theme_constant_override("separation", 16)
+	_header.add_child(opts)
+
+	_moves_check = CheckBox.new()
+	_moves_check.text = "Moves"
+	_moves_check.focus_mode = Control.FOCUS_NONE
+	_moves_check.button_pressed = false
+	_moves_check.toggled.connect(_on_show_moves_toggled)
+	_style_option_check(_moves_check)
+	opts.add_child(_moves_check)
+
+	_end_turns_check = CheckBox.new()
+	_end_turns_check.text = "End turns"
+	_end_turns_check.focus_mode = Control.FOCUS_NONE
+	_end_turns_check.button_pressed = false
+	_end_turns_check.toggled.connect(_on_show_end_turns_toggled)
+	_style_option_check(_end_turns_check)
+	opts.add_child(_end_turns_check)
 
 	_scroll = ScrollContainer.new()
 	_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	margin.add_child(_scroll)
+	root.add_child(_scroll)
 
 	_list = VBoxContainer.new()
 	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -127,6 +194,12 @@ func _build() -> void:
 	_toggle_btn.pressed.connect(_on_toggle_pressed)
 	_style_toggle_button()
 	add_child(_toggle_btn)
+
+func _style_option_check(box: CheckBox) -> void:
+	box.add_theme_color_override("font_color", COLOR_TEXT)
+	box.add_theme_color_override("font_pressed_color", COLOR_TEXT)
+	box.add_theme_color_override("font_hover_color", COLOR_TEXT)
+	box.add_theme_font_size_override("font_size", 18)
 
 func _apply_dock_style() -> void:
 	var sb := StyleBoxFlat.new()
@@ -163,6 +236,49 @@ func _style_toggle_button() -> void:
 func _on_toggle_pressed() -> void:
 	_set_expanded(not _expanded)
 
+func _on_show_moves_toggled(pressed: bool) -> void:
+	if _bound_log:
+		_bound_log.show_moves = pressed
+	_rebuild_visible_entries()
+
+func _on_show_end_turns_toggled(pressed: bool) -> void:
+	if _bound_log:
+		_bound_log.show_end_turns = pressed
+	_rebuild_visible_entries()
+
+func _sync_option_checks() -> void:
+	if _moves_check == null or _end_turns_check == null:
+		return
+	var show_moves := _bound_log.show_moves if _bound_log else false
+	var show_ends := _bound_log.show_end_turns if _bound_log else false
+	_moves_check.set_pressed_no_signal(show_moves)
+	_end_turns_check.set_pressed_no_signal(show_ends)
+
+func _rebuild_visible_entries() -> void:
+	clear_entries()
+	if _bound_log == null:
+		return
+	for entry in _bound_log.entries:
+		if _is_visible(entry) and not _is_still_pending(entry):
+			_add_entry_row(entry)
+	_scroll_to_bottom()
+
+func _is_still_pending(entry: Dictionary) -> bool:
+	for pending in _pending:
+		if pending == entry:
+			return true
+	return false
+
+func _is_visible(entry: Dictionary) -> bool:
+	if _bound_log:
+		return _bound_log.is_entry_visible(entry)
+	var action_id := String(entry.get("action_id", ""))
+	if action_id in ["move", "swap"]:
+		return false
+	if action_id == "end_turn":
+		return false
+	return true
+
 func _set_expanded(expanded: bool) -> void:
 	_expanded = expanded
 	_dock.visible = expanded
@@ -188,12 +304,24 @@ func _add_entry_row(entry: Dictionary) -> void:
 	card.tooltip_text = "Right-click to inspect"
 	card.add_theme_stylebox_override("panel", _card_stylebox())
 
+	var outer := HBoxContainer.new()
+	outer.add_theme_constant_override("separation", 0)
+	outer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	outer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	card.add_child(outer)
+
+	var caster_team := String(entry.get("caster_team_id", entry.get("team", "")))
+	var target_team := String(entry.get("target_team_id", ""))
+	outer.add_child(_make_banner_strip(caster_team))
+
 	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 14)
-	margin.add_theme_constant_override("margin_right", 14)
+	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	margin.add_theme_constant_override("margin_left", 10)
+	margin.add_theme_constant_override("margin_right", 10)
 	margin.add_theme_constant_override("margin_top", 12)
 	margin.add_theme_constant_override("margin_bottom", 12)
-	card.add_child(margin)
+	outer.add_child(margin)
 
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 14)
@@ -206,24 +334,34 @@ func _add_entry_row(entry: Dictionary) -> void:
 	var caster_type := String(entry.get("caster_unit_type", ""))
 	var target_type := String(entry.get("target_unit_type", ""))
 
-	# Caster block: portrait + stacked combat stats
 	row.add_child(_make_side_block(
 		caster_type,
 		int(entry.get("caster_hp_lost", 0)),
-		int(entry.get("caster_deaths", 0))
+		int(entry.get("caster_deaths", 0)),
+		bool(entry.get("caster_wiped", false))
 	))
 
-	# Center action well
 	row.add_child(_make_action_well(action_id, entry))
 
-	# Target / result block
 	var target_hp := int(entry.get("target_hp_lost", 0))
 	var target_deaths := int(entry.get("target_deaths", 0))
-	var has_target := not target_type.is_empty() or target_hp > 0 or target_deaths > 0
+	var target_wiped := bool(entry.get("target_wiped", false))
+	var has_target := (
+		not target_type.is_empty()
+		or target_hp > 0
+		or target_deaths > 0
+		or target_wiped
+	)
 	if has_target:
-		row.add_child(_make_side_block(target_type, target_hp, target_deaths))
+		row.add_child(_make_side_block(target_type, target_hp, target_deaths, target_wiped))
 	elif bool(entry.get("show_coords", false)):
 		row.add_child(_make_empty_side_spacer())
+
+	if not target_team.is_empty():
+		outer.add_child(_make_banner_strip(target_team))
+	elif not caster_team.is_empty():
+		# Single-side actions still get a matching right edge so the card feels framed.
+		outer.add_child(_make_banner_strip(caster_team))
 
 	var captured: Dictionary = entry.duplicate(true)
 	card.gui_input.connect(func(event: InputEvent) -> void:
@@ -233,14 +371,52 @@ func _add_entry_row(entry: Dictionary) -> void:
 	)
 	_list.add_child(card)
 
-func _make_side_block(unit_type: String, hp_lost: int, deaths: int) -> Control:
+func _make_banner_strip(team_id: String) -> Control:
+	var strip := ColorRect.new()
+	strip.custom_minimum_size = Vector2(BANNER_WIDTH, 0)
+	strip.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	strip.color = _team_color(team_id)
+	return strip
+
+func _team_color(team_id: String) -> Color:
+	if team_id.is_empty():
+		return COLOR_BORDER
+	var team_res: Resource = TeamDefs.get_def(team_id)
+	if team_res is TeamDefinition:
+		return (team_res as TeamDefinition).color
+	return COLOR_BORDER
+
+func _make_side_block(unit_type: String, hp_lost: int, deaths: int, wiped: bool = false) -> Control:
 	var block := HBoxContainer.new()
 	block.add_theme_constant_override("separation", 10)
 	block.alignment = BoxContainer.ALIGNMENT_CENTER
 	block.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	block.add_child(_make_texture_rect(_unit_icon(unit_type), ICON_UNIT))
+	block.add_child(_make_unit_portrait(unit_type, wiped))
 	block.add_child(_make_side_stats(hp_lost, deaths))
 	return block
+
+func _make_unit_portrait(unit_type: String, wiped: bool) -> Control:
+	var wrap := Control.new()
+	wrap.custom_minimum_size = ICON_UNIT
+
+	var portrait := _make_texture_rect(_unit_icon(unit_type), ICON_UNIT)
+	portrait.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	if wiped:
+		portrait.modulate = Color(0.55, 0.55, 0.55, 0.85)
+	wrap.add_child(portrait)
+
+	if wiped:
+		var mark := Label.new()
+		mark.text = "✕"
+		mark.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		mark.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		mark.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		mark.add_theme_color_override("font_color", COLOR_WIPE)
+		mark.add_theme_font_size_override("font_size", 64)
+		mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		wrap.add_child(mark)
+
+	return wrap
 
 func _make_action_well(action_id: String, entry: Dictionary) -> Control:
 	var well := PanelContainer.new()
@@ -284,12 +460,6 @@ func _make_action_well(action_id: String, entry: Dictionary) -> Control:
 		vbox.add_child(_make_stat_chip(ICON_HEAL, healed, COLOR_HEAL))
 
 	return well
-
-func _make_result_chip(icon: Texture2D, value: int, color: Color) -> Control:
-	var wrap := CenterContainer.new()
-	wrap.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	wrap.add_child(_make_stat_chip(icon, value, color))
-	return wrap
 
 func _make_empty_side_spacer() -> Control:
 	var spacer := Control.new()
@@ -365,8 +535,8 @@ func _card_stylebox() -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = COLOR_CARD_BG
 	sb.border_color = COLOR_BORDER
-	sb.border_width_left = 3
-	sb.border_width_right = 3
+	sb.border_width_left = 1
+	sb.border_width_right = 1
 	sb.border_width_top = 3
 	sb.border_width_bottom = 3
 	sb.corner_radius_top_left = CARD_RADIUS
@@ -397,6 +567,10 @@ func _inspect_entry(entry: Dictionary, control: Control) -> void:
 		body_lines.append("Caster: −%d HP, %d fallen" % [caster_hp, caster_deaths])
 	if target_hp > 0 or target_deaths > 0:
 		body_lines.append("Target: −%d HP, %d fallen" % [target_hp, target_deaths])
+	if bool(entry.get("caster_wiped", false)):
+		body_lines.append("Caster legion wiped")
+	if bool(entry.get("target_wiped", false)):
+		body_lines.append("Target legion wiped")
 	if healed > 0:
 		body_lines.append("Healed +%d" % healed)
 	if bool(entry.get("show_coords", false)):

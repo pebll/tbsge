@@ -101,7 +101,7 @@ func clear_inspect() -> void:
 
 func _on_battle_log_entry_added(entry: Dictionary) -> void:
 	if _action_log_panel:
-		_action_log_panel.append_entry(entry)
+		_action_log_panel.receive_entry(entry)
 
 func spawn_unit(coords: Vector2i) -> void:
 	var result := session.spawn_unit_at(coords)
@@ -146,6 +146,8 @@ func _perform_use_action(cmd: Dictionary, from_coords: Vector2i) -> void:
 			"deselect_after_heal": true,
 		})
 	)
+	if _action_log_panel:
+		_action_log_panel.reveal_pending()
 	input.end_action()
 
 func _setup_battle_context() -> void:

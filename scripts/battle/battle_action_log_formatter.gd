@@ -45,7 +45,9 @@ static func from_use_action(session: MatchSession, result: Dictionary) -> Dictio
 		_result_summary_for_action(action_id, payload, events),
 		payload,
 		caster.unit_type if caster else "",
-		target_unit_type
+		target_unit_type,
+		caster.team_id if caster else "",
+		target_legion.team_id if target_legion else ""
 	)
 	_fill_numeric_fields(entry, action_id, events, payload, caster, target_legion)
 	return entry
@@ -62,6 +64,8 @@ static func from_pass_legion(session: MatchSession, coords: Vector2i) -> Diction
 		"waited",
 		{"coords": coords},
 		legion.unit_type if legion else "",
+		"",
+		legion.team_id if legion else "",
 		""
 	)
 	_fill_numeric_fields(entry, "pass", ["legion_passed"], {}, legion, null)
@@ -84,10 +88,14 @@ static func from_end_turn(
 		"result_summary": "ended → %s" % _team_label(next_team),
 		"caster_unit_type": "",
 		"target_unit_type": "",
+		"caster_team_id": ending_team,
+		"target_team_id": "",
 		"caster_hp_lost": 0,
 		"caster_deaths": 0,
 		"target_hp_lost": 0,
 		"target_deaths": 0,
+		"caster_wiped": false,
+		"target_wiped": false,
 		"healed_total": 0,
 		"show_coords": false,
 		"coord_text": "",
@@ -110,6 +118,8 @@ static func _fill_numeric_fields(
 	entry["caster_deaths"] = 0
 	entry["target_hp_lost"] = 0
 	entry["target_deaths"] = 0
+	entry["caster_wiped"] = false
+	entry["target_wiped"] = false
 	entry["healed_total"] = int(payload.get("healed_total", 0))
 	entry["show_coords"] = false
 	entry["coord_text"] = ""
@@ -122,6 +132,9 @@ static func _fill_numeric_fields(
 		entry["caster_deaths"] = caster_stats["deaths"]
 		entry["target_hp_lost"] = target_stats["hp_lost"]
 		entry["target_deaths"] = target_stats["deaths"]
+		# Empty roster after resolve = legion wiped (red X on portrait).
+		entry["caster_wiped"] = caster != null and caster.units.is_empty()
+		entry["target_wiped"] = target_legion != null and target_legion.units.is_empty()
 
 	if (
 		action_id in ["move", "teleport"]
@@ -159,7 +172,9 @@ static func _entry(
 	result_summary: String,
 	payload: Dictionary,
 	caster_unit_type: String = "",
-	target_unit_type: String = ""
+	target_unit_type: String = "",
+	caster_team_id: String = "",
+	target_team_id: String = ""
 ) -> Dictionary:
 	var turn_index := 1
 	if session != null and session.turn_manager != null:
@@ -169,6 +184,8 @@ static func _entry(
 		team = session.turn_manager.active_team_id
 	if payload.has("ending_team"):
 		team = String(payload.get("ending_team", team))
+	if caster_team_id.is_empty():
+		caster_team_id = team
 	return {
 		"turn": turn_index,
 		"team": team,
@@ -180,6 +197,8 @@ static func _entry(
 		"result_summary": result_summary,
 		"caster_unit_type": caster_unit_type,
 		"target_unit_type": target_unit_type,
+		"caster_team_id": caster_team_id,
+		"target_team_id": target_team_id,
 		"payload": payload.duplicate(true),
 	}
 

@@ -7,6 +7,10 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_pass_and_end_turn_log():
 		return false
+	if not _test_filter_defaults():
+		return false
+	if not _test_combat_wipe_and_teams():
+		return false
 	if not _test_log_cap():
 		return false
 	print("Success: Battle action log tests")
@@ -52,10 +56,12 @@ func _test_move_and_heal_log_fields() -> bool:
 	if not move_entry.has("from") or not move_entry.has("to"):
 		push_error("Move log missing from/to")
 		return false
+	if String(move_entry.get("caster_team_id", "")).is_empty():
+		push_error("Move log should store caster_team_id for banners")
+		return false
 
 	# Fresh legion with enough AP for heal (move spent 1).
 	if green.current_ap < 2:
-		# Pass and end turns until green can heal, or just set AP.
 		green.current_ap = 2
 		session.turn_manager.clear_wait(green.tile_coords)
 
@@ -83,6 +89,9 @@ func _test_move_and_heal_log_fields() -> bool:
 		return false
 	if int(heal_entry.get("healed_total", 0)) <= 0:
 		push_error("Heal log should store healed_total for icon UI")
+		return false
+	if not BattleActionLog.should_defer_ui(heal_entry):
+		push_error("Heal log should defer UI until playback finishes")
 		return false
 	return true
 
@@ -120,6 +129,108 @@ func _test_pass_and_end_turn_log() -> bool:
 		return false
 	return true
 
+func _test_filter_defaults() -> bool:
+	var log := BattleActionLog.new()
+	if log.show_moves or log.show_end_turns:
+		push_error("Moves and end turns should be hidden by default")
+		return false
+	if log.is_entry_visible({"action_id": "move"}):
+		push_error("Move entries should be hidden by default")
+		return false
+	if log.is_entry_visible({"action_id": "end_turn"}):
+		push_error("End turn entries should be hidden by default")
+		return false
+	if not log.is_entry_visible({"action_id": "melee_attack"}):
+		push_error("Combat entries should stay visible")
+		return false
+	if not log.is_entry_visible({"action_id": "pass"}):
+		push_error("Wait/pass entries should stay visible")
+		return false
+	if not log.is_entry_visible({"action_id": "teleport"}):
+		push_error("Teleport entries should stay visible")
+		return false
+	log.show_moves = true
+	if not log.is_entry_visible({"action_id": "move"}):
+		push_error("Moves should appear when option enabled")
+		return false
+	log.show_end_turns = true
+	if not log.is_entry_visible({"action_id": "end_turn"}):
+		push_error("End turns should appear when option enabled")
+		return false
+	return true
+
+func _test_combat_wipe_and_teams() -> bool:
+	var session := MinigameTestHelpersScript.prepare_session()
+	var legions: Dictionary = MinigameTestHelpersScript.start_two_legion_battle(session)
+	var green: Legion = legions["a"]
+	var red: Legion = legions["b"]
+	var atk := Vector2i(0, 0)
+	var def := Vector2i(1, 0)
+	if session.grid.get(atk) == null or session.grid.get(def) == null:
+		push_error("Expected adjacent tiles for wipe log test")
+		return false
+	for c in [green.tile_coords, red.tile_coords]:
+		if session.grid.get(c):
+			session.grid[c].legion = null
+	_teleport(session, green, atk)
+	_teleport(session, red, def)
+
+	# Leave defender on one low-HP unit so a hit can wipe the legion.
+	while red.units.size() > 1:
+		red.units.pop_back()
+	if red.units.is_empty():
+		push_error("Expected at least one defender unit")
+		return false
+	red.units[0].current_health = 1
+	for u in green.units:
+		u.attack = 50
+
+	session.action_log.clear()
+	var attack_targets := session.get_action_targets(green, "melee_attack")
+	if attack_targets.is_empty():
+		push_error("Expected melee targets for wipe log test")
+		return false
+
+	var attack := session.apply({
+		"type": "use_action",
+		"action_id": "melee_attack",
+		"from": green.tile_coords,
+		"to": attack_targets[0],
+		"rng_seed": 1,
+	})
+	if not attack["ok"]:
+		push_error("Melee failed in wipe log test: %s" % attack.get("error"))
+		return false
+	var entry: Dictionary = session.action_log.latest()
+	if String(entry.get("action_id", "")) != "melee_attack":
+		push_error("Expected melee log entry")
+		return false
+	if String(entry.get("caster_team_id", "")).is_empty():
+		push_error("Combat log missing caster_team_id")
+		return false
+	if String(entry.get("target_team_id", "")).is_empty():
+		push_error("Combat log missing target_team_id")
+		return false
+	if not BattleActionLog.should_defer_ui(entry):
+		push_error("Combat log should defer UI")
+		return false
+	if not entry.has("target_wiped") or not entry.has("caster_wiped"):
+		push_error("Combat log should include wipe flags")
+		return false
+	if not bool(entry.get("target_wiped", false)):
+		push_error("Expected target_wiped after overkill melee")
+		return false
+	return true
+
+func _teleport(session, legion: Legion, coords: Vector2i) -> void:
+	var old_tile: Tile = session.grid.get(legion.tile_coords)
+	if old_tile:
+		old_tile.legion = null
+	legion.tile_coords = coords
+	var new_tile: Tile = session.grid.get(coords)
+	if new_tile:
+		new_tile.legion = legion
+
 func _test_log_cap() -> bool:
 	var session := MinigameTestHelpersScript.prepare_session()
 	MinigameTestHelpersScript.start_two_legion_battle(session)
@@ -137,10 +248,14 @@ func _test_log_cap() -> bool:
 			"result_summary": "moved",
 			"caster_unit_type": "GOBLIN",
 			"target_unit_type": "",
+			"caster_team_id": "t",
+			"target_team_id": "",
 			"caster_hp_lost": 0,
 			"caster_deaths": 0,
 			"target_hp_lost": 0,
 			"target_deaths": 0,
+			"caster_wiped": false,
+			"target_wiped": false,
 			"healed_total": 0,
 			"show_coords": true,
 			"coord_text": "%d,0" % i,

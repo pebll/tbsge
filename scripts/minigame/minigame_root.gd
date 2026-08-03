@@ -236,7 +236,7 @@ func _on_battle_started() -> void:
 
 func _on_battle_log_entry_added(entry: Dictionary) -> void:
 	if _action_log_panel and session and session.phase == MinigameSessionScript.Phase.BATTLE:
-		_action_log_panel.append_entry(entry)
+		_action_log_panel.receive_entry(entry)
 
 func _on_legion_ap_changed(legion: Legion) -> void:
 	if not _tile_info_panel or not _tile_info_panel.visible:

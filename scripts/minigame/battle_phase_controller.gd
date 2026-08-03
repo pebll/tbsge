@@ -95,6 +95,8 @@ func perform_use_action(
 		from_coords,
 		_battle_action_hooks()
 	)
+	if deps.action_log_panel:
+		deps.action_log_panel.reveal_pending()
 	_lock.end()
 	check_match_end()
 	return true
