@@ -17,24 +17,63 @@ static func sort_actionable_by_enemy_distance(
 	session: MatchSessionScript,
 	actionable: Array[Vector2i]
 ) -> Array[Vector2i]:
+	## Activation order tree (simple, deterministic):
+	## 1) Closest to any enemy first (hex distance)
+	## 2) Same distance: units that can attack now before pure movers
+	## 3) Stable coord tie-break
+	## Re-queried each activation so after a front unit moves/waits, the new
+	## closest acts — rear units stop blocking each other less often.
 	if actionable.is_empty():
 		return actionable
 	var enemies := _enemy_legions(session, session.turn_manager.active_team_id)
 	if enemies.is_empty():
 		return actionable.duplicate()
-	var sorted := actionable.duplicate()
-	sorted.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
-		var da := _min_enemy_distance(a, enemies)
-		var db := _min_enemy_distance(b, enemies)
-		if da == db:
-			if a.x == b.x:
-				return a.y < b.y
-			return a.x < b.x
-		return da < db
+
+	var scored: Array[Dictionary] = []
+	for coords in actionable:
+		scored.append({
+			"coords": coords,
+			"dist": _min_enemy_distance(coords, enemies),
+			"can_fight": _can_fight_now(session, coords),
+		})
+	scored.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var da: int = int(a["dist"])
+		var db: int = int(b["dist"])
+		if da != db:
+			return da < db
+		var fa: bool = bool(a["can_fight"])
+		var fb: bool = bool(b["can_fight"])
+		if fa != fb:
+			return fa and not fb
+		var ca: Vector2i = a["coords"]
+		var cb: Vector2i = b["coords"]
+		if ca.x != cb.x:
+			return ca.x < cb.x
+		return ca.y < cb.y
 	)
+
+	var sorted: Array[Vector2i] = []
+	for row in scored:
+		sorted.append(row["coords"])
 	if debug_enabled:
-		print("[AI] Legion order (nearest enemy first): %s" % str(sorted))
+		var parts: PackedStringArray = []
+		for row in scored:
+			parts.append(
+				"%s(d=%d%s)"
+				% [row["coords"], row["dist"], ",fight" if bool(row["can_fight"]) else ""]
+			)
+		print("[AI] Legion order (closest first): %s" % ", ".join(parts))
 	return sorted
+
+static func _can_fight_now(session: MatchSessionScript, coords: Vector2i) -> bool:
+	var legion: Legion = session.get_legion_at(coords)
+	if legion == null or not session.can_act_legion(legion):
+		return false
+	if not session.get_action_targets(legion, "melee_attack").is_empty():
+		return true
+	if not session.get_action_targets(legion, "ranged_attack").is_empty():
+		return true
+	return false
 
 static func _decide_internal(session: MatchSessionScript, legion: Legion) -> Dictionary:
 	if legion == null:

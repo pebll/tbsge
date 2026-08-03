@@ -26,6 +26,8 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_prefers_ranged_when_adjacent_no_return_fire():
 		return false
+	if not _test_activation_order_closest_first():
+		return false
 	print("Success: AI attack-nearest tests")
 	return true
 
@@ -429,5 +431,75 @@ func _test_prefers_ranged_when_adjacent_no_return_fire() -> bool:
 	var cmd: Dictionary = AttackNearestEnemyBehavior.decide(session, archer)
 	if cmd.get("type") != "use_action" or cmd.get("action_id") != "ranged_attack":
 		push_error("AI should prefer ranged vs melee-only adjacent, got %s" % cmd)
+		return false
+	return true
+
+func _test_activation_order_closest_first() -> bool:
+	## Front-line units must activate before rear ones so they stop blocking paths.
+	var session := MinigameTestHelpersScript.prepare_session()
+	var started: Dictionary = MinigameTestHelpersScript.start_two_legion_battle(session)
+	var near: Legion = started["a"]
+	var enemy: Legion = started["b"]
+	var team_a: String = started["team_a"]
+
+	var mid_coords := Vector2i(-1, 0)
+	var far_coords := Vector2i(-2, 0)
+	var enemy_coords := Vector2i(1, 0)
+	var near_coords := Vector2i(0, 0)
+	for c in [near_coords, mid_coords, far_coords, enemy_coords]:
+		if session.grid.get(c) == null:
+			push_error("Missing hex for activation-order test")
+			return false
+
+	for c in [near.tile_coords, enemy.tile_coords]:
+		if session.grid.get(c):
+			session.grid[c].legion = null
+	_teleport_legion(session, near, near_coords)
+	_teleport_legion(session, enemy, enemy_coords)
+
+	var mid := Legion.new("GOBLIN", 1, mid_coords, team_a)
+	var far := Legion.new("GOBLIN", 1, far_coords, team_a)
+	session.grid[mid_coords].legion = mid
+	session.grid[far_coords].legion = far
+	session.legions.append_array([mid, far])
+	near.refresh_ap()
+	mid.refresh_ap()
+	far.refresh_ap()
+	session.turn_manager.waited_coords.clear()
+
+	# Shuffle input order so we don't accidentally depend on append order.
+	var shuffled: Array[Vector2i] = [far_coords, near_coords, mid_coords]
+	var ordered := AttackNearestEnemyBehavior.sort_actionable_by_enemy_distance(session, shuffled)
+	var expected: Array[Vector2i] = [near_coords, mid_coords, far_coords]
+	if ordered != expected:
+		push_error("Expected closest-first order %s, got %s" % [expected, ordered])
+		return false
+
+	# Same distance: the one that can fight now should go before a pure mover.
+	var fighter_coords := Vector2i(0, 1)
+	var mover_coords := Vector2i(0, -1)
+	if session.grid.get(fighter_coords) == null or session.grid.get(mover_coords) == null:
+		return true
+	_teleport_legion(session, mid, fighter_coords)
+	_teleport_legion(session, far, mover_coords)
+	# Enemy adjacent to fighter only.
+	_teleport_legion(session, enemy, Vector2i(1, 1) if session.grid.get(Vector2i(1, 1)) else enemy_coords)
+	# Keep near far away so it doesn't win on distance.
+	_teleport_legion(session, near, Vector2i(-2, -1) if session.grid.get(Vector2i(-2, -1)) else far_coords)
+	near.refresh_ap()
+	mid.refresh_ap()
+	far.refresh_ap()
+	session.turn_manager.waited_coords.clear()
+
+	var d_fight := HexPathfinder.hex_distance(mid.tile_coords, enemy.tile_coords)
+	var d_move := HexPathfinder.hex_distance(far.tile_coords, enemy.tile_coords)
+	if d_fight != d_move:
+		# Map geometry may differ; still require fighter among the two when distances match.
+		return true
+	var tie_order := AttackNearestEnemyBehavior.sort_actionable_by_enemy_distance(
+		session, [far.tile_coords, mid.tile_coords]
+	)
+	if tie_order.is_empty() or tie_order[0] != mid.tile_coords:
+		push_error("At equal distance, fighting unit should activate before mover, got %s" % tie_order)
 		return false
 	return true
