@@ -9,6 +9,8 @@ const ICON_SHIELD := preload("res://assets/icons/base_icons_sprites/shield.png")
 const COLOR_SHIELD := Color(0.55, 0.88, 1.0)
 
 const POPUP_LINGER := 3.3
+const POPUP_SCREEN_OFFSET := Vector2(-40, -170)
+const POPUP_RISE_PX := 90.0
 
 var _host: Node
 var _fx_layer: CanvasLayer
@@ -132,10 +134,8 @@ func _spawn_floating_popup(world_pos: Vector2, rows: Array) -> void:
 	if _fx_layer == null or _host == null or not _host.is_inside_tree():
 		return
 
-	var screen_pos := _host.get_viewport().get_canvas_transform() * world_pos
 	var block := VBoxContainer.new()
 	block.add_theme_constant_override("separation", 6)
-	block.position = screen_pos + Vector2(-40, -170)
 	block.modulate = Color(1, 1, 1, 0)
 	_fx_layer.add_child(block)
 
@@ -171,11 +171,60 @@ func _spawn_floating_popup(world_pos: Vector2, rows: Array) -> void:
 		label.add_theme_color_override("outline_color", outline_color)
 		hbox.add_child(label)
 
+	# Keep screen-scaled UI, but re-pin to the world spot every frame so camera
+	# pan/zoom does not drag the report away from the unit.
+	var pin := _WorldPinnedPopup.new()
+	pin.setup(_host, block, world_pos, POPUP_SCREEN_OFFSET, POPUP_RISE_PX, POPUP_LINGER)
+	_fx_layer.add_child(pin)
+	pin.sync_position()
+
 	var tween := block.create_tween()
 	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	tween.tween_property(block, "modulate:a", 1.0, 0.22)
-	tween.set_trans(Tween.TRANS_LINEAR).set_ease(Tween.EASE_IN_OUT)
-	tween.tween_property(block, "position", block.position + Vector2(0, -90), POPUP_LINGER)
+	tween.tween_interval(POPUP_LINGER - 0.5)
 	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 	tween.tween_property(block, "modulate:a", 0.0, 0.28)
-	tween.tween_callback(block.queue_free)
+	tween.tween_callback(func() -> void:
+		if is_instance_valid(pin):
+			pin.queue_free()
+		if is_instance_valid(block):
+			block.queue_free()
+	)
+
+
+class _WorldPinnedPopup extends Node:
+	var _host: Node
+	var _block: Control
+	var _world_pos: Vector2
+	var _base_offset: Vector2
+	var _rise_px: float
+	var _rise_duration: float
+	var _elapsed: float = 0.0
+
+	func setup(
+		host: Node,
+		block: Control,
+		world_pos: Vector2,
+		base_offset: Vector2,
+		rise_px: float,
+		rise_duration: float
+	) -> void:
+		_host = host
+		_block = block
+		_world_pos = world_pos
+		_base_offset = base_offset
+		_rise_px = rise_px
+		_rise_duration = maxf(rise_duration, 0.001)
+
+	func _process(delta: float) -> void:
+		_elapsed += delta
+		sync_position()
+
+	func sync_position() -> void:
+		if not is_instance_valid(_block) or _host == null or not _host.is_inside_tree():
+			queue_free()
+			return
+		var t := clampf(_elapsed / _rise_duration, 0.0, 1.0)
+		var rise := Vector2(0.0, -_rise_px * t)
+		var screen_pos: Vector2 = _host.get_viewport().get_canvas_transform() * _world_pos
+		_block.position = screen_pos + _base_offset + rise
