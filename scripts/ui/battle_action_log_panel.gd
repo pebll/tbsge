@@ -329,12 +329,14 @@ func _add_entry_row(entry: Dictionary, animate: bool = false) -> void:
 	var action_id := String(entry.get("action_id", ""))
 	var caster_type := String(entry.get("caster_unit_type", ""))
 	var target_type := String(entry.get("target_unit_type", ""))
+	var healed := int(entry.get("healed_total", 0))
 
 	row.add_child(_make_side_block(
 		caster_type,
 		int(entry.get("caster_hp_lost", 0)),
 		int(entry.get("caster_deaths", 0)),
-		bool(entry.get("caster_wiped", false))
+		bool(entry.get("caster_wiped", false)),
+		healed if action_id == "self_heal" else 0
 	))
 
 	row.add_child(_make_action_well(action_id, entry))
@@ -347,9 +349,16 @@ func _add_entry_row(entry: Dictionary, animate: bool = false) -> void:
 		or target_hp > 0
 		or target_deaths > 0
 		or target_wiped
+		or (healed > 0 and action_id == "heal_ally")
 	)
 	if has_target:
-		row.add_child(_make_side_block(target_type, target_hp, target_deaths, target_wiped))
+		row.add_child(_make_side_block(
+			target_type,
+			target_hp,
+			target_deaths,
+			target_wiped,
+			healed if action_id == "heal_ally" else 0
+		))
 	elif bool(entry.get("show_coords", false)):
 		row.add_child(_make_empty_side_spacer())
 
@@ -407,13 +416,19 @@ func _team_color(team_id: String) -> Color:
 		return (team_res as TeamDefinition).color
 	return COLOR_BORDER
 
-func _make_side_block(unit_type: String, hp_lost: int, deaths: int, wiped: bool = false) -> Control:
+func _make_side_block(
+	unit_type: String,
+	hp_lost: int,
+	deaths: int,
+	wiped: bool = false,
+	healed: int = 0
+) -> Control:
 	var block := HBoxContainer.new()
 	block.add_theme_constant_override("separation", 10)
 	block.alignment = BoxContainer.ALIGNMENT_CENTER
 	block.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	block.add_child(_make_unit_portrait(unit_type, wiped))
-	block.add_child(_make_side_stats(hp_lost, deaths))
+	block.add_child(_make_side_stats(hp_lost, deaths, healed))
 	return block
 
 func _make_unit_portrait(unit_type: String, wiped: bool) -> Control:
@@ -469,7 +484,6 @@ func _make_action_well(action_id: String, entry: Dictionary) -> Control:
 	icon_wrap.add_child(_make_texture_rect(_action_icon(action_id), ICON_ACTION))
 	vbox.add_child(icon_wrap)
 
-	var healed := int(entry.get("healed_total", 0))
 	if bool(entry.get("show_coords", false)):
 		var coord := Label.new()
 		coord.text = String(entry.get("coord_text", ""))
@@ -477,8 +491,6 @@ func _make_action_well(action_id: String, entry: Dictionary) -> Control:
 		coord.add_theme_color_override("font_color", COLOR_TEXT)
 		coord.add_theme_font_size_override("font_size", 20)
 		vbox.add_child(coord)
-	elif healed > 0:
-		vbox.add_child(_make_stat_chip(ICON_HEAL, healed, COLOR_HEAL))
 
 	return well
 
@@ -487,11 +499,13 @@ func _make_empty_side_spacer() -> Control:
 	spacer.custom_minimum_size = Vector2(ICON_UNIT.x + 40, ICON_UNIT.y)
 	return spacer
 
-func _make_side_stats(hp_lost: int, deaths: int) -> Control:
+func _make_side_stats(hp_lost: int, deaths: int, healed: int = 0) -> Control:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	if healed > 0:
+		box.add_child(_make_stat_chip(ICON_HEAL, healed, COLOR_HEAL))
 	if hp_lost > 0:
 		box.add_child(_make_stat_chip(ICON_DAMAGE, hp_lost, COLOR_TEXT))
 	if deaths > 0:
