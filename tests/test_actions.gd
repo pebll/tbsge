@@ -26,6 +26,12 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_swap_onto_stained_empty_tile():
 		return false
+	if not _test_heal_ally_basic_and_terminal():
+		return false
+	if not _test_heal_ally_rejects_enemy_and_full_hp():
+		return false
+	if not _test_heal_ally_param_override_range():
+		return false
 	print("Success: Action system tests")
 	return true
 
@@ -487,5 +493,161 @@ func _test_swap_onto_stained_empty_tile() -> bool:
 		return false
 	if not session.can_act_legion(green_a) and green_a.has_ap():
 		push_error("Arriving legion should be able to act after swap cleared stain")
+		return false
+	return true
+
+func _test_heal_ally_basic_and_terminal() -> bool:
+	var session := MinigameTestHelpersScript.prepare_session()
+	var started: Dictionary = MinigameTestHelpersScript.start_two_legion_battle(session)
+	var team_a: String = started["team_a"]
+	var blue: Legion = started["b"]
+	# Clear opposing legion off the board for a quiet ally-heal setup.
+	if blue:
+		session.grid[blue.tile_coords].legion = null
+		session.legions.erase(blue)
+
+	var mage_coords := Vector2i(0, 0)
+	var ally_coords := Vector2i(2, 0)
+	if session.grid.get(mage_coords) == null or session.grid.get(ally_coords) == null:
+		return true
+	for legion in session.legions.duplicate():
+		if session.grid.get(legion.tile_coords):
+			session.grid[legion.tile_coords].legion = null
+		session.legions.erase(legion)
+
+	var mage := Legion.new("MAGE", 1, mage_coords, team_a)
+	var ally := Legion.new("GOBLIN", 2, ally_coords, team_a)
+	session.grid[mage_coords].legion = mage
+	session.grid[ally_coords].legion = ally
+	session.legions.append(mage)
+	session.legions.append(ally)
+	mage.refresh_ap()
+	for u in ally.units:
+		u.current_health = max(1, u.max_health - 5)
+
+	var before_hp := int(ally.units[0].current_health)
+	var result := session.apply({
+		"type": "use_action",
+		"action_id": "heal_ally",
+		"from": mage_coords,
+		"to": ally_coords,
+	})
+	if not result["ok"]:
+		push_error("heal_ally failed: %s" % result.get("error"))
+		return false
+	if "legion_healed" not in result.get("events", []):
+		push_error("Expected legion_healed event")
+		return false
+	var after_hp := int(ally.units[0].current_health)
+	if after_hp <= before_hp:
+		push_error("Ally should gain HP")
+		return false
+	# Mage override heal_amount is 3.
+	if after_hp - before_hp != 3:
+		push_error("Expected Mage heal override of 3, got %d" % (after_hp - before_hp))
+		return false
+	if mage.current_ap != 0:
+		push_error("heal_ally should be terminal")
+		return false
+	if mage_coords not in session.turn_manager.waited_coords:
+		push_error("heal_ally should end caster turn")
+		return false
+	var entry: Dictionary = session.action_log.latest()
+	if String(entry.get("action_id", "")) != "heal_ally":
+		push_error("Action log should record heal_ally")
+		return false
+	return true
+
+func _test_heal_ally_rejects_enemy_and_full_hp() -> bool:
+	var session := MinigameTestHelpersScript.prepare_session()
+	var started: Dictionary = MinigameTestHelpersScript.start_two_legion_battle(session)
+	var team_a: String = started["team_a"]
+	var team_b: String = started["team_b"]
+	for legion in session.legions.duplicate():
+		if session.grid.get(legion.tile_coords):
+			session.grid[legion.tile_coords].legion = null
+		session.legions.erase(legion)
+
+	var mage_coords := Vector2i(0, 0)
+	var enemy_coords := Vector2i(1, 0)
+	var full_ally_coords := Vector2i(0, 1)
+	for c in [mage_coords, enemy_coords, full_ally_coords]:
+		if session.grid.get(c) == null:
+			return true
+
+	var mage := Legion.new("MAGE", 1, mage_coords, team_a)
+	var enemy := Legion.new("RAT_SPEAR", 1, enemy_coords, team_b)
+	var full_ally := Legion.new("GOBLIN", 1, full_ally_coords, team_a)
+	session.grid[mage_coords].legion = mage
+	session.grid[enemy_coords].legion = enemy
+	session.grid[full_ally_coords].legion = full_ally
+	session.legions.append_array([mage, enemy, full_ally])
+	mage.refresh_ap()
+
+	var heal_def: ActionDefinition = ActionDefs.get_def("heal_ally")
+	var targets := ActionTargetingScript.get_targets(session.battle_state(), mage, heal_def)
+	if enemy_coords in targets:
+		push_error("Enemy must not be a heal_ally target")
+		return false
+	if full_ally_coords in targets:
+		push_error("Full-HP ally must not be a heal_ally target")
+		return false
+
+	var bad := session.apply({
+		"type": "use_action",
+		"action_id": "heal_ally",
+		"from": mage_coords,
+		"to": enemy_coords,
+	})
+	if bad["ok"]:
+		push_error("heal_ally on enemy should fail")
+		return false
+	return true
+
+func _test_heal_ally_param_override_range() -> bool:
+	var session := MinigameTestHelpersScript.prepare_session()
+	var started: Dictionary = MinigameTestHelpersScript.start_two_legion_battle(session)
+	var team_a: String = started["team_a"]
+	for legion in session.legions.duplicate():
+		if session.grid.get(legion.tile_coords):
+			session.grid[legion.tile_coords].legion = null
+		session.legions.erase(legion)
+
+	var mage_coords := Vector2i(0, 0)
+	var near_ally := Vector2i(2, 0)
+	var far_ally := Vector2i(3, 0)
+	for c in [mage_coords, near_ally, far_ally]:
+		if session.grid.get(c) == null:
+			return true
+
+	var mage := Legion.new("MAGE", 1, mage_coords, team_a)
+	var ally_near := Legion.new("GOBLIN", 1, near_ally, team_a)
+	var ally_far := Legion.new("GOBLIN", 1, far_ally, team_a)
+	session.grid[mage_coords].legion = mage
+	session.grid[near_ally].legion = ally_near
+	session.grid[far_ally].legion = ally_far
+	session.legions.append_array([mage, ally_near, ally_far])
+	for u in ally_near.units + ally_far.units:
+		u.current_health = max(1, u.max_health - 2)
+	mage.refresh_ap()
+
+	var heal_def: ActionDefinition = ActionDefs.get_def("heal_ally")
+	# Mage default override range is 2 — far ally at dist 3 should be excluded.
+	var targets := ActionTargetingScript.get_targets(session.battle_state(), mage, heal_def)
+	if near_ally not in targets:
+		push_error("Ally at range 2 should be healable")
+		return false
+	if far_ally in targets:
+		push_error("Ally at range 3 should be out of Mage heal range")
+		return false
+
+	# Temporary override to range 3 on the shared unit def — restore after.
+	var unit_def: UnitDefinition = UnitDefs.get_def("MAGE")
+	var original: Dictionary = unit_def.action_params.duplicate(true)
+	unit_def.action_params = {"heal_ally": {"heal_amount": 3, "target_range": 3}}
+	targets = ActionTargetingScript.get_targets(session.battle_state(), mage, heal_def)
+	unit_def.action_params = original
+	if far_ally not in targets:
+		push_error("Override range 3 should include far ally")
 		return false
 	return true

@@ -37,6 +37,8 @@ static func resolve(state: BattleStateScript, cmd: Dictionary) -> Dictionary:
 			return _execute_melee_attack(state, from_coords, to_coords, action, cmd)
 		ActionDefinitionScript.TargetingKind.ENEMY_IN_RANGE:
 			return _execute_ranged_attack(state, from_coords, to_coords, action, cmd)
+		ActionDefinitionScript.TargetingKind.ALLY_IN_RANGE:
+			return _execute_ally_heal(state, legion, action, from_coords, to_coords)
 
 	return _fail("Unhandled action targeting")
 
@@ -160,13 +162,59 @@ static func _execute_self_heal(
 	action: ActionDefinitionScript,
 	coords: Vector2i
 ) -> Dictionary:
+	var heal_amount := ActionParams.resolve_int(legion, action, "heal_amount", action.heal_amount)
+	var heal_result := _apply_heal_to_legion(legion, heal_amount)
+	legion.spend_ap(action.ap_cost)
+	_apply_terminal(state, legion, action, coords)
+	return _ok(["legion_healed"], {
+		"action_id": action.id,
+		"coords": coords,
+		"from": coords,
+		"to": coords,
+		"healed_total": heal_result["healed_total"],
+		"unit_heals": heal_result["unit_heals"],
+		"legion": legion,
+		"caster_legion": legion,
+		"target_legion": legion,
+	})
+
+static func _execute_ally_heal(
+	state: BattleStateScript,
+	caster: Legion,
+	action: ActionDefinitionScript,
+	from_coords: Vector2i,
+	to_coords: Vector2i
+) -> Dictionary:
+	var to_tile: Tile = state.tile_at(to_coords)
+	if to_tile == null or not to_tile.has_legion():
+		return _fail("No ally at target")
+	var target: Legion = to_tile.legion
+	if target.team_id != caster.team_id or target == caster:
+		return _fail("Invalid ally target")
+	var heal_amount := ActionParams.resolve_int(caster, action, "heal_amount", action.heal_amount)
+	var heal_result := _apply_heal_to_legion(target, heal_amount)
+	caster.spend_ap(action.ap_cost)
+	_apply_terminal(state, caster, action, from_coords)
+	return _ok(["legion_healed"], {
+		"action_id": action.id,
+		"coords": to_coords,
+		"from": from_coords,
+		"to": to_coords,
+		"healed_total": heal_result["healed_total"],
+		"unit_heals": heal_result["unit_heals"],
+		"legion": target,
+		"caster_legion": caster,
+		"target_legion": target,
+	})
+
+static func _apply_heal_to_legion(legion: Legion, heal_amount: int) -> Dictionary:
 	var healed := 0
 	var unit_heals: Array = []
 	for unit in legion.units:
 		if unit == null:
 			continue
 		var before := int(unit.current_health)
-		unit.current_health = mini(before + action.heal_amount, int(unit.max_health))
+		unit.current_health = mini(before + heal_amount, int(unit.max_health))
 		var after := int(unit.current_health)
 		if after > before:
 			var gained := after - before
@@ -177,15 +225,7 @@ static func _execute_self_heal(
 				"hp_after": after,
 				"hp_gained": gained,
 			})
-	legion.spend_ap(action.ap_cost)
-	_apply_terminal(state, legion, action, coords)
-	return _ok(["legion_healed"], {
-		"action_id": action.id,
-		"coords": coords,
-		"healed_total": healed,
-		"unit_heals": unit_heals,
-		"legion": legion,
-	})
+	return {"healed_total": healed, "unit_heals": unit_heals}
 
 static func _apply_terminal(
 	state: BattleStateScript,

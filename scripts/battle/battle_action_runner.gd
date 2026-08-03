@@ -51,7 +51,8 @@ func play_result(
 		_call_hook(hooks, "on_finished")
 		return played
 	elif "legion_healed" in events:
-		await playback.play_heal(from_coords, payload, {
+		var heal_coords: Vector2i = payload.get("to", payload.get("coords", from_coords))
+		await playback.play_heal(heal_coords, payload, {
 			"deselect_after": hooks.get("deselect_after_heal", false),
 			"deselect": hooks.get("deselect", Callable()),
 			"on_ap_changed": hooks.get("on_ap_changed", Callable()),

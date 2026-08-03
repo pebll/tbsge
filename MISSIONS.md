@@ -165,12 +165,12 @@ Units are still too similar. Shield + ranged help; we need **asymmetric actions*
 | UX | Tooltip explains range/heal in words; bar stays clean |
 
 Checklist:
-- [ ] Param-resolve helper (`override ?? default`) used by targeting/resolver  
-- [ ] `heal_ally` def + targeting + resolver  
-- [ ] Playback: bandage projectile  
-- [ ] Assign to support units (Mage / …) with tier II+  
-- [ ] Tooltips for action (depends on U1)  
-- [ ] Tests: heal, invalid targets, terminal wait, override range
+- [x] Param-resolve helper (`override ?? default`) used by targeting/resolver  
+- [x] `heal_ally` def + targeting + resolver  
+- [x] Playback: bandage projectile  
+- [x] Assign to support units (Mage / …) with tier II+  
+- [x] Tooltips for action (depends on U1)  
+- [x] Tests: heal, invalid targets, terminal wait, override range
 
 ---
 

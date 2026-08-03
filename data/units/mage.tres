@@ -17,3 +17,10 @@ image_size = 1.0
 size = 1.5
 price = 7
 icon = ExtResource("2_icon")
+action_ids = Array[String](["move", "melee_attack", "ranged_attack", "self_heal", "heal_ally"])
+action_params = {
+"heal_ally": {
+"heal_amount": 3,
+"target_range": 2
+}
+}

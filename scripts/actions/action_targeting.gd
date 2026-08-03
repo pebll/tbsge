@@ -48,6 +48,9 @@ static func get_targets(
 			return _coords_from_tiles(
 				Utils.get_ranged_attackable_tiles(from_tile, state.grid, _legion_attack_range(legion))
 			)
+		ActionDefinitionScript.TargetingKind.ALLY_IN_RANGE:
+			var rng := ActionParams.resolve_int(legion, action, "target_range", action.target_range)
+			return _coords_from_tiles(Utils.get_healable_ally_tiles(from_tile, state.grid, rng))
 	return []
 
 static func _move_targets(state: BattleStateScript, from_tile: Tile, legion: Legion) -> Array[Vector2i]:

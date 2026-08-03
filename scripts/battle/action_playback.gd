@@ -208,12 +208,22 @@ func _apply_defender_reaction(
 	return died_on_hit
 
 func play_heal(coords: Vector2i, payload: Dictionary, options: Dictionary = {}) -> void:
-	var tile_visu: TileVisu = _tile_visu_at.call(coords)
+	var from_coords: Vector2i = payload.get("from", coords)
+	var to_coords: Vector2i = payload.get("to", payload.get("coords", coords))
+	var action_id := String(payload.get("action_id", ""))
+	var caster_legion: Legion = payload.get("caster_legion", payload.get("legion"))
+
+	if action_id == "heal_ally" and from_coords != to_coords:
+		await _play_heal_projectile(from_coords, to_coords)
+
+	var tile_visu: TileVisu = _tile_visu_at.call(to_coords)
+	if not tile_visu or not tile_visu.legion_visu:
+		# Fall back to caster tile for self-heal edge cases.
+		tile_visu = _tile_visu_at.call(coords)
 	if not tile_visu or not tile_visu.legion_visu:
 		return
 
 	var legion_visu: LegionVisu = tile_visu.legion_visu
-	var legion: Legion = payload.get("legion")
 	var world_pos: Vector2 = legion_visu.global_position
 
 	for entry in payload.get("unit_heals", []):
@@ -237,8 +247,8 @@ func play_heal(coords: Vector2i, payload: Dictionary, options: Dictionary = {}) 
 
 	if options.has("on_ap_changed"):
 		var on_ap_changed: Callable = options["on_ap_changed"]
-		if on_ap_changed.is_valid() and legion:
-			on_ap_changed.call(legion)
+		if on_ap_changed.is_valid() and caster_legion:
+			on_ap_changed.call(caster_legion)
 
 	if options.get("deselect_after", false) and options.has("deselect"):
 		var deselect: Callable = options["deselect"]
@@ -249,6 +259,32 @@ func play_heal(coords: Vector2i, payload: Dictionary, options: Dictionary = {}) 
 		func() -> void:
 			_combat_fx.spawn_heal_popup(world_pos, int(payload.get("healed_total", 0))),
 		[legion_visu]
+	)
+
+func _play_heal_projectile(from_coords: Vector2i, to_coords: Vector2i) -> void:
+	var from_visu: TileVisu = _tile_visu_at.call(from_coords)
+	var to_visu: TileVisu = _tile_visu_at.call(to_coords)
+	if from_visu == null or to_visu == null:
+		return
+	var tex := ProjectilePresenterScript.load_projectile_texture("bandage")
+	if tex == null:
+		tex = ProjectilePresenterScript.load_projectile_texture("magicball")
+	if tex == null or _projectiles == null:
+		return
+	var from_pos := from_visu.global_position
+	var to_pos := to_visu.global_position
+	if from_visu.legion_visu:
+		from_pos = from_visu.legion_visu.global_position
+	if to_visu.legion_visu:
+		to_pos = to_visu.legion_visu.global_position
+	await _projectiles.play_parabola(
+		_host,
+		from_pos,
+		to_pos,
+		tex,
+		UnitDefinition.ProjectileMotion.THROWN,
+		0.32,
+		56.0
 	)
 
 func _build_legion_visu_map(attacker: Legion, defender: Legion, hits: Array) -> Dictionary:
