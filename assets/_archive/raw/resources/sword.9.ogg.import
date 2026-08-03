@@ -3,12 +3,12 @@
 importer="oggvorbisstr"
 type="AudioStreamOggVorbis"
 uid="uid://c4t4k272afyb4"
-path="res://.godot/imported/sword.9.ogg-ca71cf73a0a91f83e34de02fce618304.oggvorbisstr"
+path="res://.godot/imported/sword.9.ogg-055251a7bae0057c2f6027f4bb600d2d.oggvorbisstr"
 
 [deps]
 
-source_file="res://assets/_archive/resources/sword.9.ogg"
-dest_files=["res://.godot/imported/sword.9.ogg-ca71cf73a0a91f83e34de02fce618304.oggvorbisstr"]
+source_file="res://assets/_archive/raw/resources/sword.9.ogg"
+dest_files=["res://.godot/imported/sword.9.ogg-055251a7bae0057c2f6027f4bb600d2d.oggvorbisstr"]
 
 [params]
 

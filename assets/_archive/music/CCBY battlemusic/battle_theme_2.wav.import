@@ -3,12 +3,12 @@
 importer="wav"
 type="AudioStreamWAV"
 uid="uid://tgfyuferlcqg"
-path="res://.godot/imported/battle_theme_2.wav-4704d943d287b7ddf19d37a165fb0682.sample"
+path="res://.godot/imported/battle_theme_2.wav-54d05599dc0fb875ce13d43009f30b29.sample"
 
 [deps]
 
 source_file="res://assets/_archive/music/CCBY battlemusic/battle_theme_2.wav"
-dest_files=["res://.godot/imported/battle_theme_2.wav-4704d943d287b7ddf19d37a165fb0682.sample"]
+dest_files=["res://.godot/imported/battle_theme_2.wav-54d05599dc0fb875ce13d43009f30b29.sample"]
 
 [params]
 

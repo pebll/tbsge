@@ -3,12 +3,12 @@
 importer="wav"
 type="AudioStreamWAV"
 uid="uid://cncds2n5p4q4d"
-path="res://.godot/imported/Monster-7.wav-a5c96e7290d52821e9f4c8b26a4d7771.sample"
+path="res://.godot/imported/Monster-7.wav-dd1a079bcf0aec62f84941154ae4602c.sample"
 
 [deps]
 
-source_file="res://assets/_archive/resources/sfx_monster/Monster-7.wav"
-dest_files=["res://.godot/imported/Monster-7.wav-a5c96e7290d52821e9f4c8b26a4d7771.sample"]
+source_file="res://assets/_archive/raw/resources/sfx_monster/Monster-7.wav"
+dest_files=["res://.godot/imported/Monster-7.wav-dd1a079bcf0aec62f84941154ae4602c.sample"]
 
 [params]
 
