@@ -173,7 +173,7 @@ static func _run_ai_battle(
 					"from": cmd.get("from", coords),
 					"to": cmd.get("to", coords),
 				}
-				if apply_cmd["action_id"] == "melee_attack":
+				if apply_cmd["action_id"] == "melee_attack" or apply_cmd["action_id"] == "ranged_attack":
 					apply_cmd["rng_seed"] = combat_rng.randi()
 				var result: Dictionary = session.apply(apply_cmd)
 				if not result.get("ok", false):

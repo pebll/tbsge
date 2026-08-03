@@ -91,17 +91,6 @@ func get_movable_coords(from_coords: Vector2i) -> Array[Vector2i]:
 func get_attackable_coords(from_coords: Vector2i) -> Array[Vector2i]:
 	return get_action_targets(_legion_at(from_coords), "melee_attack")
 
-func get_swappable_coords(from_coords: Vector2i) -> Array[Vector2i]:
-	var legion := _legion_at(from_coords)
-	if legion == null:
-		return []
-	var move_targets := get_action_targets(legion, "move")
-	var out: Array[Vector2i] = []
-	for coords in move_targets:
-		if ActionTargetingScript.is_swap_target(battle_state(), from_coords, coords):
-			out.append(coords)
-	return out
-
 func apply_pass_legion(coords: Vector2i) -> Dictionary:
 	var tile: Tile = _tile_at(coords)
 	if tile == null or not tile.has_legion():

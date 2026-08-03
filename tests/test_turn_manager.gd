@@ -9,6 +9,8 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_tab_cycle():
 		return false
+	if not _test_clear_wait_and_end_turn_clears_waits():
+		return false
 	print("Success: Turn manager tests")
 	return true
 
@@ -71,5 +73,34 @@ func _test_tab_cycle() -> bool:
 		return false
 	if first == second:
 		push_error("tab_next should cycle between legions")
+		return false
+	return true
+
+func _test_clear_wait_and_end_turn_clears_waits() -> bool:
+	var teams: Array[String] = ["GREEN", "BLUE"]
+	var tm := TurnManager.new(teams)
+	tm.start_match("GREEN")
+	var a := Legion.new("GOBLIN", 1, Vector2i(0, 0), "GREEN")
+	var b := Legion.new("GOBLIN", 1, Vector2i(1, 0), "BLUE")
+	a.current_ap = 0
+	var legions: Array[Legion] = [a, b]
+
+	tm.wait_legion(Vector2i(0, 0))
+	tm.wait_legion(Vector2i(3, 3))
+	if Vector2i(0, 0) not in tm.waited_coords:
+		push_error("wait_legion should record coords")
+		return false
+
+	tm.clear_wait(Vector2i(0, 0))
+	if Vector2i(0, 0) in tm.waited_coords:
+		push_error("clear_wait should remove coords")
+		return false
+	if Vector2i(3, 3) not in tm.waited_coords:
+		push_error("clear_wait should only remove the given coords")
+		return false
+
+	tm.end_team_turn(legions)
+	if not tm.waited_coords.is_empty():
+		push_error("end_team_turn should clear all waited coords")
 		return false
 	return true

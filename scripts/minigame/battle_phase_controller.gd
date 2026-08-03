@@ -3,15 +3,16 @@ extends RefCounted
 
 const MinigameSessionScript = preload("res://scripts/minigame/minigame_session.gd")
 const AttackNearestEnemyBehavior = preload("res://scripts/ai/behaviors/attack_nearest_enemy.gd")
+const BattleInputLockScript = preload("res://scripts/battle/battle_input_lock.gd")
+const BattleHostWiringScript = preload("res://scripts/battle/battle_host_wiring.gd")
 
 const AI_LEGION_DELAY := 0.5
 
 signal ai_turn_finished
 
 var deps: MinigamePhaseDeps
-var input_locked: bool = false
 var ai_running: bool = false
-var _action_in_flight: bool = false
+var _lock: BattleInputLockScript = BattleInputLockScript.new()
 
 func _init(phase_deps: MinigamePhaseDeps) -> void:
 	deps = phase_deps
@@ -28,7 +29,7 @@ func exit() -> void:
 	deps.turn_hud.hide()
 
 func is_input_locked() -> bool:
-	return input_locked or ai_running or _action_in_flight
+	return _lock.is_locked() or ai_running
 
 func is_blocking_input() -> bool:
 	return deps.game_over_panel.visible
@@ -53,9 +54,9 @@ func perform_use_action(
 	to_coords: Vector2i,
 	rng_seed: int = 0
 ) -> bool:
-	if _action_in_flight:
+	if _lock.is_locked():
 		return false
-	_action_in_flight = true
+	_lock.begin()
 
 	var cmd := {
 		"type": "use_action",
@@ -68,7 +69,7 @@ func perform_use_action(
 
 	var from_tile: Tile = deps.session.grid.get(from_coords)
 	if from_tile == null or not from_tile.has_legion():
-		_action_in_flight = false
+		_lock.end()
 		return false
 
 	var result: Dictionary = deps.session.apply(cmd)
@@ -78,13 +79,9 @@ func perform_use_action(
 				"[AI] action rejected: %s %s -> %s (%s)"
 				% [action_id, from_coords, to_coords, result.get("error", "?")]
 			)
-		_action_in_flight = false
+		_lock.end()
 		return false
 
-	if not ai_running:
-		input_locked = true
-
-	# Model already committed — treat as success even if visuals cannot play.
 	await deps.action_runner.play_result(
 		deps.host,
 		deps.session,
@@ -94,10 +91,8 @@ func perform_use_action(
 		from_coords,
 		_battle_action_hooks()
 	)
-	if not ai_running:
-		input_locked = false
+	_lock.end()
 	check_match_end()
-	_action_in_flight = false
 	return true
 
 func maybe_start_ai_turn() -> void:
@@ -134,7 +129,6 @@ func inspect_tile(coords: Vector2i) -> void:
 
 func _run_ai_turn_async() -> void:
 	ai_running = true
-	input_locked = true
 	deps.battle_ui.deselect()
 	while (
 		deps.session.phase == MinigameSessionScript.Phase.BATTLE
@@ -185,20 +179,13 @@ func _run_ai_turn_async() -> void:
 			break
 
 	ai_running = false
-	input_locked = false
 	check_match_end()
 	ai_turn_finished.emit()
 	if deps.session.phase == MinigameSessionScript.Phase.BATTLE and deps.is_ai_team(deps.session.turn_manager.active_team_id):
 		maybe_start_ai_turn()
 
 func _battle_action_hooks() -> Dictionary:
-	return {
-		"session": deps.session,
-		"clear_overlays": deps.battle_ui.clear_overlays,
-		"deselect": deps.battle_ui.deselect,
+	return BattleHostWiringScript.action_hooks(deps.session, deps.battle_ui, {
 		"deselect_before_combat": true,
 		"deselect_after_heal": not ai_running,
-		"on_ap_changed": func(legion: Legion) -> void: EventBus.legion_ap_changed.emit(legion),
-		"refresh_after_action": deps.battle_ui.refresh_after_action,
-		"on_finished": func() -> void: pass,
-	}
+	})

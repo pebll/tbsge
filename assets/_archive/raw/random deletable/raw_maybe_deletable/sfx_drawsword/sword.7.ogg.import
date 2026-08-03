@@ -1,0 +1,19 @@
+[remap]
+
+importer="oggvorbisstr"
+type="AudioStreamOggVorbis"
+uid="uid://bjowb55qmiout"
+path="res://.godot/imported/sword.7.ogg-584622b64add0d7b847dba37d04f7ac3.oggvorbisstr"
+
+[deps]
+
+source_file="res://assets/_archive/raw/random deletable/raw_maybe_deletable/sfx_drawsword/sword.7.ogg"
+dest_files=["res://.godot/imported/sword.7.ogg-584622b64add0d7b847dba37d04f7ac3.oggvorbisstr"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

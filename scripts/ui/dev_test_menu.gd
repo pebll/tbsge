@@ -2,6 +2,7 @@ extends Control
 
 const SANDBOX_SCENE := "res://scenes/runnables/unit_preview.tscn"
 const DUEL_R3_SCENE := "res://scenes/runnables/minigame.tscn"
+const DUEL_R4_SCENE := "res://scenes/runnables/minigame_duel_r4.tscn"
 const BIG_R4_SCENE := "res://scenes/runnables/minigame_big.tscn"
 
 const COLOR_BG := Color(0.91, 0.86, 0.78)
@@ -12,6 +13,7 @@ const RADIUS := 16
 
 @onready var sandbox_button: GameButton = %SandboxButton
 @onready var duel_button: GameButton = %DuelButton
+@onready var duel_r4_button: GameButton = %DuelR4Button
 @onready var big_button: GameButton = %BigButton
 @onready var back_button: GameButton = %BackButton
 
@@ -20,6 +22,7 @@ func _ready() -> void:
 	_apply_styles()
 	sandbox_button.pressed.connect(func(): get_tree().change_scene_to_file(SANDBOX_SCENE))
 	duel_button.pressed.connect(func(): get_tree().change_scene_to_file(DUEL_R3_SCENE))
+	duel_r4_button.pressed.connect(func(): get_tree().change_scene_to_file(DUEL_R4_SCENE))
 	big_button.pressed.connect(func(): get_tree().change_scene_to_file(BIG_R4_SCENE))
 	back_button.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/runnables/menu.tscn"))
 

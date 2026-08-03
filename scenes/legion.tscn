@@ -1,7 +1,6 @@
 [gd_scene format=3 uid="uid://j7ywjtdpker5"]
 
 [ext_resource type="Script" uid="uid://0uimkruwg8su" path="res://scripts/visu/legion_visu.gd" id="1_swhq2"]
-[ext_resource type="Texture2D" uid="uid://bq54stu7cp4wn" path="res://assets/units_sliced/units_back/dragon.png" id="2_auw50"]
 [ext_resource type="Texture2D" uid="uid://barqbm86a200e" path="res://assets/banners_sprites/banners_0_0.png" id="3_banner"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_10c5b"]
@@ -19,12 +18,6 @@ position = Vector2(0, -14.999996)
 scale = Vector2(0.09, 0.09)
 texture = ExtResource("3_banner")
 offset = Vector2(-11.111113, -411.11115)
-
-[node name="Sprite2D" type="Sprite2D" parent="." unique_id=1152469829]
-visible = false
-scale = Vector2(0.2, 0.2)
-texture = ExtResource("2_auw50")
-offset = Vector2(4.9998407, -140.00008)
 
 [node name="Area2D" type="Area2D" parent="." unique_id=1341307370]
 

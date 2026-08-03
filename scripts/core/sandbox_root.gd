@@ -6,6 +6,7 @@ const SandboxSessionScript = preload("res://scripts/match/sandbox_session.gd")
 const BattleContextScript = preload("res://scripts/battle/battle_context.gd")
 const BattleUIAdapterScript = preload("res://scripts/ui/battle_ui_adapter.gd")
 const BattleActionRunnerScript = preload("res://scripts/battle/battle_action_runner.gd")
+const BattleHostWiringScript = preload("res://scripts/battle/battle_host_wiring.gd")
 const ActionPlaybackScript = preload("res://scripts/battle/action_playback.gd")
 const GridPresenterScript = preload("res://scripts/visu/grid_presenter.gd")
 
@@ -57,6 +58,7 @@ func _ready() -> void:
 	battle_ui = BattleUIAdapterScript.new(battle_context)
 	action_runner = BattleActionRunnerScript.new()
 	input = GameInput.new(battle_ui.clear_overlays)
+	# Input exists only after battle_ui; override lock wired in _setup_battle_context.
 	battle_context.is_locked_fn = func() -> bool: return input.is_locked()
 
 	_setup_tile_info_ui()
@@ -71,16 +73,7 @@ func _exit_tree() -> void:
 func _input(event: InputEvent) -> void:
 	if input.is_locked():
 		return
-	if not event is InputEventKey:
-		return
-	var key_event := event as InputEventKey
-	if not key_event.pressed or key_event.echo:
-		return
-	if key_event.keycode == KEY_TAB or key_event.physical_keycode == KEY_TAB:
-		battle_ui.cycle_legion_tab()
-		get_viewport().set_input_as_handled()
-	elif key_event.keycode == KEY_SPACE or key_event.physical_keycode == KEY_SPACE:
-		battle_ui.pass_current_legion()
+	if BattleHostWiringScript.handle_hotkeys(event, battle_ui):
 		get_viewport().set_input_as_handled()
 
 func end_team_turn() -> void:
@@ -113,12 +106,6 @@ func spawn_unit(coords: Vector2i) -> void:
 		presenter.spawn_legion_visu(legion)
 		EventBus.legion_ap_changed.emit(legion)
 
-func move_unit(from_coords: Vector2i, to_coords: Vector2i) -> void:
-	use_battle_action("move", from_coords, to_coords)
-
-func attack_unit(from_coords: Vector2i, to_coords: Vector2i) -> void:
-	use_battle_action("melee_attack", from_coords, to_coords)
-
 func use_battle_action(action_id: String, from_coords: Vector2i, to_coords: Vector2i) -> void:
 	if input.is_locked():
 		return
@@ -128,8 +115,7 @@ func use_battle_action(action_id: String, from_coords: Vector2i, to_coords: Vect
 		"from": from_coords,
 		"to": to_coords,
 	}
-	if action_id == "melee_attack":
-		cmd["rng_seed"] = randi()
+	cmd.merge(BattleHostWiringScript.rng_seed_for_action(action_id))
 	await _perform_use_action(cmd, from_coords)
 
 func _perform_use_action(cmd: Dictionary, from_coords: Vector2i) -> void:
@@ -149,34 +135,28 @@ func _perform_use_action(cmd: Dictionary, from_coords: Vector2i) -> void:
 		_action_playback,
 		result,
 		from_coords,
-		_action_hooks(true)
+		BattleHostWiringScript.action_hooks(session, battle_ui, {
+			"deselect_after_combat": true,
+			"deselect_after_heal": true,
+		})
 	)
 	input.end_action()
 
 func _setup_battle_context() -> void:
 	battle_context = BattleContextScript.new()
-	battle_context.session = session
-	battle_context.presenter = presenter
-	battle_context.apply_action_fn = func(action_id: String, from_coords: Vector2i, to_coords: Vector2i) -> void:
-		use_battle_action(action_id, from_coords, to_coords)
+	BattleHostWiringScript.wire_core_context(
+		battle_context,
+		session,
+		presenter,
+		func() -> bool: return false,
+		func(action_id: String, from_coords: Vector2i, to_coords: Vector2i) -> void:
+			use_battle_action(action_id, from_coords, to_coords),
+		func(coords: Vector2i) -> void: inspect_tile(coords),
+		func() -> void: clear_inspect(),
+		func() -> Node: return tile_info_layer
+	)
 	battle_context.allows_spawn_fn = func(_coords: Vector2i) -> bool: return session.config.allow_spawn
 	battle_context.spawn_fn = func(coords: Vector2i) -> void: spawn_unit(coords)
-	battle_context.inspect_fn = func(coords: Vector2i) -> void: inspect_tile(coords)
-	battle_context.clear_inspect_fn = func() -> void: clear_inspect()
-	battle_context.overlay_ui_fn = func() -> Node: return tile_info_layer
-
-func _action_hooks(unlock_on_finish: bool) -> Dictionary:
-	return {
-		"session": session,
-		"clear_overlays": battle_ui.clear_overlays,
-		"deselect": battle_ui.deselect,
-		"deselect_before_combat": false,
-		"deselect_after_combat": true,
-		"deselect_after_heal": true,
-		"on_ap_changed": func(legion: Legion) -> void: EventBus.legion_ap_changed.emit(legion),
-		"refresh_after_action": battle_ui.refresh_after_action,
-		"on_finished": func() -> void: pass,
-	}
 
 func _on_legion_ap_changed(legion: Legion) -> void:
 	if not tile_info_panel or not tile_info_panel.visible:

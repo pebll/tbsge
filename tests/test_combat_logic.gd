@@ -15,6 +15,8 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_ranged_both_sides_when_eligible():
 		return false
+	if not _test_ranged_at_distance_one():
+		return false
 	print("Success: Combat logic tests")
 	return true
 
@@ -182,6 +184,25 @@ func _test_ranged_both_sides_when_eligible() -> bool:
 		return false
 	if hits[0]["attacker_legion"] != a or hits[1]["attacker_legion"] != b:
 		push_error("Expected A then B for mutual ranged combat")
+		return false
+	return true
+
+func _test_ranged_at_distance_one() -> bool:
+	## At distance 1, ranged still works; melee-only defender does not return fire at range mode.
+	var a := _mk_ranged_legion("ARCHER", 1, 100, 5, 2)
+	var b := _mk_legion("GOBLIN", 1, 100, 3)
+	for u in b.units:
+		u.attack_range = 0
+		u.ranged_attack = 0
+	var result: Dictionary = CombatResolver.resolve_combat(
+		a, b, 9, {"mode": CombatResolver.MODE_RANGED, "distance": 1}
+	)
+	var hits: Array = result["hits"]
+	if hits.size() != 1:
+		push_error("Expected single ranged hit at d=1 vs melee, got %d" % hits.size())
+		return false
+	if int(hits[0]["raw_damage"]) != 5:
+		push_error("Expected ranged_attack damage at d=1")
 		return false
 	return true
 

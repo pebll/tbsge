@@ -1,7 +1,14 @@
 ## Agent notes (project conventions + learnings)
 
+### Architecture (engine vs modes)
+- Treat shared battle systems as an **engine**: `MatchSession`, actions, combat, turns, pathfinding, grid presenter, action playback.
+- **Minigame** (`scenes/runnables/minigame.tscn`) is the primary product (draft + battle). Main scene in `project.godot`.
+- **Sandbox** (`unit_preview` / `sandbox_root`) is a second mode for spawn/fight — keep it so the engine stays modular and not overfit to minigame.
+- Mode-specific code lives under `scripts/minigame/` (draft, deploy rules, AI drafter, win conditions) and sandbox session/root.
+
 ### Workflow
 - **Always run unit tests** after code changes: `./run_tests.sh`.
+- Balance sims: `./run_balance.sh` (not part of the main unit suite).
 - **Add tests first** when implementing new behavior (especially combat rules / edge cases).
 - Prefer **headless, CLI-only** workflows for CI.
 - Avoid flaky tests by controlling randomness (seed RNG or force deterministic state).
@@ -39,6 +46,7 @@
   - once one side is out of eligible attackers, the other side continues with remaining attackers.
 - Print each hit for terminal inspection.
 - Combat resolver returns ordered hit/death logs for driving visuals.
+- Melee and ranged are separate actions (`melee_attack`, `ranged_attack`). Counter-fire only if defender `attack_range` covers engagement distance.
 
 ### Combat visuals requirements (current)
 - Animations are **sequential** with a fixed delay between hits (currently **0.3s**).
@@ -47,3 +55,6 @@
 - When a unit dies, update the **legion visu immediately** (remove unit visu, re-pack).
 - After combat, remaining units should **tween** into their re-packed positions (no snapping).
 
+### Assets
+- Runtime art lives under `assets/`. Pipeline / unused piles may live under `assets/_archive/` or `assets_raw/` — see `ASSETS_ARCHIVE.md` when present.
+- Prefer archiving over deleting until explicitly approved.

@@ -45,6 +45,24 @@ var legions_fn: Callable
 var _events_bound: bool = false
 var _attack_choice_popup: Control = null
 
+func bind_from_context(context) -> void:
+	## Single wiring entry so hosts don't re-declare the same Callables.
+	battle_state_fn = func(): return context.battle_state()
+	tile_visu_fn = func(coords: Vector2i) -> TileVisu: return context.tile_visu_at(coords)
+	is_locked_fn = func() -> bool: return context.is_input_locked()
+	can_act_fn = func(legion: Legion) -> bool: return context.can_act_legion(legion)
+	apply_action_fn = func(action_id: String, from_coords: Vector2i, to_coords: Vector2i) -> void:
+		context.apply_action(action_id, from_coords, to_coords)
+	battle_phase_fn = func() -> bool: return context.in_battle_phase()
+	allows_spawn_fn = func(coords: Vector2i) -> bool: return context.allows_spawn(coords)
+	spawn_fn = func(coords: Vector2i) -> void: context.spawn_at(coords)
+	turn_manager_fn = func() -> TurnManager: return context.turn_manager()
+	legions_fn = func() -> Array: return context.legions()
+	_inspect_fn = func(coords: Vector2i) -> void: context.inspect_tile(coords)
+	_clear_inspect_fn = func() -> void: context.clear_inspect()
+	if context.overlay_ui_fn.is_valid():
+		overlay_ui_fn = context.overlay_ui_fn
+
 func bind_events() -> void:
 	if _events_bound:
 		return
@@ -260,10 +278,7 @@ func _dispatch_click(coords: Vector2i) -> void:
 		return
 	if has_selected and default_target_actions.has(coords):
 		var actions: Array = default_target_actions[coords]
-		var attack_ids: Array[String] = []
-		for action_id in actions:
-			if String(action_id) == "melee_attack" or String(action_id) == "ranged_attack":
-				attack_ids.append(String(action_id))
+		var attack_ids: Array[String] = attack_ids_from_actions(actions)
 		if attack_ids.size() >= 2:
 			_show_attack_choice_popup(coords, attack_ids)
 			return
@@ -309,6 +324,10 @@ func _paint_default_targets(state: BattleStateScript, legion: Legion) -> void:
 		_paint_tile(c, _overlay_for_default_actions(default_target_actions[c]), LIFT_OPTION)
 
 func _overlay_for_default_actions(action_ids: Array) -> String:
+	return overlay_state_for_default_actions(action_ids)
+
+## Pure helper — which overlay to paint for default multi-action highlights.
+static func overlay_state_for_default_actions(action_ids: Array) -> String:
 	var has_melee := "melee_attack" in action_ids
 	var has_ranged := "ranged_attack" in action_ids
 	if has_melee and has_ranged:
@@ -317,10 +336,18 @@ func _overlay_for_default_actions(action_ids: Array) -> String:
 		return "ranged_attackable"
 	if has_melee:
 		return "attackable"
-	# move / other
 	var first := String(action_ids[0]) if not action_ids.is_empty() else "movable"
 	var def: ActionDefinitionScript = ActionDefs.get_def(first)
 	return def.overlay_state if def else "movable"
+
+## Pure helper — attack action ids among default target actions for a tile.
+static func attack_ids_from_actions(actions: Array) -> Array[String]:
+	var attack_ids: Array[String] = []
+	for action_id in actions:
+		var id := String(action_id)
+		if id == "melee_attack" or id == "ranged_attack":
+			attack_ids.append(id)
+	return attack_ids
 
 func _paint_action_targets(action: ActionDefinitionScript) -> void:
 	for c in target_coords:

@@ -9,6 +9,7 @@ const ActionPlaybackScript = preload("res://scripts/battle/action_playback.gd")
 const BattleContextScript = preload("res://scripts/battle/battle_context.gd")
 const BattleUIAdapterScript = preload("res://scripts/ui/battle_ui_adapter.gd")
 const BattleActionRunnerScript = preload("res://scripts/battle/battle_action_runner.gd")
+const BattleHostWiringScript = preload("res://scripts/battle/battle_host_wiring.gd")
 const MinigameSessionScript = preload("res://scripts/minigame/minigame_session.gd")
 const MinigamePresenterScript = preload("res://scripts/minigame/minigame_presenter.gd")
 const MinigamePhaseDepsScript = preload("res://scripts/minigame/minigame_phase_deps.gd")
@@ -74,16 +75,7 @@ func _input(event: InputEvent) -> void:
 		return
 	if session.phase != MinigameSessionScript.Phase.BATTLE:
 		return
-	if not event is InputEventKey:
-		return
-	var key_event := event as InputEventKey
-	if not key_event.pressed or key_event.echo:
-		return
-	if key_event.keycode == KEY_TAB or key_event.physical_keycode == KEY_TAB:
-		battle_ui.cycle_legion_tab()
-		get_viewport().set_input_as_handled()
-	elif key_event.keycode == KEY_SPACE or key_event.physical_keycode == KEY_SPACE:
-		battle_ui.pass_current_legion()
+	if BattleHostWiringScript.handle_hotkeys(event, battle_ui):
 		get_viewport().set_input_as_handled()
 
 func inspect_tile(coords: Vector2i) -> void:
@@ -121,15 +113,18 @@ func _setup_phase_controllers() -> void:
 
 func _setup_battle_context() -> void:
 	battle_context = BattleContextScript.new()
-	battle_context.session = session
-	battle_context.presenter = presenter
-	battle_context.is_locked_fn = func() -> bool: return battle.is_input_locked()
-	battle_context.apply_action_fn = func(action_id: String, from_coords: Vector2i, to_coords: Vector2i) -> void:
-		request_use_action(action_id, from_coords, to_coords)
+	BattleHostWiringScript.wire_core_context(
+		battle_context,
+		session,
+		presenter,
+		func() -> bool: return battle.is_input_locked(),
+		func(action_id: String, from_coords: Vector2i, to_coords: Vector2i) -> void:
+			request_use_action(action_id, from_coords, to_coords),
+		func(coords: Vector2i) -> void: inspect_tile(coords),
+		func() -> void: clear_inspect(),
+		func() -> Node: return _overlay_layer
+	)
 	battle_context.battle_phase_fn = func() -> bool: return session.phase == MinigameSessionScript.Phase.BATTLE
-	battle_context.inspect_fn = func(coords: Vector2i) -> void: inspect_tile(coords)
-	battle_context.clear_inspect_fn = func() -> void: clear_inspect()
-	battle_context.overlay_ui_fn = func() -> Node: return _overlay_layer
 
 func _connect_phase_signals() -> void:
 	_setup_panel.ready_pressed.connect(func() -> void: draft.handle_ready())

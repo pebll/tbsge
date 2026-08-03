@@ -16,6 +16,14 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_move_onto_wiped_attacker_tile_can_still_act():
 		return false
+	if not _test_ranged_attack_session_e2e():
+		return false
+	if not _test_ranged_targeting_bounds():
+		return false
+	if not _test_action_failures():
+		return false
+	if not _test_wait_stain_survivor_and_end_turn():
+		return false
 	print("Success: Action system tests")
 	return true
 
@@ -211,5 +219,222 @@ func _test_move_onto_wiped_attacker_tile_can_still_act() -> bool:
 	})
 	if not melee["ok"]:
 		push_error("Ally melee from former wipe tile rejected: %s" % melee.get("error"))
+		return false
+	return true
+
+func _teleport(session, legion: Legion, coords: Vector2i) -> void:
+	var old_tile: Tile = session.grid.get(legion.tile_coords)
+	if old_tile:
+		old_tile.legion = null
+	legion.tile_coords = coords
+	var new_tile: Tile = session.grid.get(coords)
+	if new_tile:
+		new_tile.legion = legion
+
+func _test_ranged_attack_session_e2e() -> bool:
+	var session := MinigameTestHelpersScript.prepare_session()
+	var team_a: String = MinigameTestHelpersScript.team_a(session)
+	var team_b: String = MinigameTestHelpersScript.team_b(session)
+	var slots_a: Array = session.get_deploy_slots(team_a)
+	var slots_b: Array = session.get_deploy_slots(team_b)
+	session.apply({
+		"type": "draft_set_legion",
+		"team": team_a,
+		"coords": slots_a[0],
+		"unit_type": "ARCHER",
+		"unit_count": 1,
+	})
+	session.apply({"type": "draft_ready", "team": team_a})
+	session.apply({
+		"type": "draft_set_legion",
+		"team": team_b,
+		"coords": slots_b[0],
+		"unit_type": "GOBLIN",
+		"unit_count": 1,
+	})
+	session.apply({"type": "draft_ready", "team": team_b})
+
+	var archer: Legion = null
+	var goblin: Legion = null
+	for legion in session.legions:
+		if legion.team_id == team_a:
+			archer = legion
+		else:
+			goblin = legion
+	var from_coords := Vector2i(0, 0)
+	var to_coords := Vector2i(2, -1) # hex distance 2
+	if session.grid.get(from_coords) == null or session.grid.get(to_coords) == null:
+		return true
+	_teleport(session, archer, from_coords)
+	_teleport(session, goblin, to_coords)
+
+	var result := session.apply({
+		"type": "use_action",
+		"action_id": "ranged_attack",
+		"from": from_coords,
+		"to": to_coords,
+		"rng_seed": 7,
+	})
+	if not result["ok"]:
+		push_error("Ranged attack failed: %s" % result.get("error"))
+		return false
+	if archer.tile_coords != from_coords:
+		push_error("Ranged attacker should not move")
+		return false
+	if goblin.tile_coords != to_coords:
+		push_error("Ranged defender should stay put")
+		return false
+	if from_coords not in session.turn_manager.waited_coords:
+		push_error("Ranged attack is terminal and should wait attacker tile")
+		return false
+	if "combat_resolved" not in result.get("events", []):
+		push_error("Expected combat_resolved event")
+		return false
+	return true
+
+func _test_ranged_targeting_bounds() -> bool:
+	var session := MinigameTestHelpersScript.prepare_session()
+	var started: Dictionary = MinigameTestHelpersScript.start_two_legion_battle(session)
+	var green: Legion = started["a"]
+	var blue: Legion = started["b"]
+
+	# Goblin (melee-only) cannot use ranged_attack.
+	var goblin_targets := session.get_action_targets(green, "ranged_attack")
+	if not goblin_targets.is_empty():
+		push_error("Melee-only unit should have no ranged targets")
+		return false
+
+	# Replace green with archer for targeting check.
+	var from_coords := Vector2i(0, 0)
+	var near := Vector2i(1, 0)
+	var far := Vector2i(2, -1)
+	var too_far := Vector2i(3, -1)
+	for c in [from_coords, near, far, too_far]:
+		if session.grid.get(c) == null:
+			return true
+
+	for c in [green.tile_coords, blue.tile_coords]:
+		if session.grid.get(c):
+			session.grid[c].legion = null
+	session.legions.erase(green)
+
+	var archer := Legion.new("ARCHER", 1, from_coords, MinigameTestHelpersScript.team_a(session))
+	session.grid[from_coords].legion = archer
+	session.legions.append(archer)
+	_teleport(session, blue, far)
+
+	var targets := session.get_action_targets(archer, "ranged_attack")
+	if far not in targets:
+		push_error("Enemy at distance 2 should be ranged-targetable")
+		return false
+	_teleport(session, blue, too_far)
+	targets = session.get_action_targets(archer, "ranged_attack")
+	if too_far in targets:
+		push_error("Enemy beyond attack_range should not be ranged-targetable")
+		return false
+	_teleport(session, blue, near)
+	targets = session.get_action_targets(archer, "ranged_attack")
+	if near not in targets:
+		push_error("Enemy at distance 1 should still be ranged-targetable")
+		return false
+	return true
+
+func _test_action_failures() -> bool:
+	var session := MinigameTestHelpersScript.prepare_session()
+	var started: Dictionary = MinigameTestHelpersScript.start_two_legion_battle(session)
+	var green: Legion = started["a"]
+	var blue: Legion = started["b"]
+
+	var bad_target := session.apply({
+		"type": "use_action",
+		"action_id": "melee_attack",
+		"from": green.tile_coords,
+		"to": green.tile_coords,
+		"rng_seed": 1,
+	})
+	if bad_target["ok"]:
+		push_error("Melee self-target should fail")
+		return false
+
+	green.spend_all_ap()
+	var no_ap := session.apply({
+		"type": "use_action",
+		"action_id": "move",
+		"from": green.tile_coords,
+		"to": session.get_movable_coords(green.tile_coords)[0] if not session.get_movable_coords(green.tile_coords).is_empty() else green.tile_coords,
+	})
+	if no_ap["ok"]:
+		push_error("Move with 0 AP should fail")
+		return false
+
+	# Empty defender tile (after clearing blue).
+	var empty := blue.tile_coords
+	session.grid[empty].legion = null
+	session.legions.erase(blue)
+	green.refresh_ap()
+	session.turn_manager.waited_coords.clear()
+	# Place green adjacent if needed.
+	var adj := Vector2i(0, 0)
+	var enemy_spot := Vector2i(1, 0)
+	if session.grid.get(adj) and session.grid.get(enemy_spot):
+		_teleport(session, green, adj)
+		var empty_atk := session.apply({
+			"type": "use_action",
+			"action_id": "melee_attack",
+			"from": adj,
+			"to": enemy_spot,
+			"rng_seed": 1,
+		})
+		if empty_atk["ok"]:
+			push_error("Melee into empty tile should fail")
+			return false
+	return true
+
+func _test_wait_stain_survivor_and_end_turn() -> bool:
+	var session := MinigameTestHelpersScript.prepare_session()
+	var started: Dictionary = MinigameTestHelpersScript.start_two_legion_battle(session)
+	var green: Legion = started["a"]
+	var blue: Legion = started["b"]
+	var team_b: String = MinigameTestHelpersScript.team_b(session)
+
+	var atk := Vector2i(0, 0)
+	var def := Vector2i(1, 0)
+	if session.grid.get(atk) == null or session.grid.get(def) == null:
+		return true
+	for c in [green.tile_coords, blue.tile_coords]:
+		if session.grid.get(c):
+			session.grid[c].legion = null
+	_teleport(session, green, atk)
+	_teleport(session, blue, def)
+	for u in green.units:
+		u.current_health = 100
+		u.attack = 1
+	for u in blue.units:
+		u.current_health = 100
+		u.attack = 1
+
+	var melee := session.apply({
+		"type": "use_action",
+		"action_id": "melee_attack",
+		"from": atk,
+		"to": def,
+		"rng_seed": 3,
+	})
+	if not melee["ok"]:
+		push_error("Survivor melee failed: %s" % melee.get("error"))
+		return false
+	if atk not in session.turn_manager.waited_coords:
+		push_error("Surviving attacker tile should remain waited")
+		return false
+
+	var end := session.apply({"type": "end_turn"})
+	if not end["ok"]:
+		push_error("end_turn failed")
+		return false
+	if not session.turn_manager.waited_coords.is_empty():
+		push_error("end_turn should clear wait stains")
+		return false
+	if session.turn_manager.active_team_id != team_b:
+		push_error("Expected team B after end_turn")
 		return false
 	return true

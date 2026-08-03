@@ -40,30 +40,6 @@ static func resolve(state: BattleStateScript, cmd: Dictionary) -> Dictionary:
 
 	return _fail("Unhandled action targeting")
 
-static func resolve_legacy_move(state: BattleStateScript, cmd: Dictionary) -> Dictionary:
-	return resolve(state, {
-		"action_id": "move",
-		"from": cmd.get("from", Vector2i.ZERO),
-		"to": cmd.get("to", Vector2i.ZERO),
-	})
-
-static func resolve_legacy_attack(state: BattleStateScript, cmd: Dictionary) -> Dictionary:
-	return resolve(state, {
-		"action_id": "melee_attack",
-		"from": cmd.get("from", Vector2i.ZERO),
-		"to": cmd.get("to", Vector2i.ZERO),
-		"rng_seed": cmd.get("rng_seed", 0),
-	})
-
-static func resolve_legacy_swap(state: BattleStateScript, cmd: Dictionary) -> Dictionary:
-	var from_coords: Vector2i = cmd.get("from", Vector2i.ZERO)
-	var to_coords: Vector2i = cmd.get("to", Vector2i.ZERO)
-	return resolve(state, {
-		"action_id": "move",
-		"from": from_coords,
-		"to": to_coords,
-	})
-
 static func _execute_move(
 	state: BattleStateScript,
 	from_coords: Vector2i,
