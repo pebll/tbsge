@@ -1,7 +1,6 @@
 extends Node
 
 const PATH := "res://data/keyword_glossary.tres"
-const KeywordGlossaryScript = preload("res://scripts/data/keyword_glossary.gd")
 
 var _glossary: Resource
 

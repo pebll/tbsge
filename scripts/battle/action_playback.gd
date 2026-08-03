@@ -241,14 +241,17 @@ func play_heal(coords: Vector2i, payload: Dictionary, options: Dictionary = {}) 
 			caster_idx += 1
 			await _play_heal_shot(caster_visu, target_visu, shooter, unit)
 
-		target_visu.animate_unit_healed(
+		var heal_tween: Tween = target_visu.animate_unit_healed(
 			unit,
 			float(entry.get("hp_before", 0)),
 			float(entry.get("hp_after", 0)),
 			float(unit.max_health)
 		)
 		AudioManager.play_heal_sfx()
-		await _beat(COMBAT_HIT_BEAT)
+		if heal_tween:
+			await heal_tween.finished
+		else:
+			await _beat(COMBAT_HIT_BEAT)
 
 	target_visu.update_local_positions()
 	target_visu.tween_units_to_local_positions()

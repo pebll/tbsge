@@ -289,23 +289,26 @@ func _add_entry_row(entry: Dictionary, animate: bool = false) -> void:
 	if _list == null or entry.is_empty():
 		return
 
-	var card := PanelContainer.new()
-	card.custom_minimum_size = Vector2(0, CARD_MIN_HEIGHT)
-	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	card.mouse_filter = Control.MOUSE_FILTER_STOP
-	card.tooltip_text = "Right-click to inspect"
-	card.clip_contents = true
-	card.add_theme_stylebox_override("panel", _card_stylebox())
-
-	var outer := HBoxContainer.new()
-	outer.add_theme_constant_override("separation", 0)
-	outer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	outer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	card.add_child(outer)
-
 	var caster_team := String(entry.get("caster_team_id", entry.get("team", "")))
 	var target_team := String(entry.get("target_team_id", ""))
-	outer.add_child(_make_banner_strip(caster_team))
+	if target_team.is_empty():
+		target_team = caster_team
+
+	# Composite card: rounded team caps + center body (avoids ColorRect poking past corners).
+	var card := HBoxContainer.new()
+	card.custom_minimum_size = Vector2(0, CARD_MIN_HEIGHT)
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.add_theme_constant_override("separation", 0)
+	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	card.tooltip_text = "Right-click to inspect"
+
+	card.add_child(_make_banner_cap(caster_team, true))
+	var body := PanelContainer.new()
+	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body.add_theme_stylebox_override("panel", _card_body_stylebox())
+	card.add_child(body)
+	card.add_child(_make_banner_cap(target_team, false))
 
 	var margin := MarginContainer.new()
 	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -314,7 +317,7 @@ func _add_entry_row(entry: Dictionary, animate: bool = false) -> void:
 	margin.add_theme_constant_override("margin_right", 10)
 	margin.add_theme_constant_override("margin_top", 12)
 	margin.add_theme_constant_override("margin_bottom", 12)
-	outer.add_child(margin)
+	body.add_child(margin)
 
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 14)
@@ -350,11 +353,6 @@ func _add_entry_row(entry: Dictionary, animate: bool = false) -> void:
 	elif bool(entry.get("show_coords", false)):
 		row.add_child(_make_empty_side_spacer())
 
-	if not target_team.is_empty():
-		outer.add_child(_make_banner_strip(target_team))
-	elif not caster_team.is_empty():
-		outer.add_child(_make_banner_strip(caster_team))
-
 	var captured: Dictionary = entry.duplicate(true)
 	card.gui_input.connect(func(event: InputEvent) -> void:
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
@@ -372,18 +370,35 @@ func _juice_card_in(card: Control) -> void:
 		return
 	UiTheme.juice_pop_in(card, 0.13)
 
-func _make_banner_strip(team_id: String) -> Control:
-	# Inset vertically so the strip stays inside the card's rounded corners.
-	var wrap := MarginContainer.new()
-	wrap.add_theme_constant_override("margin_top", CARD_RADIUS)
-	wrap.add_theme_constant_override("margin_bottom", CARD_RADIUS)
-	wrap.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	var strip := ColorRect.new()
-	strip.custom_minimum_size = Vector2(BANNER_WIDTH, 0)
-	strip.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	strip.color = _team_color(team_id)
-	wrap.add_child(strip)
-	return wrap
+func _make_banner_cap(team_id: String, left_side: bool) -> PanelContainer:
+	var cap := PanelContainer.new()
+	cap.custom_minimum_size = Vector2(BANNER_WIDTH, 0)
+	cap.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	cap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cap.add_theme_stylebox_override("panel", _banner_cap_stylebox(team_id, left_side))
+	return cap
+
+func _banner_cap_stylebox(team_id: String, left_side: bool) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = _team_color(team_id)
+	sb.border_color = COLOR_BORDER
+	sb.border_width_top = 3
+	sb.border_width_bottom = 3
+	if left_side:
+		sb.border_width_left = 3
+		sb.border_width_right = 0
+		sb.corner_radius_top_left = CARD_RADIUS
+		sb.corner_radius_bottom_left = CARD_RADIUS
+		sb.corner_radius_top_right = 0
+		sb.corner_radius_bottom_right = 0
+	else:
+		sb.border_width_left = 0
+		sb.border_width_right = 3
+		sb.corner_radius_top_left = 0
+		sb.corner_radius_bottom_left = 0
+		sb.corner_radius_top_right = CARD_RADIUS
+		sb.corner_radius_bottom_right = CARD_RADIUS
+	return sb
 
 func _team_color(team_id: String) -> Color:
 	if team_id.is_empty():
@@ -538,18 +553,18 @@ func _make_texture_rect(tex: Texture2D, min_size: Vector2) -> TextureRect:
 	rect.modulate = Color(1, 1, 1, 1 if tex else 0.2)
 	return rect
 
-func _card_stylebox() -> StyleBoxFlat:
+func _card_body_stylebox() -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = COLOR_CARD_BG
 	sb.border_color = COLOR_BORDER
-	sb.border_width_left = 1
-	sb.border_width_right = 1
+	sb.border_width_left = 0
+	sb.border_width_right = 0
 	sb.border_width_top = 3
 	sb.border_width_bottom = 3
-	sb.corner_radius_top_left = CARD_RADIUS
-	sb.corner_radius_top_right = CARD_RADIUS
-	sb.corner_radius_bottom_left = CARD_RADIUS
-	sb.corner_radius_bottom_right = CARD_RADIUS
+	sb.corner_radius_top_left = 0
+	sb.corner_radius_top_right = 0
+	sb.corner_radius_bottom_left = 0
+	sb.corner_radius_bottom_right = 0
 	return sb
 
 func _inspect_entry(entry: Dictionary, control: Control) -> void:

@@ -708,6 +708,18 @@ func _test_teleport_basic_terminal_and_cooldown() -> bool:
 	if ActionTargetingScript.can_use(session.battle_state(), assassin, ActionDefs.get_def("teleport")):
 		push_error("Teleport should stay blocked by cooldown with AP restored")
 		return false
+	# Next own-turn refresh still keeps CD 1 (one turn unavailable).
+	assassin.refresh_ap()
+	if assassin.get_cooldown_remaining("teleport") != 1:
+		push_error("Teleport cooldown 1 should still block the next turn, got %d" % assassin.get_cooldown_remaining("teleport"))
+		return false
+	if ActionTargetingScript.can_use(session.battle_state(), assassin, ActionDefs.get_def("teleport")):
+		push_error("Teleport must stay blocked on the next turn when cooldown is 1")
+		return false
+	assassin.refresh_ap()
+	if assassin.get_cooldown_remaining("teleport") != 0:
+		push_error("Teleport should be ready after the blocked turn ends")
+		return false
 	return true
 
 func _test_teleport_rejects_occupied_and_oor() -> bool:

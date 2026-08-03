@@ -32,13 +32,18 @@ func _test_cooldown_blocks_and_ticks() -> bool:
 		push_error("Expected Ready in 2 reason, got: %s" % reason)
 		return false
 
-	green.tick_cooldowns()
-	if green.get_cooldown_remaining("self_heal") != 1:
-		push_error("Cooldown should tick to 1")
+	# First refresh skips the tick so cooldown 2 still means two blocked turns.
+	green.refresh_ap()
+	if green.get_cooldown_remaining("self_heal") != 2:
+		push_error("First refresh after start should keep cooldown 2, got %d" % green.get_cooldown_remaining("self_heal"))
 		return false
-	green.tick_cooldowns()
+	green.refresh_ap()
+	if green.get_cooldown_remaining("self_heal") != 1:
+		push_error("Second refresh should tick cooldown to 1")
+		return false
+	green.refresh_ap()
 	if green.get_cooldown_remaining("self_heal") != 0:
-		push_error("Cooldown should clear after second tick")
+		push_error("Cooldown should clear after third refresh")
 		return false
 	if not ActionTargetingScript.can_use(session.battle_state(), green, heal_def):
 		push_error("Heal should be usable after cooldown clears")
@@ -72,7 +77,11 @@ func _test_action_use_starts_cooldown_from_def() -> bool:
 	# Team turn refresh ticks cooldowns for the newly active team only —
 	# force a refresh on green to simulate its next turn start.
 	green.refresh_ap()
+	if green.get_cooldown_remaining("self_heal") != 2:
+		push_error("First refresh after cast should still show cooldown 2 (skip tick)")
+		return false
+	green.refresh_ap()
 	if green.get_cooldown_remaining("self_heal") != 1:
-		push_error("refresh_ap should tick cooldown to 1")
+		push_error("Second refresh should tick cooldown to 1")
 		return false
 	return true

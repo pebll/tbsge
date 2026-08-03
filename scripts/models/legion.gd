@@ -10,8 +10,10 @@ var tile_coords: Vector2i
 var unit_count: int
 var max_ap: int = DEFAULT_MAX_AP
 var current_ap: int = DEFAULT_MAX_AP
-## action_id -> remaining team-turns until ready (ticked on refresh_ap).
+## action_id -> remaining own-turns until ready (ticked on refresh_ap).
 var action_cooldowns: Dictionary = {}
+## Skip one tick after start so cooldown 1 blocks the next full turn.
+var _cooldown_skip_tick: Dictionary = {}
 
 func _init(unit_type: String, unit_count: int, tile_coords: Vector2i, team_id: String) -> void:
 	self.unit_type = unit_type
@@ -62,14 +64,23 @@ func start_cooldown(action_id: String, turns: int) -> void:
 	if action_id.is_empty() or turns <= 0:
 		return
 	action_cooldowns[action_id] = turns
+	# refresh_ap ticks at the start of each of our turns. Skipping the first tick
+	# makes cooldown 1 mean "unavailable for the next turn", not "ready again
+	# as soon as that turn starts".
+	_cooldown_skip_tick[action_id] = true
 
 func tick_cooldowns() -> void:
 	var finished: Array[String] = []
 	for action_id in action_cooldowns.keys():
-		var left: int = int(action_cooldowns[action_id]) - 1
+		var key := String(action_id)
+		if bool(_cooldown_skip_tick.get(key, false)):
+			_cooldown_skip_tick[key] = false
+			continue
+		var left: int = int(action_cooldowns[key]) - 1
 		if left <= 0:
-			finished.append(String(action_id))
+			finished.append(key)
 		else:
-			action_cooldowns[action_id] = left
+			action_cooldowns[key] = left
 	for action_id in finished:
 		action_cooldowns.erase(action_id)
+		_cooldown_skip_tick.erase(action_id)
