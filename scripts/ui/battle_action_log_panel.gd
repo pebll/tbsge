@@ -372,12 +372,11 @@ func _juice_card_in(card: Control) -> void:
 
 func _make_banner_cap(team_id: String, left_side: bool) -> PanelContainer:
 	var cap := PanelContainer.new()
-	cap.custom_minimum_size = Vector2(BANNER_WIDTH, 0)
+	cap.custom_minimum_size = Vector2(BANNER_WIDTH, CARD_MIN_HEIGHT)
 	cap.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	cap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	cap.add_theme_stylebox_override("panel", _banner_cap_stylebox(team_id, left_side))
 	return cap
-
 func _banner_cap_stylebox(team_id: String, left_side: bool) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = _team_color(team_id)

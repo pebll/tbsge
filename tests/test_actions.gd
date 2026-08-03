@@ -28,6 +28,8 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_heal_ally_basic_and_terminal():
 		return false
+	if not _test_heal_focuses_lowest_hp_per_caster():
+		return false
 	if not _test_heal_ally_rejects_enemy_and_full_hp():
 		return false
 	if not _test_heal_ally_param_override_range():
@@ -559,6 +561,57 @@ func _test_heal_ally_basic_and_terminal() -> bool:
 	var entry: Dictionary = session.action_log.latest()
 	if String(entry.get("action_id", "")) != "heal_ally":
 		push_error("Action log should record heal_ally")
+		return false
+	return true
+
+func _test_heal_focuses_lowest_hp_per_caster() -> bool:
+	var session := MinigameTestHelpersScript.prepare_session()
+	var started: Dictionary = MinigameTestHelpersScript.start_two_legion_battle(session)
+	var team_a: String = started["team_a"]
+	var blue: Legion = started["b"]
+	if blue:
+		session.grid[blue.tile_coords].legion = null
+		session.legions.erase(blue)
+	for legion in session.legions.duplicate():
+		if session.grid.get(legion.tile_coords):
+			session.grid[legion.tile_coords].legion = null
+		session.legions.erase(legion)
+
+	var mage_coords := Vector2i(0, 0)
+	var ally_coords := Vector2i(2, 0)
+	if session.grid.get(mage_coords) == null or session.grid.get(ally_coords) == null:
+		return true
+
+	# 2 casters × heal_amount 3; ally units at uneven HP → both pulses hit the lowest.
+	var mages := Legion.new("MAGE", 2, mage_coords, team_a)
+	var ally := Legion.new("GOBLIN", 2, ally_coords, team_a)
+	session.grid[mage_coords].legion = mages
+	session.grid[ally_coords].legion = ally
+	session.legions.append(mages)
+	session.legions.append(ally)
+	mages.refresh_ap()
+	ally.units[0].current_health = 2
+	ally.units[1].current_health = 6
+
+	var result := session.apply({
+		"type": "use_action",
+		"action_id": "heal_ally",
+		"from": mage_coords,
+		"to": ally_coords,
+	})
+	if not result["ok"]:
+		push_error("focused heal_ally failed: %s" % result.get("error"))
+		return false
+	var payload: Dictionary = result.get("payload", {})
+	var unit_heals: Array = payload.get("unit_heals", [])
+	if unit_heals.size() != 2:
+		push_error("Expected one heal pulse per caster (2), got %d" % unit_heals.size())
+		return false
+	if int(ally.units[0].current_health) != 8:
+		push_error("Lowest HP unit should receive both heals (2→5→8), got %d" % int(ally.units[0].current_health))
+		return false
+	if int(ally.units[1].current_health) != 6:
+		push_error("Higher HP unit should stay untouched, got %d" % int(ally.units[1].current_health))
 		return false
 	return true
 

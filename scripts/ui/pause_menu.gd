@@ -1,27 +1,26 @@
 class_name PauseMenu
 extends Control
 
-## ESC overlay: resume, abandon, options toggles, and sound sliders.
+## Fullscreen pause: Resume / Abandon / Sounds / Options. Sounds+Options reuse shared panels.
 
 signal resume_pressed
 signal abandon_pressed
 
 const UiTheme = preload("res://scripts/ui/ui_theme.gd")
 const GameButtonScene = preload("res://scenes/ui/game_button.tscn")
+const SoundsPanelScene = preload("res://scenes/ui/sounds_settings_panel.tscn")
+const OptionsPanelScene = preload("res://scenes/ui/options_settings_panel.tscn")
 
-const COLOR_BACKDROP := Color(0.05, 0.04, 0.03, 0.72)
-const PANEL_WIDTH := 420.0
+const MENU_BTN_WIDTH := 360
+
+enum View { MAIN, SOUNDS, OPTIONS }
 
 var _panel: PanelContainer
-var _title: Label
-var _resume_btn: GameButton
-var _abandon_btn: GameButton
-var _moves_btn: GameButton
-var _end_turns_btn: GameButton
-var _ai_debug_btn: GameButton
-var _menu_slider: HSlider
-var _game_slider: HSlider
-var _music_slider: HSlider
+var _content: VBoxContainer
+var _main_buttons: VBoxContainer
+var _sounds_panel: SoundsSettingsPanel
+var _options_panel: OptionsSettingsPanel
+var _view: View = View.MAIN
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
@@ -30,9 +29,9 @@ func _ready() -> void:
 	hide()
 
 func open_menu() -> void:
-	_sync_from_settings()
+	_show_view(View.MAIN)
 	show()
-	UiTheme.juice_pop_in(_panel, 0.14)
+	UiTheme.juice_pop_in(_content, 0.14)
 
 func close_menu() -> void:
 	hide()
@@ -41,112 +40,88 @@ func is_open() -> bool:
 	return visible
 
 func _build() -> void:
-	var backdrop := ColorRect.new()
-	backdrop.color = COLOR_BACKDROP
-	backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
-	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
-	add_child(backdrop)
-
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(center)
-
 	_panel = PanelContainer.new()
-	_panel.custom_minimum_size = Vector2(PANEL_WIDTH, 0)
+	_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_panel.add_theme_stylebox_override(
 		"panel",
 		UiTheme.panel_stylebox(UiTheme.COLOR_PANEL, UiTheme.COLOR_BORDER, UiTheme.RADIUS, UiTheme.BORDER_THICK, 24)
 	)
-	center.add_child(_panel)
+	add_child(_panel)
 
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 16)
-	_panel.add_child(vbox)
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_panel.add_child(center)
 
-	_title = Label.new()
-	_title.text = "Paused"
-	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_title.add_theme_color_override("font_color", UiTheme.COLOR_TEXT)
-	_title.add_theme_font_size_override("font_size", 36)
-	vbox.add_child(_title)
+	_content = VBoxContainer.new()
+	_content.add_theme_constant_override("separation", 20)
+	center.add_child(_content)
 
-	_resume_btn = _make_menu_button("Resume", vbox)
-	_resume_btn.pressed.connect(func() -> void: resume_pressed.emit())
+	var title := Label.new()
+	title.text = "Paused"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_color_override("font_color", UiTheme.COLOR_TEXT)
+	title.add_theme_font_size_override("font_size", 42)
+	_content.add_child(title)
 
-	_abandon_btn = _make_menu_button("Abandon game", vbox)
-	_abandon_btn.pressed.connect(func() -> void: abandon_pressed.emit())
+	_main_buttons = VBoxContainer.new()
+	_main_buttons.add_theme_constant_override("separation", 16)
+	_content.add_child(_main_buttons)
 
-	vbox.add_child(_section_label("Options"))
-	_moves_btn = _make_menu_button("Show moves: OFF", vbox)
-	_moves_btn.pressed.connect(_on_moves_pressed)
-	_end_turns_btn = _make_menu_button("Show end turns: OFF", vbox)
-	_end_turns_btn.pressed.connect(_on_end_turns_pressed)
-	_ai_debug_btn = _make_menu_button("AI debug: OFF", vbox)
-	_ai_debug_btn.pressed.connect(_on_ai_debug_pressed)
+	var resume_btn := _make_menu_button("Resume")
+	resume_btn.pressed.connect(func() -> void: resume_pressed.emit())
+	_main_buttons.add_child(resume_btn)
 
-	vbox.add_child(_section_label("Sounds"))
-	_menu_slider = _add_slider_row(vbox, "Menu sounds")
-	_game_slider = _add_slider_row(vbox, "In-game sounds")
-	_music_slider = _add_slider_row(vbox, "Music")
-	_menu_slider.value_changed.connect(func(v: float) -> void: AudioManager.set_menu_volume(v))
-	_game_slider.value_changed.connect(func(v: float) -> void: AudioManager.set_game_volume(v))
-	_music_slider.value_changed.connect(func(v: float) -> void: AudioManager.set_music_volume(v))
+	var abandon_btn := _make_menu_button("Abandon game")
+	abandon_btn.pressed.connect(func() -> void: abandon_pressed.emit())
+	_main_buttons.add_child(abandon_btn)
 
-func _make_menu_button(text: String, parent: Control) -> GameButton:
+	var sounds_btn := _make_menu_button("Sounds")
+	sounds_btn.pressed.connect(_on_sounds_pressed)
+	_main_buttons.add_child(sounds_btn)
+
+	var options_btn := _make_menu_button("Options")
+	options_btn.pressed.connect(_on_options_pressed)
+	_main_buttons.add_child(options_btn)
+
+	_sounds_panel = SoundsPanelScene.instantiate()
+	_sounds_panel.visible = false
+	_sounds_panel.back_pressed.connect(_on_back_pressed)
+	_content.add_child(_sounds_panel)
+
+	_options_panel = OptionsPanelScene.instantiate()
+	_options_panel.visible = false
+	_options_panel.back_pressed.connect(_on_back_pressed)
+	_content.add_child(_options_panel)
+
+func _make_menu_button(text: String) -> GameButton:
 	var btn: GameButton = GameButtonScene.instantiate()
 	btn.text = text
-	btn.preferred_width = 360
-	parent.add_child(btn)
+	btn.preferred_width = MENU_BTN_WIDTH
 	return btn
 
-func _section_label(text: String) -> Label:
-	var label := Label.new()
-	label.text = text
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.add_theme_color_override("font_color", UiTheme.COLOR_TEXT)
-	label.add_theme_font_size_override("font_size", 22)
-	return label
+func _show_view(view: View) -> void:
+	_view = view
+	_main_buttons.visible = view == View.MAIN
+	_sounds_panel.visible = view == View.SOUNDS
+	_options_panel.visible = view == View.OPTIONS
+	var active: Control = _main_buttons
+	match view:
+		View.SOUNDS:
+			active = _sounds_panel
+		View.OPTIONS:
+			active = _options_panel
+		_:
+			active = _main_buttons
+	UiTheme.juice_pop_in(active, 0.12)
 
-func _add_slider_row(parent: Control, label_text: String) -> HSlider:
-	var row := VBoxContainer.new()
-	row.add_theme_constant_override("separation", 4)
-	parent.add_child(row)
-	var label := Label.new()
-	label.text = label_text
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.add_theme_color_override("font_color", UiTheme.COLOR_TEXT)
-	label.add_theme_font_size_override("font_size", 18)
-	row.add_child(label)
-	var slider := HSlider.new()
-	slider.custom_minimum_size = Vector2(360, 0)
-	slider.max_value = 1.0
-	slider.step = 0.01
-	row.add_child(slider)
-	return slider
+func _on_sounds_pressed() -> void:
+	_sounds_panel.sync_from_audio()
+	_show_view(View.SOUNDS)
 
-func _sync_from_settings() -> void:
-	_refresh_toggle_labels()
-	_menu_slider.set_value_no_signal(AudioManager.menu_volume)
-	_game_slider.set_value_no_signal(AudioManager.game_volume)
-	_music_slider.set_value_no_signal(AudioManager.music_volume)
+func _on_options_pressed() -> void:
+	_options_panel.sync_from_settings()
+	_show_view(View.OPTIONS)
 
-func _refresh_toggle_labels() -> void:
-	_moves_btn.text = _on_off_label("Show moves", GameSettings.show_battle_log_moves)
-	_end_turns_btn.text = _on_off_label("Show end turns", GameSettings.show_battle_log_end_turns)
-	_ai_debug_btn.text = _on_off_label("AI debug", GameSettings.is_ai_debug_enabled())
-
-func _on_off_label(prefix: String, on: bool) -> String:
-	return "%s: %s" % [prefix, "ON" if on else "OFF"]
-
-func _on_moves_pressed() -> void:
-	GameSettings.set_show_battle_log_moves(not GameSettings.show_battle_log_moves)
-	_refresh_toggle_labels()
-
-func _on_end_turns_pressed() -> void:
-	GameSettings.set_show_battle_log_end_turns(not GameSettings.show_battle_log_end_turns)
-	_refresh_toggle_labels()
-
-func _on_ai_debug_pressed() -> void:
-	GameSettings.toggle_ai_debug()
-	_refresh_toggle_labels()
+func _on_back_pressed() -> void:
+	_show_view(View.MAIN)

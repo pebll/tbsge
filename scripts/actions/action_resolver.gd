@@ -171,7 +171,7 @@ static func _execute_self_heal(
 	coords: Vector2i
 ) -> Dictionary:
 	var heal_amount := ActionParams.resolve_int(legion, action, "heal_amount", action.heal_amount)
-	var heal_result := _apply_heal_to_legion(legion, heal_amount)
+	var heal_result := _apply_focused_heal(legion, legion, heal_amount)
 	legion.spend_ap(action.ap_cost)
 	_apply_terminal(state, legion, action, coords)
 	return _ok(["legion_healed"], {
@@ -200,7 +200,7 @@ static func _execute_ally_heal(
 	if target.team_id != caster.team_id or target == caster:
 		return _fail("Invalid ally target")
 	var heal_amount := ActionParams.resolve_int(caster, action, "heal_amount", action.heal_amount)
-	var heal_result := _apply_heal_to_legion(target, heal_amount)
+	var heal_result := _apply_focused_heal(caster, target, heal_amount)
 	caster.spend_ap(action.ap_cost)
 	_apply_terminal(state, caster, action, from_coords)
 	return _ok(["legion_healed"], {
@@ -240,25 +240,47 @@ static func _execute_teleport(
 		"caster_legion": legion,
 	})
 
-static func _apply_heal_to_legion(legion: Legion, heal_amount: int) -> Dictionary:
+## Each caster unit applies heal_amount once to the current lowest-HP wounded unit.
+static func _apply_focused_heal(caster: Legion, target: Legion, heal_amount: int) -> Dictionary:
 	var healed := 0
 	var unit_heals: Array = []
+	if caster == null or target == null or heal_amount <= 0:
+		return {"healed_total": 0, "unit_heals": unit_heals}
+	for caster_unit in caster.units:
+		if caster_unit == null:
+			continue
+		var focus := _pick_lowest_hp_wounded(target)
+		if focus == null:
+			break
+		var before := int(focus.current_health)
+		focus.current_health = mini(before + heal_amount, int(focus.max_health))
+		var after := int(focus.current_health)
+		if after <= before:
+			continue
+		var gained := after - before
+		healed += gained
+		unit_heals.append({
+			"caster": caster_unit,
+			"unit": focus,
+			"hp_before": before,
+			"hp_after": after,
+			"hp_gained": gained,
+		})
+	return {"healed_total": healed, "unit_heals": unit_heals}
+
+static func _pick_lowest_hp_wounded(legion: Legion) -> Unit:
+	var best: Unit = null
+	var best_hp := 2147483647
 	for unit in legion.units:
 		if unit == null:
 			continue
-		var before := int(unit.current_health)
-		unit.current_health = mini(before + heal_amount, int(unit.max_health))
-		var after := int(unit.current_health)
-		if after > before:
-			var gained := after - before
-			healed += gained
-			unit_heals.append({
-				"unit": unit,
-				"hp_before": before,
-				"hp_after": after,
-				"hp_gained": gained,
-			})
-	return {"healed_total": healed, "unit_heals": unit_heals}
+		var hp := int(unit.current_health)
+		if hp >= int(unit.max_health):
+			continue
+		if hp < best_hp:
+			best_hp = hp
+			best = unit
+	return best
 
 static func _start_action_cooldown(legion: Legion, action: ActionDefinitionScript) -> void:
 	if legion == null or action == null:

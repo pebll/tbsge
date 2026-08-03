@@ -226,19 +226,15 @@ func play_heal(coords: Vector2i, payload: Dictionary, options: Dictionary = {}) 
 	var world_pos: Vector2 = target_visu.global_position
 	var unit_heals: Array = payload.get("unit_heals", [])
 	var is_ally_heal := action_id == "heal_ally" and from_coords != to_coords
-	var caster_units: Array = []
-	if caster_legion:
-		caster_units = caster_legion.units.duplicate()
 
-	var caster_idx := 0
+	# One pulse per caster unit (unit_heals is already focused onto lowest-HP targets).
 	for entry in unit_heals:
 		var unit: Unit = entry.get("unit")
 		if unit == null:
 			continue
+		var shooter: Unit = entry.get("caster")
 
-		if is_ally_heal and caster_visu != null and not caster_units.is_empty():
-			var shooter: Unit = caster_units[caster_idx % caster_units.size()]
-			caster_idx += 1
+		if is_ally_heal and caster_visu != null and shooter != null:
 			await _play_heal_shot(caster_visu, target_visu, shooter, unit)
 
 		var heal_tween: Tween = target_visu.animate_unit_healed(

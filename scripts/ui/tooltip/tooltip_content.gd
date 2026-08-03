@@ -95,11 +95,11 @@ static func _action_body(action: ActionDefinition, legion: Legion) -> String:
 			return "Shoot an enemy within range. Ends this legion's turn."
 		"self_heal":
 			var heal := ActionParams.resolve_int(legion, action, "heal_amount", action.heal_amount)
-			return "Restore %d health to each unit in this legion. Ends this legion's turn." % heal
+			return "Each unit restores %d health to the lowest-health ally in this legion. Ends this legion's turn." % heal
 		"heal_ally":
 			var heal := ActionParams.resolve_int(legion, action, "heal_amount", action.heal_amount)
 			var rng := ActionParams.resolve_int(legion, action, "target_range", action.target_range)
-			return "Heal an ally within %d hexes for %d health per unit. Ends this legion's turn." % [rng, heal]
+			return "Each unit heals the lowest-health ally within %d hexes for %d health. Ends this legion's turn." % [rng, heal]
 		"teleport":
 			var rng := ActionParams.resolve_int(legion, action, "target_range", action.target_range)
 			return "Blink to an empty tile within %d hexes. Ends this legion's turn." % rng
