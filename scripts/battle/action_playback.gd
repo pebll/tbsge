@@ -226,6 +226,8 @@ func play_heal(coords: Vector2i, payload: Dictionary, options: Dictionary = {}) 
 	var caster_visu: LegionVisu = from_tile.legion_visu if from_tile else null
 	var world_pos: Vector2 = target_visu.global_position
 	var unit_heals: Array = payload.get("unit_heals", [])
+	var is_self_heal := caster_visu != null and caster_visu == target_visu
+	var facing_before := caster_visu.get_facing_direction() if is_self_heal else Vector2.RIGHT
 
 	# One pulse per caster unit (unit_heals is already focused onto lowest-HP targets).
 	for entry in unit_heals:
@@ -248,6 +250,9 @@ func play_heal(coords: Vector2i, payload: Dictionary, options: Dictionary = {}) 
 			await heal_tween.finished
 		else:
 			await _beat(COMBAT_HIT_BEAT)
+
+	if is_self_heal and caster_visu:
+		caster_visu.update_direction(facing_before)
 
 	target_visu.update_local_positions()
 	target_visu.tween_units_to_local_positions()
