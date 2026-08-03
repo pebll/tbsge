@@ -115,10 +115,10 @@ Ship early so every new feature emits a clear, modular event the UI can render �
 
 ### Phase U2 — Action bar clarity
 
-- [ ] Disabled reason in tooltip (“On cooldown: 1 turn”, “No wounded ally in range”)  
+- [x] Disabled reason in tooltip (“On cooldown: 1 turn”, “No wounded ally in range”)  
 - [ ] Cooldown badge when T2 exists  
-- [ ] Terminal actions: small skull/end-turn mark **or** only in tooltip (prefer tooltip-first to avoid clutter)  
-- [ ] Selected action: one-line hint under bar (“Choose a wounded ally”)
+- [x] Terminal actions: small skull/end-turn mark **or** only in tooltip (prefer tooltip-first to avoid clutter)  
+- [x] Selected action: one-line hint under bar (“Choose a wounded ally”)
 
 ### Phase U3 — Tile / terrain / draft UX
 

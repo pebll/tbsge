@@ -12,6 +12,8 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_tooltip_content_for_keyword_and_stat():
 		return false
+	if not _test_disable_reason_helpers():
+		return false
 	print("Success: Tooltip / glossary / action params tests")
 	return true
 
@@ -97,5 +99,30 @@ func _test_tooltip_content_for_keyword_and_stat() -> bool:
 		return false
 	if "2" not in stat.body and "2" not in stat.footer:
 		push_error("Stat tooltip should include current value")
+		return false
+	return true
+
+func _test_disable_reason_helpers() -> bool:
+	const ActionTargetingScript = preload("res://scripts/actions/action_targeting.gd")
+	const MinigameTestHelpersScript = preload("res://tests/minigame_test_helpers.gd")
+	var session := MinigameTestHelpersScript.prepare_session()
+	var started: Dictionary = MinigameTestHelpersScript.start_two_legion_battle(session)
+	var green: Legion = started["a"]
+	var heal_def: ActionDefinition = ActionDefs.get_def("self_heal")
+	# Full HP → self heal disabled.
+	var reason := ActionTargetingScript.disable_reason(session.battle_state(), green, heal_def)
+	if "full health" not in reason.to_lower():
+		push_error("Expected full-health disable reason, got: %s" % reason)
+		return false
+	for u in green.units:
+		u.current_health = max(1, u.max_health - 2)
+	green.current_ap = 1
+	var ap_reason := ActionTargetingScript.disable_reason(session.battle_state(), green, heal_def)
+	if "ap" not in ap_reason.to_lower():
+		push_error("Expected AP disable reason, got: %s" % ap_reason)
+		return false
+	var listed := ActionTargetingScript.listed_actions(green)
+	if listed.is_empty():
+		push_error("listed_actions should include kit even when disabled")
 		return false
 	return true

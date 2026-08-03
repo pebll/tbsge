@@ -8,6 +8,7 @@ signal action_pressed(action: ActionDefinitionScript)
 const COLOR_BG := Color(0.91, 0.86, 0.78)
 const COLOR_BORDER := Color(0.78, 0.70, 0.58)
 const COLOR_TEXT := Color(0.12, 0.10, 0.08)
+const COLOR_MUTED := Color(0.45, 0.40, 0.35)
 const BORDER_THICK := 4
 const RADIUS := 16
 
@@ -15,11 +16,16 @@ var _buttons: Dictionary = {}
 var _selected_id: String = ""
 var _tooltip: TooltipController = null
 var _tooltip_legion: Legion = null
+var _disabled_reasons: Dictionary = {}
 
 @onready var _row: HBoxContainer = %ActionRow
+@onready var _hint: Label = %HintLabel
 
 func _ready() -> void:
 	_apply_panel_style()
+	if _hint:
+		_hint.add_theme_color_override("font_color", COLOR_MUTED)
+		_hint.hide()
 	hide()
 
 func set_tooltip_controller(controller: TooltipController) -> void:
@@ -46,14 +52,24 @@ func _apply_panel_style() -> void:
 	sb.content_margin_bottom = 10
 	%Panel.add_theme_stylebox_override("panel", sb)
 
-func set_actions(actions: Array[ActionDefinitionScript], selected: ActionDefinitionScript = null) -> void:
+func set_actions(
+	actions: Array[ActionDefinitionScript],
+	selected: ActionDefinitionScript = null,
+	disabled_reasons: Dictionary = {}
+) -> void:
 	_clear_buttons()
+	_disabled_reasons = disabled_reasons.duplicate()
 	_selected_id = selected.id if selected else ""
 	if actions.is_empty():
+		set_hint("")
 		hide()
 		return
 	for action in actions:
 		_add_action_button(action)
+	if selected:
+		set_hint(_hint_for_action(selected))
+	else:
+		set_hint("")
 	show()
 
 func set_selected(action: ActionDefinitionScript) -> void:
@@ -62,10 +78,19 @@ func set_selected(action: ActionDefinitionScript) -> void:
 		var btn: Button = _buttons[action_id]
 		var is_pressed: bool = action_id == _selected_id
 		btn.button_pressed = is_pressed
+	set_hint(_hint_for_action(action) if action else "")
+
+func set_hint(text: String) -> void:
+	if _hint == null:
+		return
+	_hint.text = text
+	_hint.visible = not text.is_empty()
 
 func clear_bar() -> void:
 	_clear_buttons()
 	_selected_id = ""
+	_disabled_reasons.clear()
+	set_hint("")
 	hide()
 
 func _clear_buttons() -> void:
@@ -79,15 +104,25 @@ func _add_action_button(action: ActionDefinitionScript) -> void:
 	btn.button_pressed = action.id == _selected_id
 	btn.focus_mode = Control.FOCUS_NONE
 	btn.custom_minimum_size = Vector2(96, 96)
-	btn.tooltip_text = "%s — right-click to inspect" % action.display_name
+	var reason := String(_disabled_reasons.get(action.id, ""))
+	var disabled := not reason.is_empty()
+	btn.disabled = disabled
+	if disabled:
+		btn.tooltip_text = "%s — %s" % [action.display_name, reason]
+	else:
+		btn.tooltip_text = "%s — right-click to inspect" % action.display_name
 
 	var sb_normal := _button_stylebox(Color(0.93, 0.89, 0.82))
 	var sb_hover := _button_stylebox(Color(0.95, 0.91, 0.84))
 	var sb_pressed := _button_stylebox(Color(0.88, 0.83, 0.74))
+	var sb_disabled := _button_stylebox(Color(0.82, 0.78, 0.72))
 	btn.add_theme_stylebox_override("normal", sb_normal)
 	btn.add_theme_stylebox_override("hover", sb_hover)
 	btn.add_theme_stylebox_override("pressed", sb_pressed)
+	btn.add_theme_stylebox_override("disabled", sb_disabled)
 	btn.add_theme_color_override("font_color", COLOR_TEXT)
+	btn.add_theme_color_override("font_disabled_color", COLOR_MUTED)
+	btn.modulate = Color(1, 1, 1, 0.55) if disabled else Color.WHITE
 
 	if action.icon:
 		btn.icon = action.icon
@@ -97,19 +132,40 @@ func _add_action_button(action: ActionDefinitionScript) -> void:
 	else:
 		btn.text = action.display_name.substr(0, 1)
 
-	btn.pressed.connect(func(): action_pressed.emit(action))
 	var captured_action: ActionDefinitionScript = action
+	var captured_reason := reason
+	if not disabled:
+		btn.pressed.connect(func(): action_pressed.emit(captured_action))
 	btn.gui_input.connect(func(event: InputEvent) -> void:
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
 			if _tooltip:
-				_tooltip.show_for_control(
-					btn,
-					TooltipContent.for_action(captured_action, _tooltip_legion)
-				)
+				var content := TooltipContent.for_action(captured_action, _tooltip_legion)
+				if not captured_reason.is_empty():
+					content.body = "%s\n\nUnavailable: %s" % [content.body, captured_reason]
+				_tooltip.show_for_control(btn, content)
 			btn.accept_event()
 	)
 	_row.add_child(btn)
 	_buttons[action.id] = btn
+
+func _hint_for_action(action: ActionDefinitionScript) -> String:
+	if action == null:
+		return ""
+	if not action.select_hint.is_empty():
+		return action.select_hint
+	match action.targeting:
+		ActionDefinitionScript.TargetingKind.SELF:
+			return "Confirm to heal this legion"
+		ActionDefinitionScript.TargetingKind.ADJACENT_MOVE:
+			return "Choose an adjacent hex"
+		ActionDefinitionScript.TargetingKind.ADJACENT_ENEMY:
+			return "Choose an adjacent enemy"
+		ActionDefinitionScript.TargetingKind.ENEMY_IN_RANGE:
+			return "Choose an enemy in range"
+		ActionDefinitionScript.TargetingKind.ALLY_IN_RANGE:
+			return "Choose a wounded ally"
+		_:
+			return "Choose a target"
 
 func _button_stylebox(bg: Color) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()

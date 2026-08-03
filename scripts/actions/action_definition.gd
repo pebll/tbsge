@@ -26,3 +26,5 @@ enum TargetingKind {
 @export_multiline var tooltip_body: String = ""
 ## Glossary keyword ids shown as chips (e.g. terminal, range, ally).
 @export var keywords: Array[String] = []
+## One-line action-bar hint when selected (optional override).
+@export var select_hint: String = ""

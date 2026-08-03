@@ -120,7 +120,7 @@ func select_tile(coords: Vector2i) -> void:
 	if action_bar:
 		if action_bar.has_method("set_tooltip_context_legion"):
 			action_bar.set_tooltip_context_legion(legion)
-		action_bar.set_actions(ActionTargetingScript.available_actions(state, legion))
+		_refresh_action_bar(state, legion, null)
 
 func select_action(action: ActionDefinitionScript) -> void:
 	if not has_selected:
@@ -153,6 +153,21 @@ func select_action(action: ActionDefinitionScript) -> void:
 	else:
 		_paint_tile(selected_coords, "selected", LIFT_SELECTED)
 		_paint_action_targets(action)
+
+func _refresh_action_bar(
+	state: BattleStateScript,
+	legion: Legion,
+	selected: ActionDefinitionScript
+) -> void:
+	if action_bar == null:
+		return
+	var listed := ActionTargetingScript.listed_actions(legion)
+	var reasons: Dictionary = {}
+	for action in listed:
+		var reason := ActionTargetingScript.disable_reason(state, legion, action)
+		if not reason.is_empty():
+			reasons[action.id] = reason
+	action_bar.set_actions(listed, selected, reasons)
 
 func refresh_after_action(legion_coords: Vector2i) -> void:
 	var state: BattleStateScript = battle_state_fn.call()

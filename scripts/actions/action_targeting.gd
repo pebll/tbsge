@@ -6,11 +6,50 @@ const BattleStateScript = preload("res://scripts/actions/battle_state.gd")
 
 static func available_actions(state: BattleStateScript, legion: Legion) -> Array[ActionDefinitionScript]:
 	var out: Array[ActionDefinitionScript] = []
+	for action in listed_actions(legion):
+		if can_use(state, legion, action):
+			out.append(action)
+	return out
+
+## All actions on the bar for this legion (usable + disabled).
+static func listed_actions(legion: Legion) -> Array[ActionDefinitionScript]:
+	var out: Array[ActionDefinitionScript] = []
+	if legion == null:
+		return out
 	for action_id in ActionDefs.legion_action_ids(legion):
 		var def: ActionDefinitionScript = ActionDefs.get_def(action_id)
-		if def and can_use(state, legion, def):
+		if def:
 			out.append(def)
 	return out
+
+static func disable_reason(
+	state: BattleStateScript,
+	legion: Legion,
+	action: ActionDefinitionScript
+) -> String:
+	if legion == null or action == null:
+		return "Unavailable"
+	if state == null or not state.can_act_legion(legion):
+		return "Cannot act now"
+	if not legion.can_afford(action.ap_cost):
+		return "Not enough AP (%d needed)" % action.ap_cost
+	if action.id == "ranged_attack" and not _legion_has_ranged(legion):
+		return "This unit cannot shoot"
+	if get_targets(state, legion, action).is_empty():
+		match action.id:
+			"self_heal":
+				return "Already at full health"
+			"heal_ally":
+				return "No wounded ally in range"
+			"move":
+				return "No valid move"
+			"melee_attack":
+				return "No adjacent enemy"
+			"ranged_attack":
+				return "No enemy in range"
+			_:
+				return "No valid target"
+	return ""
 
 static func can_use(state: BattleStateScript, legion: Legion, action: ActionDefinitionScript) -> bool:
 	if legion == null or action == null:
