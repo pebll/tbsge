@@ -5,6 +5,7 @@
 - **Minigame** (`scenes/runnables/minigame.tscn`) is the primary product (draft + battle). Main scene in `project.godot`.
 - **Sandbox** (`unit_preview` / `sandbox_root`) is a second mode for spawn/fight — keep it so the engine stays modular and not overfit to minigame.
 - Mode-specific code lives under `scripts/minigame/` (draft, deploy rules, AI drafter, win conditions) and sandbox session/root.
+- Living mission board: **`MISSIONS.md`** (short-term polish vs next features).
 
 ### Workflow
 - **Always run unit tests** after code changes: `./run_tests.sh`.
@@ -17,6 +18,7 @@
 - Tests live in `res://tests/` and are executed by `tests/run_tests.gd`.
 - Test runner must print a clear summary and exit **0 on pass**, **non-zero on fail**.
 - Prefer **logic-level unit tests** (no scenes) unless visuals/nodes are required.
+- Headless exit may print `ObjectDB instances leaked` / resources still in use — known Godot autoload/test teardown noise; ignore unless a new test clearly owns the leak.
 
 ### Terrain/spawn/move test constraints
 - Spawn/move behavior depends on `Tile.walkable`; tests must not fail due to random terrain.
@@ -47,6 +49,7 @@
 - Print each hit for terminal inspection.
 - Combat resolver returns ordered hit/death logs for driving visuals.
 - Melee and ranged are separate actions (`melee_attack`, `ranged_attack`). Counter-fire only if defender `attack_range` covers engagement distance.
+- **Move is non-terminal** (does not `wait_legion`); combat/heal terminal actions do. Wait stains are per-tile — move/swap onto a stained tile clears that wait.
 
 ### Combat visuals requirements (current)
 - Animations are **sequential** with a fixed delay between hits (currently **0.3s**).
@@ -56,5 +59,6 @@
 - After combat, remaining units should **tween** into their re-packed positions (no snapping).
 
 ### Assets
-- Runtime art lives under `assets/`. Pipeline / unused piles may live under `assets/_archive/` or `assets_raw/` — see `ASSETS_ARCHIVE.md` when present.
-- Prefer archiving over deleting until explicitly approved.
+- Runtime art lives under `assets/`. Unused / pipeline piles live under `assets/_archive/` — see `ASSETS_ARCHIVE.md`.
+- Prefer archiving over deleting until explicitly approved (speeches were an exception).
+- Menu music: `assets/music/bgmusic_menu.wav`.

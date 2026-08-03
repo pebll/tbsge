@@ -64,9 +64,10 @@ const ICON_BOW := preload("res://assets/icons/base_icons_sprites/bow.png")
 const ICON_HEALTH := preload("res://assets/icons/base_icons_sprites/heart.png")
 const ICON_UNIT_COUNT := preload("res://assets/icons/base_icons_sprites/torso.png")
 const ICON_AP := preload("res://assets/icons/base_icons_sprites/boot.png")
-const ICON_SIZE := preload("res://assets/icons/base_icons_sprites/strong.png")
+const ICON_SIZE := preload("res://assets/icons/base_icons_sprites/size.png")
 const ICON_PRICE := preload("res://assets/icons/base_icons_sprites/coin.png")
 const ICON_SHIELD := preload("res://assets/icons/base_icons_sprites/shield.png")
+const ICON_RANGE := preload("res://assets/icons/base_icons_sprites/range.png")
 
 var _ranged_stat: HBoxContainer
 var _ranged_value: Label
@@ -391,7 +392,7 @@ func _ensure_ranged_stat_rows() -> void:
 	stats.add_child(_ranged_stat)
 	stats.move_child(_ranged_stat, 1)
 
-	_range_stat = _make_stat_row(null, true)
+	_range_stat = _make_stat_row(ICON_RANGE)
 	_range_value = _range_stat.get_child(1) as Label
 	_range_stat.hide()
 	stats.add_child(_range_stat)

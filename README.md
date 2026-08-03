@@ -20,4 +20,5 @@ Battle commands use `{"type": "use_action", "action_id": "move"|"melee_attack"|"
 
 ## Docs
 
-See `AGENT_NOTES.md` for conventions (tests, combat rules, UI style).
+See `AGENT_NOTES.md` for conventions (tests, combat rules, UI style).  
+See `MISSIONS.md` for the living short-term / features checklist.

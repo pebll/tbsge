@@ -24,6 +24,8 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_prefers_ranged_at_distance_two():
 		return false
+	if not _test_prefers_ranged_when_adjacent_no_return_fire():
+		return false
 	print("Success: AI attack-nearest tests")
 	return true
 
@@ -380,5 +382,52 @@ func _test_prefers_ranged_at_distance_two() -> bool:
 		return false
 	if cmd.get("to") != to_coords:
 		push_error("AI should target the enemy @ %s" % to_coords)
+		return false
+	return true
+
+func _test_prefers_ranged_when_adjacent_no_return_fire() -> bool:
+	## Adjacent melee enemy that cannot return fire → prefer ranged over melee.
+	var session := MinigameTestHelpersScript.prepare_session()
+	var team_a: String = MinigameTestHelpersScript.team_a(session)
+	var team_b: String = MinigameTestHelpersScript.team_b(session)
+	var slots_a: Array = session.get_deploy_slots(team_a)
+	var slots_b: Array = session.get_deploy_slots(team_b)
+	session.apply({
+		"type": "draft_set_legion",
+		"team": team_a,
+		"coords": slots_a[0],
+		"unit_type": "ARCHER",
+		"unit_count": 1,
+	})
+	session.apply({"type": "draft_ready", "team": team_a})
+	session.apply({
+		"type": "draft_set_legion",
+		"team": team_b,
+		"coords": slots_b[0],
+		"unit_type": "GOBLIN",
+		"unit_count": 1,
+	})
+	session.apply({"type": "draft_ready", "team": team_b})
+
+	var archer: Legion = null
+	var goblin: Legion = null
+	for legion in session.legions:
+		if legion.team_id == team_a:
+			archer = legion
+		else:
+			goblin = legion
+	var from_coords := Vector2i(0, 0)
+	var to_coords := Vector2i(1, 0)
+	if session.grid.get(from_coords) == null or session.grid.get(to_coords) == null:
+		return true
+	_teleport_legion(session, archer, from_coords)
+	_teleport_legion(session, goblin, to_coords)
+	for u in goblin.units:
+		u.attack_range = 0
+		u.ranged_attack = 0
+
+	var cmd: Dictionary = AttackNearestEnemyBehavior.decide(session, archer)
+	if cmd.get("type") != "use_action" or cmd.get("action_id") != "ranged_attack":
+		push_error("AI should prefer ranged vs melee-only adjacent, got %s" % cmd)
 		return false
 	return true

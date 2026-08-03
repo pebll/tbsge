@@ -5,7 +5,7 @@ const HexPathfinder = preload("res://scripts/ai/hex_pathfinder.gd")
 const Utils = preload("res://scripts/core/utils.gd")
 const MatchSessionScript = preload("res://scripts/match/match_session.gd")
 
-static var debug_enabled: bool = true
+static var debug_enabled: bool = false
 
 static func decide(session: MatchSessionScript, legion: Legion) -> Dictionary:
 	var cmd := _decide_internal(session, legion)

@@ -1,5 +1,7 @@
 extends Control
 
+const AttackNearestEnemyBehavior = preload("res://scripts/ai/behaviors/attack_nearest_enemy.gd")
+
 const SANDBOX_SCENE := "res://scenes/runnables/unit_preview.tscn"
 const DUEL_R3_SCENE := "res://scenes/runnables/minigame.tscn"
 const DUEL_R4_SCENE := "res://scenes/runnables/minigame_duel_r4.tscn"
@@ -16,15 +18,26 @@ const RADIUS := 16
 @onready var duel_r4_button: GameButton = %DuelR4Button
 @onready var big_button: GameButton = %BigButton
 @onready var back_button: GameButton = %BackButton
+@onready var ai_debug_button: GameButton = %AiDebugButton
 
 func _ready() -> void:
 	AudioManager.ensure_music()
 	_apply_styles()
+	_refresh_ai_debug_label()
 	sandbox_button.pressed.connect(func(): get_tree().change_scene_to_file(SANDBOX_SCENE))
 	duel_button.pressed.connect(func(): get_tree().change_scene_to_file(DUEL_R3_SCENE))
 	duel_r4_button.pressed.connect(func(): get_tree().change_scene_to_file(DUEL_R4_SCENE))
 	big_button.pressed.connect(func(): get_tree().change_scene_to_file(BIG_R4_SCENE))
+	ai_debug_button.pressed.connect(_toggle_ai_debug)
 	back_button.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/runnables/menu.tscn"))
+
+func _toggle_ai_debug() -> void:
+	AttackNearestEnemyBehavior.debug_enabled = not AttackNearestEnemyBehavior.debug_enabled
+	_refresh_ai_debug_label()
+
+func _refresh_ai_debug_label() -> void:
+	var on := AttackNearestEnemyBehavior.debug_enabled
+	ai_debug_button.text = "AI debug: ON" if on else "AI debug: OFF"
 
 func _apply_styles() -> void:
 	var panel_sb := _make_stylebox()

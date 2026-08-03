@@ -24,6 +24,8 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_wait_stain_survivor_and_end_turn():
 		return false
+	if not _test_swap_onto_stained_empty_tile():
+		return false
 	print("Success: Action system tests")
 	return true
 
@@ -436,5 +438,54 @@ func _test_wait_stain_survivor_and_end_turn() -> bool:
 		return false
 	if session.turn_manager.active_team_id != team_b:
 		push_error("Expected team B after end_turn")
+		return false
+	return true
+
+func _test_swap_onto_stained_empty_tile() -> bool:
+	## Wait stain on the swap destination must not block the arriving legion.
+	var session := MinigameTestHelpersScript.prepare_session()
+	var started: Dictionary = MinigameTestHelpersScript.start_two_legion_battle(session)
+	var team_a: String = MinigameTestHelpersScript.team_a(session)
+	var green_a: Legion = started["a"]
+	var blue: Legion = started["b"]
+
+	var a_coords := Vector2i(0, 0)
+	var b_coords := Vector2i(1, 0)
+	if session.grid.get(a_coords) == null or session.grid.get(b_coords) == null:
+		return true
+	for c in [green_a.tile_coords, blue.tile_coords]:
+		if session.grid.get(c):
+			session.grid[c].legion = null
+	_teleport(session, green_a, a_coords)
+
+	var green_b := Legion.new("GOBLIN", 2, b_coords, team_a)
+	session.grid[b_coords].legion = green_b
+	session.legions.append(green_b)
+	# Stale wait on destination (e.g. wiped previous occupant).
+	session.turn_manager.wait_legion(b_coords)
+
+	var result := session.apply({
+		"type": "use_action",
+		"action_id": "move",
+		"from": a_coords,
+		"to": b_coords,
+	})
+	if not result["ok"]:
+		push_error("Swap onto stained tile failed: %s" % result.get("error"))
+		return false
+	if "legions_swapped" not in result.get("events", []):
+		push_error("Expected swap event")
+		return false
+	if b_coords in session.turn_manager.waited_coords:
+		push_error("Swap should clear wait stain on destination")
+		return false
+	if a_coords in session.turn_manager.waited_coords:
+		push_error("Swap should clear wait stain on source")
+		return false
+	if green_a.tile_coords != b_coords:
+		push_error("Swap mover should land on destination")
+		return false
+	if not session.can_act_legion(green_a) and green_a.has_ap():
+		push_error("Arriving legion should be able to act after swap cleared stain")
 		return false
 	return true

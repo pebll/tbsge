@@ -15,7 +15,7 @@ const DEFAULT_MENU_VOLUME := 1.0
 const DEFAULT_GAME_VOLUME := 0.0
 const DEFAULT_MUSIC_VOLUME := 1.0
 
-const DEFAULT_MUSIC_STREAM := preload("res://assets_raw/music/bgmusic_menu.wav")
+const DEFAULT_MUSIC_STREAM := preload("res://assets/music/bgmusic_menu.wav")
 
 const MAX_UI_SFX_PLAYERS := 6
 const MAX_SELECT_SFX_PLAYERS := 6

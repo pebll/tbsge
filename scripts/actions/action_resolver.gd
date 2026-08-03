@@ -84,6 +84,9 @@ static func _execute_swap(
 	legion_a.spend_ap(action.ap_cost)
 	legion_b.spend_ap(action.ap_cost)
 	_apply_terminal(state, legion_a, action, from_coords)
+	# Wait stains are per-tile; swapping must not strand either legion under a stale wait.
+	state.turn_manager.clear_wait(from_coords)
+	state.turn_manager.clear_wait(to_coords)
 	return _ok(["legions_swapped"], {
 		"action_id": action.id,
 		"from": from_coords,
