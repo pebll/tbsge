@@ -157,6 +157,7 @@ func _play_ranged_hit(
 		tex = ProjectilePresenterScript.load_projectile_texture("arrow")
 	var dist := from_pos.distance_to(to_pos)
 	var arc := clampf(22.0 + dist * 0.14, 28.0, 70.0)
+	var spin_sign := 1.0 if to_pos.x >= from_pos.x else -1.0
 	await _projectiles.play_parabola(
 		_host,
 		from_pos,
@@ -164,7 +165,9 @@ func _play_ranged_hit(
 		tex,
 		atk_unit.projectile_motion,
 		RANGED_FLIGHT_TIME,
-		arc
+		arc,
+		1.75,
+		spin_sign
 	)
 
 	AudioManager.play_unit_hit(atk_unit.unit_type)
@@ -329,6 +332,15 @@ func _play_heal_shot(
 	if self_toss:
 		to_pos = from_pos
 
+	# Spin handedness from facing (self) or throw direction (ally / teammate).
+	var spin_sign := 1.0
+	if self_toss:
+		var shooter_visu: UnitVisu = caster_visu.get_unit_visu(shooter)
+		if shooter_visu != null and not shooter_visu.direction_right:
+			spin_sign = -1.0
+	elif to_pos.x < from_pos.x:
+		spin_sign = -1.0
+
 	var direction := Vector2.UP if self_toss else (to_pos - from_pos).normalized()
 	if direction == Vector2.ZERO:
 		direction = Vector2.UP
@@ -341,15 +353,19 @@ func _play_heal_shot(
 	if tex == null or _projectiles == null:
 		return
 	var dist := from_pos.distance_to(to_pos)
-	var arc := 56.0 if self_toss else clampf(22.0 + dist * 0.14, 28.0, 70.0)
+	var arc := 110.0 if self_toss else clampf(22.0 + dist * 0.14, 28.0, 70.0)
+	var flight := 0.38 if self_toss else RANGED_FLIGHT_TIME
+	var spins := 1.0 if self_toss else 1.75
 	await _projectiles.play_parabola(
 		_host,
 		from_pos,
 		to_pos,
 		tex,
 		UnitDefinition.ProjectileMotion.THROWN,
-		RANGED_FLIGHT_TIME,
-		arc
+		flight,
+		arc,
+		spins,
+		spin_sign
 	)
 
 func _build_legion_visu_map(attacker: Legion, defender: Legion, hits: Array) -> Dictionary:
