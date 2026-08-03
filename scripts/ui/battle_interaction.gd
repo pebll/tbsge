@@ -4,6 +4,7 @@ extends RefCounted
 const ActionDefinitionScript = preload("res://scripts/actions/action_definition.gd")
 const ActionTargetingScript = preload("res://scripts/actions/action_targeting.gd")
 const BattleStateScript = preload("res://scripts/actions/battle_state.gd")
+const UiTheme = preload("res://scripts/ui/ui_theme.gd")
 
 const LIFT_NONE := 0.0
 const LIFT_OPTION := 2.0
@@ -466,30 +467,7 @@ func _make_attack_icon_button(icon: Texture2D) -> Button:
 	btn.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	if icon:
 		btn.icon = icon
-
-	var normal := StyleBoxFlat.new()
-	normal.bg_color = COLOR_ICON_BTN_BG
-	normal.border_color = COLOR_POPUP_BORDER
-	normal.border_width_left = 3
-	normal.border_width_right = 3
-	normal.border_width_top = 3
-	normal.border_width_bottom = 3
-	normal.corner_radius_top_left = 12
-	normal.corner_radius_top_right = 12
-	normal.corner_radius_bottom_left = 12
-	normal.corner_radius_bottom_right = 12
-	normal.content_margin_left = 14
-	normal.content_margin_right = 14
-	normal.content_margin_top = 14
-	normal.content_margin_bottom = 14
-	var hover := normal.duplicate()
-	hover.bg_color = Color(0.96, 0.92, 0.85)
-	var pressed := normal.duplicate()
-	pressed.bg_color = Color(0.86, 0.80, 0.70)
-	btn.add_theme_stylebox_override("normal", normal)
-	btn.add_theme_stylebox_override("hover", hover)
-	btn.add_theme_stylebox_override("pressed", pressed)
-	btn.add_theme_stylebox_override("focus", normal)
+	UiTheme.apply_button_chrome(btn, 12, 3, 14, 14)
 	return btn
 
 func _hide_attack_choice_popup() -> void:

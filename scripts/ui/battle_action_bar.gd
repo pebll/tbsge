@@ -2,31 +2,37 @@ class_name BattleActionBar
 extends Control
 
 const ActionDefinitionScript = preload("res://scripts/actions/action_definition.gd")
+const UiTheme = preload("res://scripts/ui/ui_theme.gd")
 
 signal action_pressed(action: ActionDefinitionScript)
 
-const COLOR_BG := Color(0.91, 0.86, 0.78)
-const COLOR_BORDER := Color(0.78, 0.70, 0.58)
-const COLOR_TEXT := Color(0.12, 0.10, 0.08)
-const COLOR_MUTED := Color(0.45, 0.40, 0.35)
-const BORDER_THICK := 4
-const RADIUS := 16
+const COLOR_TEXT := UiTheme.COLOR_TEXT
+const COLOR_MUTED := UiTheme.COLOR_TEXT_MUTED
+const BORDER_THICK := UiTheme.BORDER_THICK
+const RADIUS := UiTheme.RADIUS
 
 var _buttons: Dictionary = {}
 var _selected_id: String = ""
 var _tooltip: TooltipController = null
 var _tooltip_legion: Legion = null
 var _disabled_reasons: Dictionary = {}
+var _panel: PanelContainer
+var _visibility_tween: Tween
+var _showing: bool = false
 
 @onready var _row: HBoxContainer = %ActionRow
 @onready var _hint: Label = %HintLabel
 
 func _ready() -> void:
+	_panel = %Panel
 	_apply_panel_style()
 	if _hint:
 		_hint.add_theme_color_override("font_color", COLOR_MUTED)
 		_hint.hide()
+	pivot_offset = size * 0.5
 	hide()
+	modulate.a = 0.0
+	scale = Vector2(0.92, 0.82)
 
 func set_tooltip_controller(controller: TooltipController) -> void:
 	_tooltip = controller
@@ -35,22 +41,10 @@ func set_tooltip_context_legion(legion: Legion) -> void:
 	_tooltip_legion = legion
 
 func _apply_panel_style() -> void:
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = COLOR_BG
-	sb.border_color = COLOR_BORDER
-	sb.border_width_left = BORDER_THICK
-	sb.border_width_right = BORDER_THICK
-	sb.border_width_top = BORDER_THICK
-	sb.border_width_bottom = BORDER_THICK
-	sb.corner_radius_top_left = RADIUS
-	sb.corner_radius_top_right = RADIUS
-	sb.corner_radius_bottom_left = RADIUS
-	sb.corner_radius_bottom_right = RADIUS
-	sb.content_margin_left = 14
-	sb.content_margin_right = 14
-	sb.content_margin_top = 10
-	sb.content_margin_bottom = 10
-	%Panel.add_theme_stylebox_override("panel", sb)
+	%Panel.add_theme_stylebox_override(
+		"panel",
+		UiTheme.panel_stylebox(UiTheme.COLOR_PANEL, UiTheme.COLOR_BORDER, RADIUS, BORDER_THICK, 10)
+	)
 
 func set_actions(
 	actions: Array[ActionDefinitionScript],
@@ -62,7 +56,7 @@ func set_actions(
 	_selected_id = selected.id if selected else ""
 	if actions.is_empty():
 		set_hint("")
-		hide()
+		_animate_hide()
 		return
 	for action in actions:
 		_add_action_button(action)
@@ -70,7 +64,8 @@ func set_actions(
 		set_hint(_hint_for_action(selected))
 	else:
 		set_hint("")
-	show()
+	_animate_show()
+	_juice_buttons_in()
 
 func set_selected(action: ActionDefinitionScript) -> void:
 	_selected_id = action.id if action else ""
@@ -87,11 +82,11 @@ func set_hint(text: String) -> void:
 	_hint.visible = not text.is_empty()
 
 func clear_bar() -> void:
-	_clear_buttons()
 	_selected_id = ""
 	_disabled_reasons.clear()
 	set_hint("")
-	hide()
+	_animate_hide()
+	_clear_buttons()
 
 func _clear_buttons() -> void:
 	for child in _row.get_children():
@@ -112,17 +107,8 @@ func _add_action_button(action: ActionDefinitionScript) -> void:
 	else:
 		btn.tooltip_text = "%s — right-click to inspect" % action.display_name
 
-	var sb_normal := _button_stylebox(Color(0.93, 0.89, 0.82))
-	var sb_hover := _button_stylebox(Color(0.95, 0.91, 0.84))
-	var sb_pressed := _button_stylebox(Color(0.88, 0.83, 0.74))
-	var sb_disabled := _button_stylebox(Color(0.82, 0.78, 0.72))
-	btn.add_theme_stylebox_override("normal", sb_normal)
-	btn.add_theme_stylebox_override("hover", sb_hover)
-	btn.add_theme_stylebox_override("pressed", sb_pressed)
-	btn.add_theme_stylebox_override("disabled", sb_disabled)
-	btn.add_theme_color_override("font_color", COLOR_TEXT)
-	btn.add_theme_color_override("font_disabled_color", COLOR_MUTED)
-	btn.modulate = Color(1, 1, 1, 0.55) if disabled else Color.WHITE
+	UiTheme.apply_button_chrome(btn, RADIUS, BORDER_THICK, 10, 10)
+	btn.modulate = Color(1, 1, 1, 0.55) if disabled else Color(1, 1, 1, 1)
 
 	if action.icon:
 		btn.icon = action.icon
@@ -131,11 +117,15 @@ func _add_action_button(action: ActionDefinitionScript) -> void:
 		btn.text = ""
 	else:
 		btn.text = action.display_name.substr(0, 1)
+		btn.add_theme_color_override("font_color", COLOR_TEXT)
 
 	var captured_action: ActionDefinitionScript = action
 	var captured_reason := reason
 	if not disabled:
-		btn.pressed.connect(func(): action_pressed.emit(captured_action))
+		btn.pressed.connect(func():
+			UiTheme.juice_press(btn)
+			action_pressed.emit(captured_action)
+		)
 	btn.gui_input.connect(func(event: InputEvent) -> void:
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
 			if _tooltip:
@@ -181,6 +171,49 @@ func _maybe_add_cooldown_badge(btn: Button, action: ActionDefinitionScript) -> v
 	holder.add_child(badge)
 	btn.add_child(holder)
 
+func _animate_show() -> void:
+	_showing = true
+	show()
+	pivot_offset = Vector2(size.x * 0.5, size.y)
+	if _visibility_tween and _visibility_tween.is_running():
+		_visibility_tween.kill()
+	_visibility_tween = UiTheme.juice_pop_in(self, 0.15)
+
+func _animate_hide() -> void:
+	if not visible and not _showing:
+		hide()
+		return
+	_showing = false
+	pivot_offset = Vector2(size.x * 0.5, size.y)
+	if _visibility_tween and _visibility_tween.is_running():
+		_visibility_tween.kill()
+	_visibility_tween = UiTheme.juice_pop_out(self, 0.1)
+	if _visibility_tween:
+		_visibility_tween.finished.connect(func() -> void:
+			if not _showing:
+				hide()
+				scale = Vector2(0.92, 0.82)
+				modulate.a = 0.0
+		, CONNECT_ONE_SHOT)
+
+func _juice_buttons_in() -> void:
+	# Defer one frame so button sizes are valid for pivot.
+	await get_tree().process_frame
+	var delay := 0.0
+	for action_id in _buttons.keys():
+		var btn: Button = _buttons[action_id]
+		if btn == null or not is_instance_valid(btn):
+			continue
+		btn.pivot_offset = btn.size * 0.5
+		btn.scale = Vector2(0.82, 0.72)
+		btn.modulate.a = 0.0
+		var tween := btn.create_tween()
+		tween.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tween.tween_interval(delay)
+		tween.tween_property(btn, "scale", Vector2.ONE, 0.12)
+		tween.parallel().tween_property(btn, "modulate:a", 1.0 if not btn.disabled else 0.55, 0.1)
+		delay += 0.03
+
 func _hint_for_action(action: ActionDefinitionScript) -> String:
 	if action == null:
 		return ""
@@ -201,21 +234,3 @@ func _hint_for_action(action: ActionDefinitionScript) -> String:
 			return "Choose an empty tile in range"
 		_:
 			return "Choose a target"
-
-func _button_stylebox(bg: Color) -> StyleBoxFlat:
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = bg
-	sb.border_color = COLOR_BORDER
-	sb.border_width_left = BORDER_THICK
-	sb.border_width_right = BORDER_THICK
-	sb.border_width_top = BORDER_THICK
-	sb.border_width_bottom = BORDER_THICK
-	sb.corner_radius_top_left = RADIUS
-	sb.corner_radius_top_right = RADIUS
-	sb.corner_radius_bottom_left = RADIUS
-	sb.corner_radius_bottom_right = RADIUS
-	sb.content_margin_left = 10
-	sb.content_margin_right = 10
-	sb.content_margin_top = 10
-	sb.content_margin_bottom = 10
-	return sb

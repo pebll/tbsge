@@ -5,14 +5,16 @@ extends Control
 ## Toggle button stays on the left edge to pop the dock in/out.
 ## Combat/heal/teleport lines wait in a pending queue until reveal_pending().
 
-const COLOR_BG := Color(0.91, 0.86, 0.78, 0.96)
-const COLOR_BORDER := Color(0.78, 0.70, 0.58)
-const COLOR_CARD_BG := Color(0.94, 0.90, 0.83)
-const COLOR_ACTION_WELL := Color(0.88, 0.83, 0.74)
-const COLOR_TEXT := Color(0.12, 0.10, 0.08)
+const UiTheme = preload("res://scripts/ui/ui_theme.gd")
+
+const COLOR_BG := Color(UiTheme.COLOR_PANEL, 0.96)
+const COLOR_BORDER := UiTheme.COLOR_BORDER
+const COLOR_CARD_BG := UiTheme.COLOR_CARD
+const COLOR_ACTION_WELL := UiTheme.COLOR_PRESSED
+const COLOR_TEXT := UiTheme.COLOR_TEXT
 const COLOR_HEAL := Color(0.18, 0.52, 0.28)
 const COLOR_WIPE := Color(0.78, 0.12, 0.12)
-const BORDER_THICK := 4
+const BORDER_THICK := UiTheme.BORDER_THICK
 const RADIUS := 14
 const CARD_RADIUS := 14
 const DOCK_WIDTH := 540.0
@@ -21,7 +23,7 @@ const CARD_MIN_HEIGHT := 108.0
 const BANNER_WIDTH := 10.0
 const ICON_UNIT := Vector2(84, 84)
 const ICON_ACTION := Vector2(52, 52)
-const ICON_STAT := Vector2(30, 30)
+const ICON_STAT := Vector2(42, 42)
 
 const ICON_WAIT := preload("res://assets/icons/base_icons_sprites/boot.png")
 const ICON_END_TURN := preload("res://assets/icons/base_icons_sprites/strong.png")
@@ -34,13 +36,12 @@ var _header: VBoxContainer
 var _scroll: ScrollContainer
 var _list: VBoxContainer
 var _toggle_btn: Button
-var _moves_check: CheckBox
-var _end_turns_check: CheckBox
 var _tooltip: TooltipController = null
 var _bound_log: BattleActionLog = null
 var _pending: Array[Dictionary] = []
 var _expanded: bool = true
 var _battle_mode: bool = false
+var _dock_tween: Tween
 
 func _ready() -> void:
 	name = "BattleActionLogPanel"
@@ -54,6 +55,8 @@ func _ready() -> void:
 	_apply_dock_style()
 	_set_expanded(false)
 	hide()
+	if not GameSettings.settings_changed.is_connected(_on_settings_changed):
+		GameSettings.settings_changed.connect(_on_settings_changed)
 
 func set_tooltip_controller(controller: TooltipController) -> void:
 	_tooltip = controller
@@ -66,6 +69,8 @@ func enter_battle(action_log: BattleActionLog = null) -> void:
 	if action_log:
 		bind_log(action_log)
 	_set_expanded(true)
+	if _dock:
+		UiTheme.juice_pop_in(_dock, 0.14)
 
 func exit_battle() -> void:
 	_battle_mode = false
@@ -77,7 +82,7 @@ func exit_battle() -> void:
 
 func bind_log(action_log: BattleActionLog) -> void:
 	_bound_log = action_log
-	_sync_option_checks()
+	GameSettings.apply_to_action_log(_bound_log)
 	_rebuild_visible_entries()
 
 func clear_entries() -> void:
@@ -112,11 +117,17 @@ func append_entry(entry: Dictionary) -> void:
 		return
 	if not _is_visible(entry):
 		return
-	_add_entry_row(entry)
+	_add_entry_row(entry, true)
 	_scroll_to_bottom()
 
 func is_expanded() -> bool:
 	return _expanded
+
+func _on_settings_changed() -> void:
+	if _bound_log:
+		GameSettings.apply_to_action_log(_bound_log)
+	if _battle_mode:
+		_rebuild_visible_entries()
 
 func _build() -> void:
 	_dock = PanelContainer.new()
@@ -152,26 +163,6 @@ func _build() -> void:
 	title.add_theme_font_size_override("font_size", 22)
 	_header.add_child(title)
 
-	var opts := HBoxContainer.new()
-	opts.add_theme_constant_override("separation", 16)
-	_header.add_child(opts)
-
-	_moves_check = CheckBox.new()
-	_moves_check.text = "Moves"
-	_moves_check.focus_mode = Control.FOCUS_NONE
-	_moves_check.button_pressed = false
-	_moves_check.toggled.connect(_on_show_moves_toggled)
-	_style_option_check(_moves_check)
-	opts.add_child(_moves_check)
-
-	_end_turns_check = CheckBox.new()
-	_end_turns_check.text = "End turns"
-	_end_turns_check.focus_mode = Control.FOCUS_NONE
-	_end_turns_check.button_pressed = false
-	_end_turns_check.toggled.connect(_on_show_end_turns_toggled)
-	_style_option_check(_end_turns_check)
-	opts.add_child(_end_turns_check)
-
 	_scroll = ScrollContainer.new()
 	_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -194,12 +185,6 @@ func _build() -> void:
 	_toggle_btn.pressed.connect(_on_toggle_pressed)
 	_style_toggle_button()
 	add_child(_toggle_btn)
-
-func _style_option_check(box: CheckBox) -> void:
-	box.add_theme_color_override("font_color", COLOR_TEXT)
-	box.add_theme_color_override("font_pressed_color", COLOR_TEXT)
-	box.add_theme_color_override("font_hover_color", COLOR_TEXT)
-	box.add_theme_font_size_override("font_size", 18)
 
 func _apply_dock_style() -> void:
 	var sb := StyleBoxFlat.new()
@@ -227,32 +212,21 @@ func _style_toggle_button() -> void:
 	sb.content_margin_right = 4
 	_toggle_btn.add_theme_stylebox_override("normal", sb)
 	var hover := sb.duplicate()
-	hover.bg_color = Color(0.95, 0.91, 0.84)
+	hover.bg_color = UiTheme.COLOR_HOVER
+	var pressed := sb.duplicate()
+	pressed.bg_color = UiTheme.COLOR_PRESSED
 	_toggle_btn.add_theme_stylebox_override("hover", hover)
-	_toggle_btn.add_theme_stylebox_override("pressed", hover)
+	_toggle_btn.add_theme_stylebox_override("pressed", pressed)
+	_toggle_btn.add_theme_stylebox_override("hover_pressed", pressed)
+	_toggle_btn.add_theme_stylebox_override("focus", sb)
 	_toggle_btn.add_theme_color_override("font_color", COLOR_TEXT)
+	_toggle_btn.add_theme_color_override("font_hover_color", COLOR_TEXT)
+	_toggle_btn.add_theme_color_override("font_pressed_color", COLOR_TEXT)
 	_toggle_btn.add_theme_font_size_override("font_size", 26)
 
 func _on_toggle_pressed() -> void:
+	UiTheme.juice_press(_toggle_btn)
 	_set_expanded(not _expanded)
-
-func _on_show_moves_toggled(pressed: bool) -> void:
-	if _bound_log:
-		_bound_log.show_moves = pressed
-	_rebuild_visible_entries()
-
-func _on_show_end_turns_toggled(pressed: bool) -> void:
-	if _bound_log:
-		_bound_log.show_end_turns = pressed
-	_rebuild_visible_entries()
-
-func _sync_option_checks() -> void:
-	if _moves_check == null or _end_turns_check == null:
-		return
-	var show_moves := _bound_log.show_moves if _bound_log else false
-	var show_ends := _bound_log.show_end_turns if _bound_log else false
-	_moves_check.set_pressed_no_signal(show_moves)
-	_end_turns_check.set_pressed_no_signal(show_ends)
 
 func _rebuild_visible_entries() -> void:
 	clear_entries()
@@ -260,7 +234,7 @@ func _rebuild_visible_entries() -> void:
 		return
 	for entry in _bound_log.entries:
 		if _is_visible(entry) and not _is_still_pending(entry):
-			_add_entry_row(entry)
+			_add_entry_row(entry, false)
 	_scroll_to_bottom()
 
 func _is_still_pending(entry: Dictionary) -> bool:
@@ -274,9 +248,9 @@ func _is_visible(entry: Dictionary) -> bool:
 		return _bound_log.is_entry_visible(entry)
 	var action_id := String(entry.get("action_id", ""))
 	if action_id in ["move", "swap"]:
-		return false
+		return GameSettings.show_battle_log_moves
 	if action_id == "end_turn":
-		return false
+		return GameSettings.show_battle_log_end_turns
 	return true
 
 func _set_expanded(expanded: bool) -> void:
@@ -288,12 +262,16 @@ func _set_expanded(expanded: bool) -> void:
 		_toggle_btn.offset_left = DOCK_WIDTH
 		_toggle_btn.offset_right = DOCK_WIDTH + TOGGLE_WIDTH
 		offset_right = DOCK_WIDTH + TOGGLE_WIDTH
+		if _dock_tween and _dock_tween.is_running():
+			_dock_tween.kill()
+		_dock.pivot_offset = Vector2(0, _dock.size.y * 0.5)
+		_dock_tween = UiTheme.juice_pop_in(_dock, 0.12)
 	else:
 		_toggle_btn.offset_left = 0
 		_toggle_btn.offset_right = TOGGLE_WIDTH
 		offset_right = TOGGLE_WIDTH
 
-func _add_entry_row(entry: Dictionary) -> void:
+func _add_entry_row(entry: Dictionary, animate: bool = false) -> void:
 	if _list == null or entry.is_empty():
 		return
 
@@ -360,7 +338,6 @@ func _add_entry_row(entry: Dictionary) -> void:
 	if not target_team.is_empty():
 		outer.add_child(_make_banner_strip(target_team))
 	elif not caster_team.is_empty():
-		# Single-side actions still get a matching right edge so the card feels framed.
 		outer.add_child(_make_banner_strip(caster_team))
 
 	var captured: Dictionary = entry.duplicate(true)
@@ -370,7 +347,16 @@ func _add_entry_row(entry: Dictionary) -> void:
 			card.accept_event()
 	)
 	_list.add_child(card)
+	if animate:
+		# Size is ready next frame for pivot-based pop.
+		card.modulate.a = 0.0
+		card.scale = Vector2(0.92, 0.82)
+		call_deferred("_juice_card_in", card)
 
+func _juice_card_in(card: Control) -> void:
+	if card == null or not is_instance_valid(card):
+		return
+	UiTheme.juice_pop_in(card, 0.13)
 func _make_banner_strip(team_id: String) -> Control:
 	var strip := ColorRect.new()
 	strip.custom_minimum_size = Vector2(BANNER_WIDTH, 0)
@@ -489,7 +475,7 @@ func _make_stat_chip(icon: Texture2D, value: int, color: Color) -> Control:
 	var label := Label.new()
 	label.text = str(value)
 	label.add_theme_color_override("font_color", color)
-	label.add_theme_font_size_override("font_size", 24)
+	label.add_theme_font_size_override("font_size", 34)
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	row.add_child(label)
 	return row

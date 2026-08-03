@@ -4,6 +4,8 @@ extends PanelContainer
 signal keyword_inspect_requested(keyword_id: String)
 signal dismiss_requested
 
+const UiTheme = preload("res://scripts/ui/ui_theme.gd")
+
 const COLOR_BG := Color(0.91, 0.86, 0.78)
 const COLOR_BORDER := Color(0.78, 0.70, 0.58)
 const COLOR_TEXT := Color(0.12, 0.10, 0.08)
@@ -121,25 +123,5 @@ func _rebuild_keywords(keyword_ids: Array[String]) -> void:
 		_keywords_row.add_child(chip)
 
 func _style_chip(btn: Button) -> void:
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = COLOR_CHIP_BG
-	sb.border_color = COLOR_BORDER
-	sb.border_width_left = 2
-	sb.border_width_right = 2
-	sb.border_width_top = 2
-	sb.border_width_bottom = 2
-	sb.corner_radius_top_left = 10
-	sb.corner_radius_top_right = 10
-	sb.corner_radius_bottom_left = 10
-	sb.corner_radius_bottom_right = 10
-	sb.content_margin_left = 10
-	sb.content_margin_right = 10
-	sb.content_margin_top = 4
-	sb.content_margin_bottom = 4
-	btn.add_theme_stylebox_override("normal", sb)
-	var hover := sb.duplicate()
-	hover.bg_color = Color(0.95, 0.91, 0.84)
-	btn.add_theme_stylebox_override("hover", hover)
-	btn.add_theme_stylebox_override("pressed", hover)
-	btn.add_theme_color_override("font_color", COLOR_TEXT)
+	UiTheme.apply_button_chrome(btn, 10, 2, 10, 4)
 	btn.add_theme_font_size_override("font_size", 14)

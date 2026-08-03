@@ -3,6 +3,8 @@ extends Control
 
 ## Reusable styled button with hover lift, scale, and tile SFX.
 
+const UiTheme = preload("res://scripts/ui/ui_theme.gd")
+
 signal pressed
 
 enum SizePreset { NORMAL, COMPACT, LARGE }
@@ -49,13 +51,13 @@ var _button_disabled: bool = false
 @export var hover_scale: float = 1.035
 @export var play_sounds: bool = true
 
-const COLOR_BORDER := Color(0.78, 0.70, 0.58)
-const COLOR_TEXT := Color(0.12, 0.10, 0.08)
-const COLOR_TEXT_DISABLED := Color(0.42, 0.38, 0.34)
-const COLOR_BLOCK_BG := Color(0.93, 0.89, 0.82)
-const COLOR_BLOCK_BG_DISABLED := Color(0.84, 0.79, 0.72)
-const BORDER_THICK := 4
-const RADIUS := 16
+const COLOR_BORDER := UiTheme.COLOR_BORDER
+const COLOR_TEXT := UiTheme.COLOR_TEXT
+const COLOR_TEXT_DISABLED := UiTheme.COLOR_TEXT_DISABLED
+const COLOR_BLOCK_BG := UiTheme.COLOR_BLOCK
+const COLOR_BLOCK_BG_DISABLED := UiTheme.COLOR_DISABLED
+const BORDER_THICK := UiTheme.BORDER_THICK
+const RADIUS := UiTheme.RADIUS
 
 const HEIGHT_NORMAL := 54
 const HEIGHT_COMPACT := 64
@@ -187,42 +189,10 @@ func _apply_font_size() -> void:
 		_button.add_theme_font_size_override("font_size", font_size)
 
 func _apply_theme() -> void:
-	for color_name in [
-		"font_color", "font_hover_color", "font_pressed_color",
-		"font_focus_color", "font_hover_pressed_color", "font_disabled_color",
-	]:
-		var color := COLOR_TEXT_DISABLED if color_name == "font_disabled_color" else COLOR_TEXT
-		_button.add_theme_color_override(color_name, color)
-
 	_button.clip_text = true
 	_button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-
-	var normal_sb := _make_stylebox(COLOR_BLOCK_BG)
-	var hover_sb := _make_stylebox(COLOR_BLOCK_BG.lightened(0.05))
-	var pressed_sb := _make_stylebox(Color(0.88, 0.83, 0.74))
-	_button.add_theme_stylebox_override("normal", normal_sb)
-	_button.add_theme_stylebox_override("hover", hover_sb)
-	_button.add_theme_stylebox_override("pressed", pressed_sb)
-	_button.add_theme_stylebox_override("focus", normal_sb)
-	_button.add_theme_stylebox_override("disabled", _make_stylebox(COLOR_BLOCK_BG_DISABLED))
-
-func _make_stylebox(bg: Color) -> StyleBoxFlat:
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = bg
-	sb.border_color = COLOR_BORDER
-	sb.border_width_left = BORDER_THICK
-	sb.border_width_right = BORDER_THICK
-	sb.border_width_top = BORDER_THICK
-	sb.border_width_bottom = BORDER_THICK
-	sb.corner_radius_top_left = RADIUS
-	sb.corner_radius_top_right = RADIUS
-	sb.corner_radius_bottom_left = RADIUS
-	sb.corner_radius_bottom_right = RADIUS
-	sb.content_margin_left = 20
-	sb.content_margin_right = 20
-	sb.content_margin_top = 14
-	sb.content_margin_bottom = 14
-	return sb
+	UiTheme.apply_button_chrome(_button, RADIUS, BORDER_THICK, 20, 14)
+	_button.add_theme_font_size_override("font_size", font_size)
 
 func _capture_rest_position() -> void:
 	_relayout_inner()
@@ -234,6 +204,7 @@ func _capture_rest_position() -> void:
 func _on_pressed() -> void:
 	if play_sounds:
 		AudioManager.play_sfx("tile_click")
+	UiTheme.juice_press(_button)
 	pressed.emit()
 
 func _on_mouse_entered() -> void:
