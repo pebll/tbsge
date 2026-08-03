@@ -66,12 +66,6 @@ layout_mode = 2
 text = "Minigame — BIG R4 (100 gold, AI)"
 preferred_width = 360
 
-[node name="AiDebugButton" parent="UI/Menu/CenterContainer/MenuPanel/VBox" instance=ExtResource("2_gb")]
-unique_name_in_owner = true
-layout_mode = 2
-text = "AI debug: OFF"
-preferred_width = 360
-
 [node name="BackButton" parent="UI/Menu/CenterContainer/MenuPanel/VBox" instance=ExtResource("2_gb")]
 unique_name_in_owner = true
 layout_mode = 2

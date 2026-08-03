@@ -82,7 +82,6 @@ func exit_battle() -> void:
 
 func bind_log(action_log: BattleActionLog) -> void:
 	_bound_log = action_log
-	GameSettings.apply_to_action_log(_bound_log)
 	_rebuild_visible_entries()
 
 func clear_entries() -> void:
@@ -124,8 +123,6 @@ func is_expanded() -> bool:
 	return _expanded
 
 func _on_settings_changed() -> void:
-	if _bound_log:
-		GameSettings.apply_to_action_log(_bound_log)
 	if _battle_mode:
 		_rebuild_visible_entries()
 
@@ -254,18 +251,35 @@ func _is_visible(entry: Dictionary) -> bool:
 	return true
 
 func _set_expanded(expanded: bool) -> void:
+	if _expanded == expanded and _dock != null and _dock.visible == expanded:
+		_apply_toggle_chrome(expanded)
+		return
 	_expanded = expanded
-	_dock.visible = expanded
+	_apply_toggle_chrome(expanded)
+	if _dock_tween and _dock_tween.is_running():
+		_dock_tween.kill()
+	if expanded:
+		_dock.visible = true
+		_dock.pivot_offset = Vector2(0, maxf(_dock.size.y, 1.0) * 0.5)
+		_dock_tween = UiTheme.juice_pop_in(_dock, 0.12)
+	else:
+		_dock.pivot_offset = Vector2(0, maxf(_dock.size.y, 1.0) * 0.5)
+		_dock_tween = UiTheme.juice_pop_out(_dock, 0.11)
+		if _dock_tween:
+			_dock_tween.finished.connect(func() -> void:
+				if not _expanded:
+					_dock.visible = false
+					_dock.scale = Vector2.ONE
+					_dock.modulate.a = 1.0
+			, CONNECT_ONE_SHOT)
+
+func _apply_toggle_chrome(expanded: bool) -> void:
 	_toggle_btn.text = "‹" if expanded else "›"
 	_toggle_btn.tooltip_text = "Hide battle log" if expanded else "Show battle log"
 	if expanded:
 		_toggle_btn.offset_left = DOCK_WIDTH
 		_toggle_btn.offset_right = DOCK_WIDTH + TOGGLE_WIDTH
 		offset_right = DOCK_WIDTH + TOGGLE_WIDTH
-		if _dock_tween and _dock_tween.is_running():
-			_dock_tween.kill()
-		_dock.pivot_offset = Vector2(0, _dock.size.y * 0.5)
-		_dock_tween = UiTheme.juice_pop_in(_dock, 0.12)
 	else:
 		_toggle_btn.offset_left = 0
 		_toggle_btn.offset_right = TOGGLE_WIDTH
@@ -280,6 +294,7 @@ func _add_entry_row(entry: Dictionary, animate: bool = false) -> void:
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
 	card.tooltip_text = "Right-click to inspect"
+	card.clip_contents = true
 	card.add_theme_stylebox_override("panel", _card_stylebox())
 
 	var outer := HBoxContainer.new()
@@ -348,7 +363,6 @@ func _add_entry_row(entry: Dictionary, animate: bool = false) -> void:
 	)
 	_list.add_child(card)
 	if animate:
-		# Size is ready next frame for pivot-based pop.
 		card.modulate.a = 0.0
 		card.scale = Vector2(0.92, 0.82)
 		call_deferred("_juice_card_in", card)
@@ -357,12 +371,19 @@ func _juice_card_in(card: Control) -> void:
 	if card == null or not is_instance_valid(card):
 		return
 	UiTheme.juice_pop_in(card, 0.13)
+
 func _make_banner_strip(team_id: String) -> Control:
+	# Inset vertically so the strip stays inside the card's rounded corners.
+	var wrap := MarginContainer.new()
+	wrap.add_theme_constant_override("margin_top", CARD_RADIUS)
+	wrap.add_theme_constant_override("margin_bottom", CARD_RADIUS)
+	wrap.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var strip := ColorRect.new()
 	strip.custom_minimum_size = Vector2(BANNER_WIDTH, 0)
 	strip.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	strip.color = _team_color(team_id)
-	return strip
+	wrap.add_child(strip)
+	return wrap
 
 func _team_color(team_id: String) -> Color:
 	if team_id.is_empty():

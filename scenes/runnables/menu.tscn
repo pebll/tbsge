@@ -54,23 +54,28 @@ theme_override_constants/separation = 12
 [node name="DevTestButton" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox/MainButtons" unique_id=220938300 instance=ExtResource("3_gb")]
 unique_name_in_owner = true
 text = "Dev Test"
-preferred_width = 240
+preferred_width = 360
 
 [node name="SoundsButton" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox/MainButtons" unique_id=220938301 instance=ExtResource("3_gb")]
 unique_name_in_owner = true
 text = "Sounds"
-preferred_width = 240
+preferred_width = 360
 
 [node name="OptionsButton" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox/MainButtons" unique_id=220938303 instance=ExtResource("3_gb")]
 unique_name_in_owner = true
 text = "Options"
-preferred_width = 240
+preferred_width = 360
 
 [node name="SoundsPanel" type="VBoxContainer" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox" unique_id=1100000002]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
-theme_override_constants/separation = 14
+theme_override_constants/separation = 16
+
+[node name="SoundsTitle" type="Label" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox/SoundsPanel" unique_id=1100000020]
+layout_mode = 2
+text = "Sounds"
+horizontal_alignment = 1
 
 [node name="MenuSoundRow" type="VBoxContainer" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox/SoundsPanel" unique_id=1100000003]
 layout_mode = 2
@@ -83,7 +88,7 @@ horizontal_alignment = 1
 
 [node name="MenuSoundSlider" type="HSlider" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox/SoundsPanel/MenuSoundRow" unique_id=1100000005]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(240, 0)
+custom_minimum_size = Vector2(360, 0)
 layout_mode = 2
 max_value = 1.0
 step = 0.01
@@ -100,7 +105,7 @@ horizontal_alignment = 1
 
 [node name="GameSoundSlider" type="HSlider" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox/SoundsPanel/GameSoundRow" unique_id=1100000008]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(240, 0)
+custom_minimum_size = Vector2(360, 0)
 layout_mode = 2
 max_value = 1.0
 step = 0.01
@@ -116,7 +121,7 @@ horizontal_alignment = 1
 
 [node name="MusicSoundSlider" type="HSlider" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox/SoundsPanel/MusicSoundRow" unique_id=1100000011]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(240, 0)
+custom_minimum_size = Vector2(360, 0)
 layout_mode = 2
 max_value = 1.0
 step = 0.01
@@ -125,39 +130,35 @@ value = 1.0
 [node name="BackButton" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox/SoundsPanel" unique_id=220938302 instance=ExtResource("3_gb")]
 unique_name_in_owner = true
 text = "Back"
-preferred_width = 240
+preferred_width = 360
 
 [node name="OptionsPanel" type="VBoxContainer" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox" unique_id=1100000012]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
-theme_override_constants/separation = 14
+theme_override_constants/separation = 16
 
 [node name="OptionsTitle" type="Label" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox/OptionsPanel" unique_id=1100000013]
 layout_mode = 2
-text = "Game options"
+text = "Options"
 horizontal_alignment = 1
 
-[node name="BattleLogSection" type="VBoxContainer" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox/OptionsPanel" unique_id=1100000014]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="BattleLogLabel" type="Label" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox/OptionsPanel/BattleLogSection" unique_id=1100000015]
-layout_mode = 2
-text = "Battle log"
-horizontal_alignment = 1
-
-[node name="ShowMovesCheck" type="CheckBox" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox/OptionsPanel/BattleLogSection" unique_id=1100000016]
+[node name="ShowMovesButton" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox/OptionsPanel" unique_id=220938305 instance=ExtResource("3_gb")]
 unique_name_in_owner = true
-layout_mode = 2
-text = "Show moves"
+text = "Show moves: OFF"
+preferred_width = 360
 
-[node name="ShowEndTurnsCheck" type="CheckBox" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox/OptionsPanel/BattleLogSection" unique_id=1100000017]
+[node name="ShowEndTurnsButton" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox/OptionsPanel" unique_id=220938306 instance=ExtResource("3_gb")]
 unique_name_in_owner = true
-layout_mode = 2
-text = "Show end turns"
+text = "Show end turns: OFF"
+preferred_width = 360
+
+[node name="AiDebugButton" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox/OptionsPanel" unique_id=220938307 instance=ExtResource("3_gb")]
+unique_name_in_owner = true
+text = "AI debug: OFF"
+preferred_width = 360
 
 [node name="OptionsBackButton" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox/OptionsPanel" unique_id=220938304 instance=ExtResource("3_gb")]
 unique_name_in_owner = true
 text = "Back"
-preferred_width = 240
+preferred_width = 360

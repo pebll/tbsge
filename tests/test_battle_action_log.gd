@@ -130,11 +130,9 @@ func _test_pass_and_end_turn_log() -> bool:
 	return true
 
 func _test_filter_defaults() -> bool:
+	GameSettings.set_show_battle_log_moves(false, false)
+	GameSettings.set_show_battle_log_end_turns(false, false)
 	var log := BattleActionLog.new()
-	GameSettings.apply_to_action_log(log)
-	if log.show_moves or log.show_end_turns:
-		push_error("Moves and end turns should be hidden by default")
-		return false
 	if log.is_entry_visible({"action_id": "move"}):
 		push_error("Move entries should be hidden by default")
 		return false
@@ -150,15 +148,14 @@ func _test_filter_defaults() -> bool:
 	if not log.is_entry_visible({"action_id": "teleport"}):
 		push_error("Teleport entries should stay visible")
 		return false
-	log.show_moves = true
+	GameSettings.set_show_battle_log_moves(true, false)
 	if not log.is_entry_visible({"action_id": "move"}):
 		push_error("Moves should appear when option enabled")
 		return false
-	log.show_end_turns = true
+	GameSettings.set_show_battle_log_end_turns(true, false)
 	if not log.is_entry_visible({"action_id": "end_turn"}):
 		push_error("End turns should appear when option enabled")
 		return false
-	# Restore defaults so later tests / sessions stay clean.
 	GameSettings.set_show_battle_log_moves(false, false)
 	GameSettings.set_show_battle_log_end_turns(false, false)
 	return true

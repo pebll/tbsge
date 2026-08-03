@@ -24,6 +24,7 @@ var status_label: Label
 var game_over_panel: GameOverPanel
 var action_bar: Control
 var action_log_panel: BattleActionLogPanel
+var pause_menu: PauseMenu
 
 func config():
 	return session.config if session else null

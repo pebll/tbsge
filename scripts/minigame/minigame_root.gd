@@ -42,6 +42,7 @@ var _game_over_panel: GameOverPanel
 var _action_bar: Control
 var _tooltip_controller: TooltipController
 var _action_log_panel: BattleActionLogPanel
+var _pause_menu: PauseMenu
 
 @onready var _camera: Camera2D = $Camera2D
 
@@ -73,12 +74,39 @@ func _exit_tree() -> void:
 		battle_ui.unbind()
 
 func _input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_ESCAPE or event.physical_keycode == KEY_ESCAPE:
+			_toggle_pause_menu()
+			get_viewport().set_input_as_handled()
+			return
+	if _pause_menu and _pause_menu.is_open():
+		return
 	if battle.is_input_locked() or _unit_picker.visible:
 		return
 	if session.phase != MinigameSessionScript.Phase.BATTLE:
 		return
 	if BattleHostWiringScript.handle_hotkeys(event, battle_ui):
 		get_viewport().set_input_as_handled()
+
+func _toggle_pause_menu() -> void:
+	if _game_over_panel and _game_over_panel.visible:
+		return
+	if _pause_menu == null:
+		return
+	if _pause_menu.is_open():
+		_pause_menu.close_menu()
+	else:
+		if battle_ui:
+			battle_ui.deselect()
+			battle_ui.clear_overlays()
+		_pause_menu.open_menu()
+
+func _on_pause_resume() -> void:
+	if _pause_menu:
+		_pause_menu.close_menu()
+
+func _on_pause_abandon() -> void:
+	get_tree().change_scene_to_file(MENU_SCENE)
 
 func inspect_tile(coords: Vector2i) -> void:
 	if session.phase == MinigameSessionScript.Phase.DRAFT:
@@ -109,6 +137,7 @@ func _setup_phase_controllers() -> void:
 	deps.game_over_panel = _game_over_panel
 	deps.action_bar = _action_bar
 	deps.action_log_panel = _action_log_panel
+	deps.pause_menu = _pause_menu
 
 	draft = DraftPhaseControllerScript.new(deps)
 	battle = BattlePhaseControllerScript.new(deps)
@@ -215,6 +244,11 @@ func _setup_ui() -> void:
 	_overlay_layer.add_child(_game_over_panel)
 	_game_over_panel.new_game_pressed.connect(_on_game_over_new_game)
 	_game_over_panel.main_menu_pressed.connect(_on_game_over_main_menu)
+
+	_pause_menu = PauseMenu.new()
+	_overlay_layer.add_child(_pause_menu)
+	_pause_menu.resume_pressed.connect(_on_pause_resume)
+	_pause_menu.abandon_pressed.connect(_on_pause_abandon)
 
 func _on_tile_clicked(coords: Vector2i) -> void:
 	if session.phase == MinigameSessionScript.Phase.DRAFT:

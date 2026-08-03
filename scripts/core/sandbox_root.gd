@@ -40,6 +40,8 @@ var turn_hud: TurnHud
 var _action_playback: RefCounted
 var _tooltip_controller: TooltipController
 var _action_log_panel: BattleActionLogPanel
+var _pause_menu: PauseMenu
+const MENU_SCENE := "res://scenes/runnables/menu.tscn"
 
 func _ready() -> void:
 	var config: SandboxConfigScript = load(config_path)
@@ -73,10 +75,28 @@ func _exit_tree() -> void:
 		battle_ui.unbind()
 
 func _input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_ESCAPE or event.physical_keycode == KEY_ESCAPE:
+			_toggle_pause_menu()
+			get_viewport().set_input_as_handled()
+			return
+	if _pause_menu and _pause_menu.is_open():
+		return
 	if input.is_locked():
 		return
 	if BattleHostWiringScript.handle_hotkeys(event, battle_ui):
 		get_viewport().set_input_as_handled()
+
+func _toggle_pause_menu() -> void:
+	if _pause_menu == null:
+		return
+	if _pause_menu.is_open():
+		_pause_menu.close_menu()
+	else:
+		if battle_ui:
+			battle_ui.deselect()
+			battle_ui.clear_overlays()
+		_pause_menu.open_menu()
 
 func end_team_turn() -> void:
 	battle_ui.deselect()
@@ -206,6 +226,11 @@ func _setup_tile_info_ui() -> void:
 	_action_log_panel.set_tooltip_controller(_tooltip_controller)
 	_action_log_panel.enter_battle(session.action_log if session else null)
 	EventBus.battle_log_entry_added.connect(_on_battle_log_entry_added)
+
+	_pause_menu = PauseMenu.new()
+	tile_info_layer.add_child(_pause_menu)
+	_pause_menu.resume_pressed.connect(func() -> void: _pause_menu.close_menu())
+	_pause_menu.abandon_pressed.connect(func() -> void: get_tree().change_scene_to_file(MENU_SCENE))
 
 func _setup_combat_fx_ui() -> void:
 	combat_fx_layer = CanvasLayer.new()

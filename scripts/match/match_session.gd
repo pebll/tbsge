@@ -19,7 +19,6 @@ func _init(p_team_ids: Array[String]) -> void:
 	team_ids = p_team_ids.duplicate()
 	turn_manager = TurnManagerRes.new(team_ids)
 	action_log = BattleActionLogScript.new()
-	GameSettings.apply_to_action_log(action_log)
 
 func battle_state() -> BattleStateScript:
 	return BattleStateScript.from_session(self)

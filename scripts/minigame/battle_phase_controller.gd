@@ -33,10 +33,10 @@ func exit() -> void:
 		deps.action_log_panel.exit_battle()
 
 func is_input_locked() -> bool:
-	return _lock.is_locked() or ai_running
+	return _lock.is_locked() or ai_running or (deps.pause_menu != null and deps.pause_menu.is_open())
 
 func is_blocking_input() -> bool:
-	return deps.game_over_panel.visible
+	return deps.game_over_panel.visible or (deps.pause_menu != null and deps.pause_menu.is_open())
 
 func handle_end_turn() -> void:
 	if is_input_locked():
@@ -61,6 +61,9 @@ func perform_use_action(
 	if _lock.is_locked():
 		return false
 	_lock.begin()
+	if ai_running:
+		deps.battle_ui.deselect()
+		deps.battle_ui.clear_overlays()
 
 	var cmd := {
 		"type": "use_action",
@@ -193,7 +196,14 @@ func _run_ai_turn_async() -> void:
 		maybe_start_ai_turn()
 
 func _battle_action_hooks() -> Dictionary:
-	return BattleHostWiringScript.action_hooks(deps.session, deps.battle_ui, {
+	var hooks := BattleHostWiringScript.action_hooks(deps.session, deps.battle_ui, {
 		"deselect_before_combat": true,
-		"deselect_after_heal": not ai_running,
+		"deselect_after_heal": true,
 	})
+	# AI turns must not re-select / paint move-attack highlights after resolving.
+	if ai_running:
+		hooks["refresh_after_action"] = func(_coords: Vector2i) -> void:
+			deps.battle_ui.deselect()
+			deps.battle_ui.clear_overlays()
+		hooks["deselect_after_combat"] = true
+	return hooks
