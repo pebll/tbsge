@@ -36,7 +36,8 @@ func play_parabola(
 
 	var mid := (from_global + to_global) * 0.5 + Vector2(0.0, -absf(arc_height))
 	var prev_pos := from_global
-	var spin := 0.0
+	## THROWN: ~1.75 spins over the flight, frame-rate independent.
+	const THROWN_SPINS := 1.75
 
 	var tween := host.create_tween()
 	tween.tween_method(
@@ -48,8 +49,7 @@ func play_parabola(
 				if delta.length_squared() > 0.01:
 					sprite.rotation = delta.angle() - ART_FORWARD_ANGLE
 			else:
-				spin += 0.45
-				sprite.rotation = spin
+				sprite.rotation = t * TAU * THROWN_SPINS
 			prev_pos = pos,
 		0.0,
 		1.0,

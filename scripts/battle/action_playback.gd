@@ -210,9 +210,7 @@ func _apply_defender_reaction(
 func play_heal(coords: Vector2i, payload: Dictionary, options: Dictionary = {}) -> void:
 	var from_coords: Vector2i = payload.get("from", coords)
 	var to_coords: Vector2i = payload.get("to", payload.get("coords", coords))
-	var action_id := String(payload.get("action_id", ""))
 	var caster_legion: Legion = payload.get("caster_legion", payload.get("legion"))
-	var target_legion: Legion = payload.get("target_legion", payload.get("legion"))
 
 	var from_tile: TileVisu = _tile_visu_at.call(from_coords)
 	var to_tile: TileVisu = _tile_visu_at.call(to_coords)
@@ -225,7 +223,6 @@ func play_heal(coords: Vector2i, payload: Dictionary, options: Dictionary = {}) 
 	var caster_visu: LegionVisu = from_tile.legion_visu if from_tile else null
 	var world_pos: Vector2 = target_visu.global_position
 	var unit_heals: Array = payload.get("unit_heals", [])
-	var is_ally_heal := action_id == "heal_ally" and from_coords != to_coords
 
 	# One pulse per caster unit (unit_heals is already focused onto lowest-HP targets).
 	for entry in unit_heals:
@@ -234,7 +231,7 @@ func play_heal(coords: Vector2i, payload: Dictionary, options: Dictionary = {}) 
 			continue
 		var shooter: Unit = entry.get("caster")
 
-		if is_ally_heal and caster_visu != null and shooter != null:
+		if caster_visu != null and shooter != null:
 			await _play_heal_shot(caster_visu, target_visu, shooter, unit)
 
 		var heal_tween: Tween = target_visu.animate_unit_healed(
@@ -327,9 +324,14 @@ func _play_heal_shot(
 ) -> void:
 	var from_pos := caster_visu.get_unit_sprite_global_position(shooter)
 	var to_pos := target_visu.get_unit_sprite_global_position(target_unit)
-	var direction := (to_pos - from_pos).normalized()
+	# Self-heal onto yourself: loft the bandage straight up and back down.
+	var self_toss := shooter == target_unit
+	if self_toss:
+		to_pos = from_pos
+
+	var direction := Vector2.UP if self_toss else (to_pos - from_pos).normalized()
 	if direction == Vector2.ZERO:
-		direction = Vector2.RIGHT
+		direction = Vector2.UP
 	caster_visu.animate_unit_ranged_attack(shooter, direction)
 	await _beat(UnitVisu.RANGED_WINDUP_SEC)
 
@@ -339,7 +341,7 @@ func _play_heal_shot(
 	if tex == null or _projectiles == null:
 		return
 	var dist := from_pos.distance_to(to_pos)
-	var arc := clampf(22.0 + dist * 0.14, 28.0, 70.0)
+	var arc := 56.0 if self_toss else clampf(22.0 + dist * 0.14, 28.0, 70.0)
 	await _projectiles.play_parabola(
 		_host,
 		from_pos,
