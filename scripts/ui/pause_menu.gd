@@ -2,6 +2,7 @@ class_name PauseMenu
 extends Control
 
 ## Fullscreen pause: Resume / Abandon / Sounds / Options. Sounds+Options reuse shared panels.
+## Backdrop fills the screen; the menu box stays naturally sized and centered.
 
 signal resume_pressed
 signal abandon_pressed
@@ -15,7 +16,6 @@ const MENU_BTN_WIDTH := 360
 
 enum View { MAIN, SOUNDS, OPTIONS }
 
-var _panel: PanelContainer
 var _content: VBoxContainer
 var _main_buttons: VBoxContainer
 var _sounds_panel: SoundsSettingsPanel
@@ -24,7 +24,7 @@ var _view: View = View.MAIN
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	set_anchors_preset(Control.PRESET_FULL_RECT)
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_build()
 	hide()
 
@@ -40,18 +40,19 @@ func is_open() -> bool:
 	return visible
 
 func _build() -> void:
-	_panel = PanelContainer.new()
-	_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_panel.add_theme_stylebox_override(
+	var backdrop := PanelContainer.new()
+	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	backdrop.add_theme_stylebox_override(
 		"panel",
 		UiTheme.panel_stylebox(UiTheme.COLOR_PANEL, UiTheme.COLOR_BORDER, UiTheme.RADIUS, UiTheme.BORDER_THICK, 24)
 	)
-	add_child(_panel)
+	add_child(backdrop)
 
 	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_panel.add_child(center)
+	add_child(center)
 
 	_content = VBoxContainer.new()
 	_content.add_theme_constant_override("separation", 20)
