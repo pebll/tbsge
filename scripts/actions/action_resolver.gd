@@ -26,21 +26,27 @@ static func resolve(state: BattleStateScript, cmd: Dictionary) -> Dictionary:
 	if to_coords not in targets:
 		return _fail("Invalid target for %s" % action_id)
 
+	var result: Dictionary = {}
 	match action.targeting:
 		ActionDefinitionScript.TargetingKind.SELF:
-			return _execute_self_heal(state, legion, action, from_coords)
+			result = _execute_self_heal(state, legion, action, from_coords)
 		ActionDefinitionScript.TargetingKind.ADJACENT_MOVE:
 			if ActionTargeting.is_swap_target(state, from_coords, to_coords):
-				return _execute_swap(state, from_coords, to_coords, action)
-			return _execute_move(state, from_coords, to_coords, action)
+				result = _execute_swap(state, from_coords, to_coords, action)
+			else:
+				result = _execute_move(state, from_coords, to_coords, action)
 		ActionDefinitionScript.TargetingKind.ADJACENT_ENEMY:
-			return _execute_melee_attack(state, from_coords, to_coords, action, cmd)
+			result = _execute_melee_attack(state, from_coords, to_coords, action, cmd)
 		ActionDefinitionScript.TargetingKind.ENEMY_IN_RANGE:
-			return _execute_ranged_attack(state, from_coords, to_coords, action, cmd)
+			result = _execute_ranged_attack(state, from_coords, to_coords, action, cmd)
 		ActionDefinitionScript.TargetingKind.ALLY_IN_RANGE:
-			return _execute_ally_heal(state, legion, action, from_coords, to_coords)
+			result = _execute_ally_heal(state, legion, action, from_coords, to_coords)
+		_:
+			return _fail("Unhandled action targeting")
 
-	return _fail("Unhandled action targeting")
+	if result.get("ok", false):
+		_start_action_cooldown(legion, action)
+	return result
 
 static func _execute_move(
 	state: BattleStateScript,
@@ -226,6 +232,12 @@ static func _apply_heal_to_legion(legion: Legion, heal_amount: int) -> Dictionar
 				"hp_gained": gained,
 			})
 	return {"healed_total": healed, "unit_heals": unit_heals}
+
+static func _start_action_cooldown(legion: Legion, action: ActionDefinitionScript) -> void:
+	if legion == null or action == null:
+		return
+	var cd := ActionParams.resolve_int(legion, action, "cooldown", action.cooldown)
+	legion.start_cooldown(action.id, cd)
 
 static func _apply_terminal(
 	state: BattleStateScript,

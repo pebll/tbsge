@@ -94,6 +94,21 @@ static func _legion_needs_heal(legion: Legion) -> bool:
 			return true
 	return false
 
+## Walkable empty tiles within [1, max_range] hexes (no LOS yet).
+static func get_empty_tiles_in_range(tile: Tile, grid: Dictionary, max_range: int) -> Array[Tile]:
+	if tile == null or max_range <= 0:
+		return []
+	var from_coords := tile.coords
+	var out: Array[Tile] = []
+	for coords in grid.keys():
+		var t: Tile = grid[coords]
+		if t == null or not t.walkable or t.has_legion():
+			continue
+		var dist := HexPathfinder.hex_distance(from_coords, t.coords)
+		if dist >= 1 and dist <= max_range:
+			out.append(t)
+	return out
+
 static func get_swappable_tiles(tile: Tile, grid: Dictionary) -> Array[Tile]:
 	if not tile.has_legion():
 		return []

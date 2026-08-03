@@ -31,6 +31,9 @@ static func disable_reason(
 		return "Unavailable"
 	if state == null or not state.can_act_legion(legion):
 		return "Cannot act now"
+	var cd_left := legion.get_cooldown_remaining(action.id)
+	if cd_left > 0:
+		return "Ready in %d turn%s" % [cd_left, "s" if cd_left != 1 else ""]
 	if not legion.can_afford(action.ap_cost):
 		return "Not enough AP (%d needed)" % action.ap_cost
 	if action.id == "ranged_attack" and not _legion_has_ranged(legion):
@@ -47,6 +50,8 @@ static func disable_reason(
 				return "No adjacent enemy"
 			"ranged_attack":
 				return "No enemy in range"
+			"teleport":
+				return "No empty tile in range"
 			_:
 				return "No valid target"
 	return ""
@@ -55,6 +60,8 @@ static func can_use(state: BattleStateScript, legion: Legion, action: ActionDefi
 	if legion == null or action == null:
 		return false
 	if not state.can_act_legion(legion):
+		return false
+	if not legion.is_action_ready(action.id):
 		return false
 	if not legion.can_afford(action.ap_cost):
 		return false
@@ -90,6 +97,9 @@ static func get_targets(
 		ActionDefinitionScript.TargetingKind.ALLY_IN_RANGE:
 			var rng := ActionParams.resolve_int(legion, action, "target_range", action.target_range)
 			return _coords_from_tiles(Utils.get_healable_ally_tiles(from_tile, state.grid, rng))
+		ActionDefinitionScript.TargetingKind.EMPTY_IN_RANGE:
+			var rng := ActionParams.resolve_int(legion, action, "target_range", action.target_range)
+			return _coords_from_tiles(Utils.get_empty_tiles_in_range(from_tile, state.grid, rng))
 	return []
 
 static func _move_targets(state: BattleStateScript, from_tile: Tile, legion: Legion) -> Array[Vector2i]:

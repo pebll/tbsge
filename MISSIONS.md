@@ -116,7 +116,7 @@ Ship early so every new feature emits a clear, modular event the UI can render �
 ### Phase U2 — Action bar clarity
 
 - [x] Disabled reason in tooltip (“On cooldown: 1 turn”, “No wounded ally in range”)  
-- [ ] Cooldown badge when T2 exists  
+- [x] Cooldown badge when T2 exists  
 - [x] Terminal actions: small skull/end-turn mark **or** only in tooltip (prefer tooltip-first to avoid clutter)  
 - [x] Selected action: one-line hint under bar (“Choose a wounded ally”)
 
@@ -177,9 +177,9 @@ Checklist:
 ### Phase T2 — Action cooldowns + teleport
 
 **Cooldowns**
-- [ ] Per-legion cooldown map; tick on team turn start  
-- [ ] `can_use` + action-bar badge + tooltip “Ready in N turns”  
-- [ ] Tests
+- [x] Per-legion cooldown map; tick on team turn start  
+- [x] `can_use` + action-bar badge + tooltip “Ready in N turns”  
+- [x] Tests
 
 **Teleport**
 - Visible empty walkable tiles (fog later); recommend terminal + 1-turn CD (overridable per unit).  

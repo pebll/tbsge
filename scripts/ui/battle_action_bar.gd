@@ -146,7 +146,40 @@ func _add_action_button(action: ActionDefinitionScript) -> void:
 			btn.accept_event()
 	)
 	_row.add_child(btn)
+	_maybe_add_cooldown_badge(btn, action)
 	_buttons[action.id] = btn
+
+func _maybe_add_cooldown_badge(btn: Button, action: ActionDefinitionScript) -> void:
+	if _tooltip_legion == null or action == null:
+		return
+	var rem := _tooltip_legion.get_cooldown_remaining(action.id)
+	if rem <= 0:
+		return
+	var badge := Label.new()
+	badge.text = str(rem)
+	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	badge.add_theme_color_override("font_color", Color(0.95, 0.92, 0.85))
+	badge.add_theme_font_size_override("font_size", 18)
+	badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	var holder := PanelContainer.new()
+	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	holder.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	holder.offset_left = -36
+	holder.offset_top = -32
+	holder.offset_right = -4
+	holder.offset_bottom = -4
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.28, 0.18, 0.12, 0.95)
+	sb.corner_radius_top_left = 8
+	sb.corner_radius_top_right = 8
+	sb.corner_radius_bottom_left = 8
+	sb.corner_radius_bottom_right = 8
+	sb.content_margin_left = 4
+	sb.content_margin_right = 4
+	holder.add_theme_stylebox_override("panel", sb)
+	holder.add_child(badge)
+	btn.add_child(holder)
 
 func _hint_for_action(action: ActionDefinitionScript) -> String:
 	if action == null:
@@ -164,6 +197,8 @@ func _hint_for_action(action: ActionDefinitionScript) -> String:
 			return "Choose an enemy in range"
 		ActionDefinitionScript.TargetingKind.ALLY_IN_RANGE:
 			return "Choose a wounded ally"
+		ActionDefinitionScript.TargetingKind.EMPTY_IN_RANGE:
+			return "Choose an empty tile in range"
 		_:
 			return "Choose a target"
 

@@ -72,6 +72,15 @@ static func for_action(
 	c.keywords = _action_keywords(action)
 	var ap := ActionParams.resolve_int(legion, action, "ap_cost", action.ap_cost)
 	c.footer = "Cost: %d AP" % ap
+	var rem := 0
+	if legion:
+		rem = legion.get_cooldown_remaining(action.id)
+	if rem > 0:
+		c.footer += " · Ready in %d" % rem
+	else:
+		var base_cd := ActionParams.resolve_int(legion, action, "cooldown", action.cooldown)
+		if base_cd > 0:
+			c.footer += " · Cooldown %d" % base_cd
 	return c
 
 static func _action_body(action: ActionDefinition, legion: Legion) -> String:
@@ -114,4 +123,6 @@ static func _action_keywords(action: ActionDefinition) -> Array[String]:
 		out.append("ap")
 	if action.target_range > 0 and "range" not in out:
 		out.append("range")
+	if action.cooldown > 0 and "cooldown" not in out:
+		out.append("cooldown")
 	return out
