@@ -1,22 +1,24 @@
 class_name BattleActionLogPanel
 extends Control
 
-## Full-height left dock. Icon/number-first cards; coords text only for moves.
+## Full-height left dock. Fat icon/number cards; coords text only for moves.
 ## Toggle button stays on the left edge to pop the dock in/out.
 
 const COLOR_BG := Color(0.91, 0.86, 0.78, 0.96)
 const COLOR_BORDER := Color(0.78, 0.70, 0.58)
-const COLOR_CARD_BG := Color(0.93, 0.89, 0.82)
+const COLOR_CARD_BG := Color(0.94, 0.90, 0.83)
+const COLOR_ACTION_WELL := Color(0.88, 0.83, 0.74)
 const COLOR_TEXT := Color(0.12, 0.10, 0.08)
-const COLOR_MUTED := Color(0.40, 0.35, 0.30)
+const COLOR_HEAL := Color(0.18, 0.52, 0.28)
 const BORDER_THICK := 4
-const RADIUS := 12
-const CARD_RADIUS := 10
-const DOCK_WIDTH := 460.0
-const TOGGLE_WIDTH := 36.0
-const ICON_UNIT := Vector2(48, 48)
-const ICON_ACTION := Vector2(32, 32)
-const ICON_STAT := Vector2(22, 22)
+const RADIUS := 14
+const CARD_RADIUS := 14
+const DOCK_WIDTH := 540.0
+const TOGGLE_WIDTH := 40.0
+const CARD_MIN_HEIGHT := 108.0
+const ICON_UNIT := Vector2(84, 84)
+const ICON_ACTION := Vector2(52, 52)
+const ICON_STAT := Vector2(30, 30)
 
 const ICON_WAIT := preload("res://assets/icons/base_icons_sprites/boot.png")
 const ICON_END_TURN := preload("res://assets/icons/base_icons_sprites/strong.png")
@@ -97,10 +99,10 @@ func _build() -> void:
 	add_child(_dock)
 
 	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 12)
-	margin.add_theme_constant_override("margin_right", 12)
-	margin.add_theme_constant_override("margin_top", 12)
-	margin.add_theme_constant_override("margin_bottom", 12)
+	margin.add_theme_constant_override("margin_left", 14)
+	margin.add_theme_constant_override("margin_right", 14)
+	margin.add_theme_constant_override("margin_top", 16)
+	margin.add_theme_constant_override("margin_bottom", 16)
 	_dock.add_child(margin)
 
 	_scroll = ScrollContainer.new()
@@ -111,17 +113,17 @@ func _build() -> void:
 
 	_list = VBoxContainer.new()
 	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_list.add_theme_constant_override("separation", 8)
+	_list.add_theme_constant_override("separation", 12)
 	_scroll.add_child(_list)
 
 	_toggle_btn = Button.new()
 	_toggle_btn.focus_mode = Control.FOCUS_NONE
-	_toggle_btn.custom_minimum_size = Vector2(TOGGLE_WIDTH, 72)
+	_toggle_btn.custom_minimum_size = Vector2(TOGGLE_WIDTH, 88)
 	_toggle_btn.set_anchors_preset(Control.PRESET_CENTER_LEFT)
 	_toggle_btn.offset_left = DOCK_WIDTH
 	_toggle_btn.offset_right = DOCK_WIDTH + TOGGLE_WIDTH
-	_toggle_btn.offset_top = -36
-	_toggle_btn.offset_bottom = 36
+	_toggle_btn.offset_top = -44
+	_toggle_btn.offset_bottom = 44
 	_toggle_btn.pressed.connect(_on_toggle_pressed)
 	_style_toggle_button()
 	add_child(_toggle_btn)
@@ -146,8 +148,8 @@ func _style_toggle_button() -> void:
 	sb.border_width_right = 3
 	sb.border_width_top = 3
 	sb.border_width_bottom = 3
-	sb.corner_radius_top_right = 10
-	sb.corner_radius_bottom_right = 10
+	sb.corner_radius_top_right = 12
+	sb.corner_radius_bottom_right = 12
 	sb.content_margin_left = 4
 	sb.content_margin_right = 4
 	_toggle_btn.add_theme_stylebox_override("normal", sb)
@@ -156,7 +158,7 @@ func _style_toggle_button() -> void:
 	_toggle_btn.add_theme_stylebox_override("hover", hover)
 	_toggle_btn.add_theme_stylebox_override("pressed", hover)
 	_toggle_btn.add_theme_color_override("font_color", COLOR_TEXT)
-	_toggle_btn.add_theme_font_size_override("font_size", 22)
+	_toggle_btn.add_theme_font_size_override("font_size", 26)
 
 func _on_toggle_pressed() -> void:
 	_set_expanded(not _expanded)
@@ -180,57 +182,48 @@ func _add_entry_row(entry: Dictionary) -> void:
 		return
 
 	var card := PanelContainer.new()
+	card.custom_minimum_size = Vector2(0, CARD_MIN_HEIGHT)
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
 	card.tooltip_text = "Right-click to inspect"
 	card.add_theme_stylebox_override("panel", _card_stylebox())
 
 	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 8)
-	margin.add_theme_constant_override("margin_right", 8)
-	margin.add_theme_constant_override("margin_top", 6)
-	margin.add_theme_constant_override("margin_bottom", 6)
+	margin.add_theme_constant_override("margin_left", 14)
+	margin.add_theme_constant_override("margin_right", 14)
+	margin.add_theme_constant_override("margin_top", 12)
+	margin.add_theme_constant_override("margin_bottom", 12)
 	card.add_child(margin)
 
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
+	row.add_theme_constant_override("separation", 14)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	margin.add_child(row)
 
 	var action_id := String(entry.get("action_id", ""))
 	var caster_type := String(entry.get("caster_unit_type", ""))
 	var target_type := String(entry.get("target_unit_type", ""))
 
-	# Left side (caster)
-	row.add_child(_make_texture_rect(_unit_icon(caster_type), ICON_UNIT))
-	row.add_child(_make_side_stats(
+	# Caster block: portrait + stacked combat stats
+	row.add_child(_make_side_block(
+		caster_type,
 		int(entry.get("caster_hp_lost", 0)),
-		int(entry.get("caster_deaths", 0)),
-		0
+		int(entry.get("caster_deaths", 0))
 	))
 
-	# Action
-	row.add_child(_make_texture_rect(_action_icon(action_id), ICON_ACTION))
+	# Center action well
+	row.add_child(_make_action_well(action_id, entry))
 
-	# Move / teleport coords (only allowed prose-ish text besides numbers)
-	if bool(entry.get("show_coords", false)):
-		var coord := Label.new()
-		coord.text = String(entry.get("coord_text", ""))
-		coord.add_theme_color_override("font_color", COLOR_TEXT)
-		coord.add_theme_font_size_override("font_size", 18)
-		coord.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		row.add_child(coord)
-
-	var healed := int(entry.get("healed_total", 0))
-	if healed > 0:
-		row.add_child(_make_stat_chip(ICON_HEAL, healed, Color(0.2, 0.55, 0.28)))
-
+	# Target / result block
 	var target_hp := int(entry.get("target_hp_lost", 0))
 	var target_deaths := int(entry.get("target_deaths", 0))
-	if not target_type.is_empty() or target_hp > 0 or target_deaths > 0:
-		row.add_child(_make_texture_rect(_unit_icon(target_type), ICON_UNIT))
-		row.add_child(_make_side_stats(target_hp, target_deaths, 0))
+	var has_target := not target_type.is_empty() or target_hp > 0 or target_deaths > 0
+	if has_target:
+		row.add_child(_make_side_block(target_type, target_hp, target_deaths))
+	elif bool(entry.get("show_coords", false)):
+		row.add_child(_make_empty_side_spacer())
 
 	var captured: Dictionary = entry.duplicate(true)
 	card.gui_input.connect(func(event: InputEvent) -> void:
@@ -240,28 +233,93 @@ func _add_entry_row(entry: Dictionary) -> void:
 	)
 	_list.add_child(card)
 
-func _make_side_stats(hp_lost: int, deaths: int, _unused: int) -> Control:
-	var box := HBoxContainer.new()
-	box.add_theme_constant_override("separation", 4)
+func _make_side_block(unit_type: String, hp_lost: int, deaths: int) -> Control:
+	var block := HBoxContainer.new()
+	block.add_theme_constant_override("separation", 10)
+	block.alignment = BoxContainer.ALIGNMENT_CENTER
+	block.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	block.add_child(_make_texture_rect(_unit_icon(unit_type), ICON_UNIT))
+	block.add_child(_make_side_stats(hp_lost, deaths))
+	return block
+
+func _make_action_well(action_id: String, entry: Dictionary) -> Control:
+	var well := PanelContainer.new()
+	well.custom_minimum_size = Vector2(96, 88)
+	well.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = COLOR_ACTION_WELL
+	sb.border_color = COLOR_BORDER
+	sb.border_width_left = 2
+	sb.border_width_right = 2
+	sb.border_width_top = 2
+	sb.border_width_bottom = 2
+	sb.corner_radius_top_left = 12
+	sb.corner_radius_top_right = 12
+	sb.corner_radius_bottom_left = 12
+	sb.corner_radius_bottom_right = 12
+	sb.content_margin_left = 10
+	sb.content_margin_right = 10
+	sb.content_margin_top = 8
+	sb.content_margin_bottom = 8
+	well.add_theme_stylebox_override("panel", sb)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 6)
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	well.add_child(vbox)
+
+	var icon_wrap := CenterContainer.new()
+	icon_wrap.add_child(_make_texture_rect(_action_icon(action_id), ICON_ACTION))
+	vbox.add_child(icon_wrap)
+
+	var healed := int(entry.get("healed_total", 0))
+	if bool(entry.get("show_coords", false)):
+		var coord := Label.new()
+		coord.text = String(entry.get("coord_text", ""))
+		coord.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		coord.add_theme_color_override("font_color", COLOR_TEXT)
+		coord.add_theme_font_size_override("font_size", 20)
+		vbox.add_child(coord)
+	elif healed > 0:
+		vbox.add_child(_make_stat_chip(ICON_HEAL, healed, COLOR_HEAL))
+
+	return well
+
+func _make_result_chip(icon: Texture2D, value: int, color: Color) -> Control:
+	var wrap := CenterContainer.new()
+	wrap.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	wrap.add_child(_make_stat_chip(icon, value, color))
+	return wrap
+
+func _make_empty_side_spacer() -> Control:
+	var spacer := Control.new()
+	spacer.custom_minimum_size = Vector2(ICON_UNIT.x + 40, ICON_UNIT.y)
+	return spacer
+
+func _make_side_stats(hp_lost: int, deaths: int) -> Control:
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 8)
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	if hp_lost > 0:
 		box.add_child(_make_stat_chip(ICON_DAMAGE, hp_lost, COLOR_TEXT))
 	if deaths > 0:
 		box.add_child(_make_stat_chip(ICON_DEATH, deaths, COLOR_TEXT))
 	if box.get_child_count() == 0:
-		# Keep layout stable with a tiny spacer when no losses.
 		var spacer := Control.new()
-		spacer.custom_minimum_size = Vector2(8, ICON_STAT.y)
+		spacer.custom_minimum_size = Vector2(ICON_STAT.x + 28, ICON_STAT.y)
 		box.add_child(spacer)
 	return box
 
 func _make_stat_chip(icon: Texture2D, value: int, color: Color) -> Control:
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 2)
+	row.add_theme_constant_override("separation", 4)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_child(_make_texture_rect(icon, ICON_STAT))
 	var label := Label.new()
 	label.text = str(value)
 	label.add_theme_color_override("font_color", color)
-	label.add_theme_font_size_override("font_size", 18)
+	label.add_theme_font_size_override("font_size", 24)
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	row.add_child(label)
 	return row
@@ -307,10 +365,10 @@ func _card_stylebox() -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = COLOR_CARD_BG
 	sb.border_color = COLOR_BORDER
-	sb.border_width_left = 2
-	sb.border_width_right = 2
-	sb.border_width_top = 2
-	sb.border_width_bottom = 2
+	sb.border_width_left = 3
+	sb.border_width_right = 3
+	sb.border_width_top = 3
+	sb.border_width_bottom = 3
 	sb.corner_radius_top_left = CARD_RADIUS
 	sb.corner_radius_top_right = CARD_RADIUS
 	sb.corner_radius_bottom_left = CARD_RADIUS
