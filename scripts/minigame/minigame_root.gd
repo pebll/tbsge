@@ -180,7 +180,6 @@ func _setup_ui() -> void:
 	_action_log_panel = BattleActionLogPanel.new()
 	_ui_layer.add_child(_action_log_panel)
 	_action_log_panel.set_tooltip_controller(_tooltip_controller)
-	_action_log_panel.hide()
 	EventBus.battle_log_entry_added.connect(_on_battle_log_entry_added)
 
 	_combat_fx_layer = CanvasLayer.new()

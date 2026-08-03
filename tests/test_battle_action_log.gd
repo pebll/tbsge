@@ -40,6 +40,12 @@ func _test_move_and_heal_log_fields() -> bool:
 	if String(move_entry.get("result_summary", "")) != "moved":
 		push_error("Expected moved result, got %s" % move_entry.get("result_summary"))
 		return false
+	if not bool(move_entry.get("show_coords", false)):
+		push_error("Move log should flag show_coords")
+		return false
+	if String(move_entry.get("coord_text", "")).is_empty():
+		push_error("Move log should include coord_text")
+		return false
 	if String(move_entry.get("caster_summary", "")).is_empty():
 		push_error("Move log missing caster_summary")
 		return false
@@ -74,6 +80,9 @@ func _test_move_and_heal_log_fields() -> bool:
 		return false
 	if String(heal_entry.get("caster_unit_type", "")) != green.unit_type:
 		push_error("Heal log should store caster_unit_type for sprites")
+		return false
+	if int(heal_entry.get("healed_total", 0)) <= 0:
+		push_error("Heal log should store healed_total for icon UI")
 		return false
 	return true
 
@@ -126,6 +135,15 @@ func _test_log_cap() -> bool:
 			"caster_summary": "x",
 			"target_summary": "",
 			"result_summary": "moved",
+			"caster_unit_type": "GOBLIN",
+			"target_unit_type": "",
+			"caster_hp_lost": 0,
+			"caster_deaths": 0,
+			"target_hp_lost": 0,
+			"target_deaths": 0,
+			"healed_total": 0,
+			"show_coords": true,
+			"coord_text": "%d,0" % i,
 			"payload": {},
 		})
 	if session.action_log.size() != cap:

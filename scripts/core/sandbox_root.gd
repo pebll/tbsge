@@ -202,9 +202,7 @@ func _setup_tile_info_ui() -> void:
 	_action_log_panel = BattleActionLogPanel.new()
 	tile_info_layer.add_child(_action_log_panel)
 	_action_log_panel.set_tooltip_controller(_tooltip_controller)
-	if session and session.action_log:
-		_action_log_panel.bind_log(session.action_log)
-	_action_log_panel.show()
+	_action_log_panel.enter_battle(session.action_log if session else null)
 	EventBus.battle_log_entry_added.connect(_on_battle_log_entry_added)
 
 func _setup_combat_fx_ui() -> void:

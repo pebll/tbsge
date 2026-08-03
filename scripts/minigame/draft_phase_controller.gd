@@ -22,7 +22,7 @@ func enter(first_team_id: String) -> void:
 	selected_coords = INVALID_COORDS
 	deps.tile_info_panel.set_draft_mode(true)
 	if deps.action_log_panel:
-		deps.action_log_panel.hide()
+		deps.action_log_panel.exit_battle()
 	refresh_view()
 
 func exit() -> void:
