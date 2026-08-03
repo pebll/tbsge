@@ -212,25 +212,36 @@ func play_heal(coords: Vector2i, payload: Dictionary, options: Dictionary = {}) 
 	var to_coords: Vector2i = payload.get("to", payload.get("coords", coords))
 	var action_id := String(payload.get("action_id", ""))
 	var caster_legion: Legion = payload.get("caster_legion", payload.get("legion"))
+	var target_legion: Legion = payload.get("target_legion", payload.get("legion"))
 
-	if action_id == "heal_ally" and from_coords != to_coords:
-		await _play_heal_projectile(from_coords, to_coords)
-
-	var tile_visu: TileVisu = _tile_visu_at.call(to_coords)
-	if not tile_visu or not tile_visu.legion_visu:
-		# Fall back to caster tile for self-heal edge cases.
-		tile_visu = _tile_visu_at.call(coords)
-	if not tile_visu or not tile_visu.legion_visu:
+	var from_tile: TileVisu = _tile_visu_at.call(from_coords)
+	var to_tile: TileVisu = _tile_visu_at.call(to_coords)
+	if to_tile == null or to_tile.legion_visu == null:
+		to_tile = _tile_visu_at.call(coords)
+	if to_tile == null or to_tile.legion_visu == null:
 		return
 
-	var legion_visu: LegionVisu = tile_visu.legion_visu
-	var world_pos: Vector2 = legion_visu.global_position
+	var target_visu: LegionVisu = to_tile.legion_visu
+	var caster_visu: LegionVisu = from_tile.legion_visu if from_tile else null
+	var world_pos: Vector2 = target_visu.global_position
+	var unit_heals: Array = payload.get("unit_heals", [])
+	var is_ally_heal := action_id == "heal_ally" and from_coords != to_coords
+	var caster_units: Array = []
+	if caster_legion:
+		caster_units = caster_legion.units.duplicate()
 
-	for entry in payload.get("unit_heals", []):
+	var caster_idx := 0
+	for entry in unit_heals:
 		var unit: Unit = entry.get("unit")
 		if unit == null:
 			continue
-		legion_visu.animate_unit_healed(
+
+		if is_ally_heal and caster_visu != null and not caster_units.is_empty():
+			var shooter: Unit = caster_units[caster_idx % caster_units.size()]
+			caster_idx += 1
+			await _play_heal_shot(caster_visu, target_visu, shooter, unit)
+
+		target_visu.animate_unit_healed(
 			unit,
 			float(entry.get("hp_before", 0)),
 			float(entry.get("hp_after", 0)),
@@ -239,11 +250,11 @@ func play_heal(coords: Vector2i, payload: Dictionary, options: Dictionary = {}) 
 		AudioManager.play_heal_sfx()
 		await _beat(COMBAT_HIT_BEAT)
 
-	legion_visu.update_local_positions()
-	legion_visu.tween_units_to_local_positions()
+	target_visu.update_local_positions()
+	target_visu.tween_units_to_local_positions()
 	await _beat(COMBAT_REPOSITION_BEAT)
-	legion_visu.start_idle_animation()
-	legion_visu.sync_all_unit_hp_bars()
+	target_visu.start_idle_animation()
+	target_visu.sync_all_unit_hp_bars()
 
 	if options.has("on_ap_changed"):
 		var on_ap_changed: Callable = options["on_ap_changed"]
@@ -258,33 +269,38 @@ func play_heal(coords: Vector2i, payload: Dictionary, options: Dictionary = {}) 
 	_fx_tail.release(
 		func() -> void:
 			_combat_fx.spawn_heal_popup(world_pos, int(payload.get("healed_total", 0))),
-		[legion_visu]
+		[target_visu]
 	)
 
-func _play_heal_projectile(from_coords: Vector2i, to_coords: Vector2i) -> void:
-	var from_visu: TileVisu = _tile_visu_at.call(from_coords)
-	var to_visu: TileVisu = _tile_visu_at.call(to_coords)
-	if from_visu == null or to_visu == null:
-		return
+func _play_heal_shot(
+	caster_visu: LegionVisu,
+	target_visu: LegionVisu,
+	shooter: Unit,
+	target_unit: Unit
+) -> void:
+	var from_pos := caster_visu.get_unit_sprite_global_position(shooter)
+	var to_pos := target_visu.get_unit_sprite_global_position(target_unit)
+	var direction := (to_pos - from_pos).normalized()
+	if direction == Vector2.ZERO:
+		direction = Vector2.RIGHT
+	caster_visu.animate_unit_ranged_attack(shooter, direction)
+	await _beat(UnitVisu.RANGED_WINDUP_SEC)
+
 	var tex := ProjectilePresenterScript.load_projectile_texture("bandage")
 	if tex == null:
 		tex = ProjectilePresenterScript.load_projectile_texture("magicball")
 	if tex == null or _projectiles == null:
 		return
-	var from_pos := from_visu.global_position
-	var to_pos := to_visu.global_position
-	if from_visu.legion_visu:
-		from_pos = from_visu.legion_visu.global_position
-	if to_visu.legion_visu:
-		to_pos = to_visu.legion_visu.global_position
+	var dist := from_pos.distance_to(to_pos)
+	var arc := clampf(22.0 + dist * 0.14, 28.0, 70.0)
 	await _projectiles.play_parabola(
 		_host,
 		from_pos,
 		to_pos,
 		tex,
 		UnitDefinition.ProjectileMotion.THROWN,
-		0.32,
-		56.0
+		RANGED_FLIGHT_TIME,
+		arc
 	)
 
 func _build_legion_visu_map(attacker: Legion, defender: Legion, hits: Array) -> Dictionary:

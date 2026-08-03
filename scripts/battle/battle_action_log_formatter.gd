@@ -8,30 +8,44 @@ static func from_use_action(session: MatchSession, result: Dictionary) -> Dictio
 	var action_id := String(payload.get("action_id", ""))
 	var from: Vector2i = payload.get("from", payload.get("coords", Vector2i.ZERO))
 	var to: Vector2i = payload.get("to", from)
-	var caster: Legion = payload.get("legion", null)
+	var events: Array = result.get("events", [])
+
+	var caster: Legion = payload.get("caster_legion", null)
+	if caster == null:
+		caster = payload.get("legion", null)
+	# Move leaves legion on `to`; combat/heal_ally keep caster on `from`.
+	if caster == null:
+		if "legion_moved" in events or "legions_swapped" in events:
+			caster = session.get_legion_at(to)
+		else:
+			caster = session.get_legion_at(from)
 	if caster == null:
 		caster = session.get_legion_at(to)
-		if caster == null:
-			caster = session.get_legion_at(from)
-	var target: Legion = null
-	if to != from:
-		target = session.get_legion_at(to)
-		if target == caster:
-			# After move, target tile is caster; look for combat defender via payload.
-			target = null
-	var events: Array = result.get("events", [])
-	if "combat_resolved" in events:
-		# Defender may be wiped; summarize from combat payload only.
-		target = null
+
+	var target_unit_type := ""
+	var target_summary := _target_summary_for_action(session, action_id, to, payload, events)
+	if action_id == "heal_ally":
+		var target_legion: Legion = payload.get("target_legion", session.get_legion_at(to))
+		if target_legion:
+			target_unit_type = target_legion.unit_type
+	elif "combat_resolved" in events:
+		target_unit_type = _combat_defender_unit_type(payload.get("combat", {}))
+	elif action_id not in ["self_heal", "move"] and "legions_swapped" not in events:
+		var at_to: Legion = session.get_legion_at(to)
+		if at_to and at_to != caster:
+			target_unit_type = at_to.unit_type
+
 	return _entry(
 		session,
 		action_id,
 		from,
 		to,
 		_legion_summary(caster),
-		_target_summary_for_action(session, action_id, to, payload, events),
+		target_summary,
 		_result_summary_for_action(action_id, payload, events),
-		payload
+		payload,
+		caster.unit_type if caster else "",
+		target_unit_type
 	)
 
 static func from_pass_legion(session: MatchSession, coords: Vector2i) -> Dictionary:
@@ -44,7 +58,9 @@ static func from_pass_legion(session: MatchSession, coords: Vector2i) -> Diction
 		_legion_summary(legion),
 		"",
 		"waited",
-		{"coords": coords}
+		{"coords": coords},
+		legion.unit_type if legion else "",
+		""
 	)
 
 static func from_end_turn(
@@ -62,6 +78,8 @@ static func from_end_turn(
 		"caster_summary": _team_label(ending_team),
 		"target_summary": "",
 		"result_summary": "ended → %s" % _team_label(next_team),
+		"caster_unit_type": "",
+		"target_unit_type": "",
 		"payload": {
 			"active_team": next_team,
 			"ending_team": ending_team,
@@ -77,7 +95,9 @@ static func _entry(
 	caster_summary: String,
 	target_summary: String,
 	result_summary: String,
-	payload: Dictionary
+	payload: Dictionary,
+	caster_unit_type: String = "",
+	target_unit_type: String = ""
 ) -> Dictionary:
 	var turn_index := 1
 	if session != null and session.turn_manager != null:
@@ -85,9 +105,10 @@ static func _entry(
 	var team := ""
 	if session != null and session.turn_manager != null:
 		team = session.turn_manager.active_team_id
-	# After end_turn, active team already advanced — use payload if present.
-	if payload.has("active_team"):
-		team = String(payload.get("active_team", team))
+	if payload.has("ending_team"):
+		team = String(payload.get("ending_team", team))
+	elif payload.has("active_team") and action_id == "end_turn":
+		team = String(payload.get("ending_team", team))
 	return {
 		"turn": turn_index,
 		"team": team,
@@ -97,6 +118,8 @@ static func _entry(
 		"caster_summary": caster_summary,
 		"target_summary": target_summary,
 		"result_summary": result_summary,
+		"caster_unit_type": caster_unit_type,
+		"target_unit_type": target_unit_type,
 		"payload": payload.duplicate(true),
 	}
 
@@ -154,6 +177,15 @@ static func _result_summary_for_action(action_id: String, payload: Dictionary, e
 	if action_id == "end_turn":
 		return "turn ended"
 	return action_id
+
+static func _combat_defender_unit_type(combat: Dictionary) -> String:
+	var hits: Array = combat.get("hits", [])
+	if hits.is_empty() or not (hits[0] is Dictionary):
+		return ""
+	var def_legion: Variant = hits[0].get("defender_legion", null)
+	if def_legion is Legion:
+		return (def_legion as Legion).unit_type
+	return ""
 
 static func _combat_result_summary(combat: Dictionary) -> String:
 	if combat.is_empty():

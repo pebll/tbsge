@@ -72,6 +72,9 @@ func _test_move_and_heal_log_fields() -> bool:
 	if int(heal_entry.get("turn", 0)) < 1:
 		push_error("Log entry missing turn")
 		return false
+	if String(heal_entry.get("caster_unit_type", "")) != green.unit_type:
+		push_error("Heal log should store caster_unit_type for sprites")
+		return false
 	return true
 
 func _test_pass_and_end_turn_log() -> bool:
