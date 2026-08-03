@@ -13,12 +13,20 @@ const RADIUS := 16
 
 var _buttons: Dictionary = {}
 var _selected_id: String = ""
+var _tooltip: TooltipController = null
+var _tooltip_legion: Legion = null
 
 @onready var _row: HBoxContainer = %ActionRow
 
 func _ready() -> void:
 	_apply_panel_style()
 	hide()
+
+func set_tooltip_controller(controller: TooltipController) -> void:
+	_tooltip = controller
+
+func set_tooltip_context_legion(legion: Legion) -> void:
+	_tooltip_legion = legion
 
 func _apply_panel_style() -> void:
 	var sb := StyleBoxFlat.new()
@@ -71,7 +79,7 @@ func _add_action_button(action: ActionDefinitionScript) -> void:
 	btn.button_pressed = action.id == _selected_id
 	btn.focus_mode = Control.FOCUS_NONE
 	btn.custom_minimum_size = Vector2(96, 96)
-	btn.tooltip_text = "%s (%d AP)" % [action.display_name, action.ap_cost]
+	btn.tooltip_text = "%s — right-click to inspect" % action.display_name
 
 	var sb_normal := _button_stylebox(Color(0.93, 0.89, 0.82))
 	var sb_hover := _button_stylebox(Color(0.95, 0.91, 0.84))
@@ -90,6 +98,16 @@ func _add_action_button(action: ActionDefinitionScript) -> void:
 		btn.text = action.display_name.substr(0, 1)
 
 	btn.pressed.connect(func(): action_pressed.emit(action))
+	var captured_action: ActionDefinitionScript = action
+	btn.gui_input.connect(func(event: InputEvent) -> void:
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
+			if _tooltip:
+				_tooltip.show_for_control(
+					btn,
+					TooltipContent.for_action(captured_action, _tooltip_legion)
+				)
+			btn.accept_event()
+	)
 	_row.add_child(btn)
 	_buttons[action.id] = btn
 

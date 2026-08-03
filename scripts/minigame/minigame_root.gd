@@ -40,6 +40,7 @@ var _pass_continue_btn: GameButton
 var _status_label: Label
 var _game_over_panel: GameOverPanel
 var _action_bar: Control
+var _tooltip_controller: TooltipController
 
 @onready var _camera: Camera2D = $Camera2D
 
@@ -166,6 +167,13 @@ func _setup_ui() -> void:
 
 	_action_bar = preload("res://scenes/ui/battle_action_bar.tscn").instantiate()
 	_ui_layer.add_child(_action_bar)
+
+	_tooltip_controller = TooltipController.new()
+	_ui_layer.add_child(_tooltip_controller)
+	if _tile_info_panel.has_method("set_tooltip_controller"):
+		_tile_info_panel.set_tooltip_controller(_tooltip_controller)
+	if _action_bar.has_method("set_tooltip_controller"):
+		_action_bar.set_tooltip_controller(_tooltip_controller)
 
 	_combat_fx_layer = CanvasLayer.new()
 	_combat_fx_layer.name = "CombatFX"

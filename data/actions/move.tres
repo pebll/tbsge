@@ -12,3 +12,5 @@ ap_cost = 1
 terminal = false
 targeting = 1
 overlay_state = "movable"
+tooltip_body = "Move to an adjacent hex, or swap with an adjacent ally."
+keywords = Array[String](["ap"])

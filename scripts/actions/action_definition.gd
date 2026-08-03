@@ -17,3 +17,11 @@ enum TargetingKind {
 ## Tile overlay id when this action is selected (movable, attackable, healable).
 @export var overlay_state: String = "movable"
 @export var heal_amount: int = 0
+## Hex range for ally/enemy targeting beyond adjacency helpers (0 = unused / self).
+@export var target_range: int = 0
+## Turns before this action can be used again (0 = no cooldown).
+@export var cooldown: int = 0
+## Plain-language tooltip; may include {heal}, {range}, {ap} tokens.
+@export_multiline var tooltip_body: String = ""
+## Glossary keyword ids shown as chips (e.g. terminal, range, ally).
+@export var keywords: Array[String] = []

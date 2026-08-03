@@ -26,6 +26,7 @@ AudioManager="*uid://cxvbv8c8txafc"
 UnitDefs="*res://scripts/core/unit_defs.gd"
 TeamDefs="*res://scripts/core/team_defs.gd"
 ActionDefs="*res://scripts/actions/action_defs.gd"
+KeywordDefs="*res://scripts/core/keyword_defs.gd"
 
 [editor]
 

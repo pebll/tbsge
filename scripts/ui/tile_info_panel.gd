@@ -73,6 +73,8 @@ var _ranged_stat: HBoxContainer
 var _ranged_value: Label
 var _range_stat: HBoxContainer
 var _range_value: Label
+var _tooltip: TooltipController = null
+var _stat_tooltips_wired: bool = false
 
 func _ready() -> void:
 	_apply_style()
@@ -85,6 +87,10 @@ func _ready() -> void:
 	clear_button.pressed.connect(func(): draft_clear_slot_pressed.emit())
 	_set_empty_state()
 	set_draft_mode(false)
+
+func set_tooltip_controller(controller: TooltipController) -> void:
+	_tooltip = controller
+	_wire_stat_tooltips()
 
 func _apply_style() -> void:
 	var sb := StyleBoxFlat.new()
@@ -440,3 +446,34 @@ func _update_ranged_stat_rows(unit0: Unit, def: UnitDefinition = null) -> void:
 func _load_unit_icon(unit_type: String) -> Texture2D:
 	var def := UnitDefs.get_def(unit_type)
 	return def.icon if def else null
+
+func _wire_stat_tooltips() -> void:
+	if _tooltip == null or _stat_tooltips_wired:
+		return
+	_stat_tooltips_wired = true
+	_wire_stat_icon(attack_icon, "attack", func() -> String: return attack_value.text)
+	_wire_stat_icon(health_icon, "health", func() -> String: return health_value.text)
+	_wire_stat_icon(unit_count_icon, "unit_count", func() -> String: return unit_count_value.text)
+	_wire_stat_icon(ap_icon, "ap", func() -> String: return ap_value.text)
+	_wire_stat_icon(size_icon, "size", func() -> String: return size_value.text)
+	_wire_stat_icon(price_icon, "price", func() -> String: return price_value.text)
+	_wire_stat_icon(shield_icon, "shield", func() -> String: return shield_value.text)
+	_ensure_ranged_stat_rows()
+	if _ranged_stat and _ranged_stat.get_child_count() > 0:
+		var ranged_icon := _ranged_stat.get_child(0) as Control
+		_wire_stat_icon(ranged_icon, "ranged_attack", func() -> String: return _ranged_value.text if _ranged_value else "")
+	if _range_stat and _range_stat.get_child_count() > 0:
+		var range_icon := _range_stat.get_child(0) as Control
+		_wire_stat_icon(range_icon, "range", func() -> String: return _range_value.text if _range_value else "")
+
+func _wire_stat_icon(icon: Control, stat_id: String, value_fn: Callable) -> void:
+	if icon == null or _tooltip == null:
+		return
+	icon.mouse_filter = Control.MOUSE_FILTER_STOP
+	icon.mouse_default_cursor_shape = Control.CURSOR_HELP
+	icon.gui_input.connect(func(event: InputEvent) -> void:
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
+			var value_text := String(value_fn.call()) if value_fn.is_valid() else ""
+			_tooltip.show_for_control(icon, TooltipContent.for_stat(stat_id, value_text))
+			icon.accept_event()
+	)

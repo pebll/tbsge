@@ -38,6 +38,7 @@ var tile_info_layer: CanvasLayer
 var combat_fx_layer: CanvasLayer
 var turn_hud: TurnHud
 var _action_playback: RefCounted
+var _tooltip_controller: TooltipController
 
 func _ready() -> void:
 	var config: SandboxConfigScript = load(config_path)
@@ -185,6 +186,13 @@ func _setup_tile_info_ui() -> void:
 	var action_bar = preload("res://scenes/ui/battle_action_bar.tscn").instantiate()
 	tile_info_layer.add_child(action_bar)
 	battle_ui.attach_action_bar(action_bar)
+
+	_tooltip_controller = TooltipController.new()
+	tile_info_layer.add_child(_tooltip_controller)
+	if tile_info_panel.has_method("set_tooltip_controller"):
+		tile_info_panel.set_tooltip_controller(_tooltip_controller)
+	if action_bar.has_method("set_tooltip_controller"):
+		action_bar.set_tooltip_controller(_tooltip_controller)
 
 func _setup_combat_fx_ui() -> void:
 	combat_fx_layer = CanvasLayer.new()

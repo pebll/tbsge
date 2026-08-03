@@ -118,6 +118,8 @@ func select_tile(coords: Vector2i) -> void:
 	_paint_tile(coords, "selected", LIFT_SELECTED)
 	_paint_default_targets(state, legion)
 	if action_bar:
+		if action_bar.has_method("set_tooltip_context_legion"):
+			action_bar.set_tooltip_context_legion(legion)
 		action_bar.set_actions(ActionTargetingScript.available_actions(state, legion))
 
 func select_action(action: ActionDefinitionScript) -> void:
