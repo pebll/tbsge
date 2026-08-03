@@ -1,7 +1,7 @@
 class_name TooltipController
 extends Control
 
-## Full-rect host: click-outside dismisses; anchors popup near cursor/control.
+## Full-rect host: click-outside / Escape dismisses; anchors popup near cursor/control.
 
 var _popup: TooltipPopup
 var _dim: Control
@@ -11,7 +11,7 @@ func _ready() -> void:
 	name = "TooltipController"
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	z_index = 40
+	z_index = 80
 
 	_dim = Control.new()
 	_dim.name = "DismissCatcher"
@@ -26,6 +26,22 @@ func _ready() -> void:
 	add_child(_popup)
 	_popup.hide()
 
+func _input(event: InputEvent) -> void:
+	if not is_open():
+		return
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_ESCAPE:
+			dismiss()
+			get_viewport().set_input_as_handled()
+			return
+	if event is InputEventMouseButton and event.pressed:
+		if event.button_index == MOUSE_BUTTON_LEFT or event.button_index == MOUSE_BUTTON_RIGHT:
+			# Clicks on the popup (or its keyword chips) should not dismiss.
+			if _popup and _popup.get_global_rect().has_point(event.position):
+				return
+			dismiss()
+			get_viewport().set_input_as_handled()
+
 func is_open() -> bool:
 	return _popup != null and _popup.visible
 
@@ -38,6 +54,10 @@ func show_content(content: TooltipContent, global_anchor: Vector2) -> void:
 	_dim.show()
 	_dim.mouse_filter = Control.MOUSE_FILTER_STOP
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	# Stay above siblings added later on the same CanvasLayer.
+	z_index = 80
+	if get_parent():
+		get_parent().move_child(self, -1)
 	await get_tree().process_frame
 	_place_near(global_anchor)
 
@@ -55,6 +75,7 @@ func dismiss() -> void:
 		_popup.hide()
 	if _dim:
 		_dim.hide()
+		_dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 func wire_right_click(control: Control, content_fn: Callable) -> void:

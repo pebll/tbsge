@@ -99,6 +99,8 @@ func deselect() -> void:
 	selected_action = null
 	target_coords.clear()
 	default_target_actions.clear()
+	_info_visible_for_tile = false
+	_clear_inspect_fn.call()
 	if action_bar:
 		action_bar.clear_bar()
 
@@ -118,6 +120,9 @@ func select_tile(coords: Vector2i) -> void:
 	default_target_actions.clear()
 	_paint_tile(coords, "selected", LIFT_SELECTED)
 	_paint_default_targets(state, legion)
+	_info_tile_coords = coords
+	_info_visible_for_tile = true
+	_inspect_fn.call(coords)
 	if action_bar:
 		if action_bar.has_method("set_tooltip_context_legion"):
 			action_bar.set_tooltip_context_legion(legion)
@@ -268,9 +273,6 @@ func _on_tile_hover_entered(coords: Vector2i) -> void:
 			selected_visu.legion_visu.update_direction(dir)
 
 func _on_tile_hover_exited(coords: Vector2i) -> void:
-	if _info_visible_for_tile and coords == _info_tile_coords:
-		_info_visible_for_tile = false
-		_clear_inspect_fn.call()
 	if coords in _overlay_coords:
 		var tile_visu: TileVisu = tile_visu_fn.call(coords)
 		if tile_visu:
