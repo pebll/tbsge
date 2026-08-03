@@ -1,0 +1,20 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/actions/action_definition.gd" id="1_def"]
+[ext_resource type="Texture2D" path="res://assets/icons/base_icons_sprites/spell.png" id="2_icon"]
+
+[resource]
+script = ExtResource("1_def")
+id = "teleport"
+display_name = "Teleport"
+icon = ExtResource("2_icon")
+ap_cost = 1
+terminal = true
+targeting = 5
+overlay_state = "teleportable"
+heal_amount = 0
+target_range = 3
+cooldown = 1
+tooltip_body = "Blink to an empty tile within {range} hexes. Ends this legion's turn."
+keywords = Array[String](["terminal", "ap", "range", "cooldown"])
+select_hint = "Choose an empty tile in range"

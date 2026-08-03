@@ -32,6 +32,10 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_heal_ally_param_override_range():
 		return false
+	if not _test_teleport_basic_terminal_and_cooldown():
+		return false
+	if not _test_teleport_rejects_occupied_and_oor():
+		return false
 	print("Success: Action system tests")
 	return true
 
@@ -649,5 +653,102 @@ func _test_heal_ally_param_override_range() -> bool:
 	unit_def.action_params = original
 	if far_ally not in targets:
 		push_error("Override range 3 should include far ally")
+		return false
+	return true
+
+func _test_teleport_basic_terminal_and_cooldown() -> bool:
+	var session := MinigameTestHelpersScript.prepare_session()
+	var started: Dictionary = MinigameTestHelpersScript.start_two_legion_battle(session)
+	var team_a: String = started["team_a"]
+	for legion in session.legions.duplicate():
+		if session.grid.get(legion.tile_coords):
+			session.grid[legion.tile_coords].legion = null
+		session.legions.erase(legion)
+
+	var from_coords := Vector2i(0, 0)
+	var to_coords := Vector2i(2, 0)
+	if session.grid.get(from_coords) == null or session.grid.get(to_coords) == null:
+		return true
+
+	var assassin := Legion.new("ASSASSIN", 1, from_coords, team_a)
+	session.grid[from_coords].legion = assassin
+	session.legions.append(assassin)
+	assassin.refresh_ap()
+
+	var result := session.apply({
+		"type": "use_action",
+		"action_id": "teleport",
+		"from": from_coords,
+		"to": to_coords,
+	})
+	if not result["ok"]:
+		push_error("Teleport failed: %s" % result.get("error"))
+		return false
+	if "legion_teleported" not in result.get("events", []):
+		push_error("Expected legion_teleported event")
+		return false
+	if assassin.tile_coords != to_coords:
+		push_error("Assassin should be at teleport destination")
+		return false
+	if session.grid[from_coords].has_legion():
+		push_error("Source tile should be empty after teleport")
+		return false
+	if assassin.current_ap != 0:
+		push_error("Teleport should be terminal")
+		return false
+	if assassin.get_cooldown_remaining("teleport") != 1:
+		push_error("Teleport should start cooldown 1")
+		return false
+	if ActionTargetingScript.can_use(session.battle_state(), assassin, ActionDefs.get_def("teleport")):
+		push_error("Teleport should be unavailable while cooling down (also no AP)")
+		return false
+	# Restore AP but keep cooldown — still blocked.
+	assassin.current_ap = assassin.max_ap
+	session.turn_manager.clear_wait(assassin.tile_coords)
+	if ActionTargetingScript.can_use(session.battle_state(), assassin, ActionDefs.get_def("teleport")):
+		push_error("Teleport should stay blocked by cooldown with AP restored")
+		return false
+	return true
+
+func _test_teleport_rejects_occupied_and_oor() -> bool:
+	var session := MinigameTestHelpersScript.prepare_session()
+	var started: Dictionary = MinigameTestHelpersScript.start_two_legion_battle(session)
+	var team_a: String = started["team_a"]
+	for legion in session.legions.duplicate():
+		if session.grid.get(legion.tile_coords):
+			session.grid[legion.tile_coords].legion = null
+		session.legions.erase(legion)
+
+	var from_coords := Vector2i(0, 0)
+	var occ_coords := Vector2i(1, 0)
+	var far_coords := Vector2i(5, 0)
+	for c in [from_coords, occ_coords]:
+		if session.grid.get(c) == null:
+			return true
+
+	var assassin := Legion.new("ASSASSIN", 1, from_coords, team_a)
+	var blocker := Legion.new("GOBLIN", 1, occ_coords, team_a)
+	session.grid[from_coords].legion = assassin
+	session.grid[occ_coords].legion = blocker
+	session.legions.append_array([assassin, blocker])
+	assassin.refresh_ap()
+
+	var tp_def: ActionDefinition = ActionDefs.get_def("teleport")
+	var targets := ActionTargetingScript.get_targets(session.battle_state(), assassin, tp_def)
+	if occ_coords in targets:
+		push_error("Occupied tile must not be a teleport target")
+		return false
+	if session.grid.get(far_coords) and far_coords in targets:
+		push_error("Out-of-range tile must not be a teleport target")
+		return false
+
+	var bad := session.apply({
+		"type": "use_action",
+		"action_id": "teleport",
+		"from": from_coords,
+		"to": occ_coords,
+	})
+	if bad["ok"]:
+		push_error("Teleport onto occupied tile should fail")
 		return false
 	return true

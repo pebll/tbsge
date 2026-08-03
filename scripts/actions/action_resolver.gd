@@ -41,6 +41,8 @@ static func resolve(state: BattleStateScript, cmd: Dictionary) -> Dictionary:
 			result = _execute_ranged_attack(state, from_coords, to_coords, action, cmd)
 		ActionDefinitionScript.TargetingKind.ALLY_IN_RANGE:
 			result = _execute_ally_heal(state, legion, action, from_coords, to_coords)
+		ActionDefinitionScript.TargetingKind.EMPTY_IN_RANGE:
+			result = _execute_teleport(state, legion, action, from_coords, to_coords)
 		_:
 			return _fail("Unhandled action targeting")
 
@@ -211,6 +213,31 @@ static func _execute_ally_heal(
 		"legion": target,
 		"caster_legion": caster,
 		"target_legion": target,
+	})
+
+static func _execute_teleport(
+	state: BattleStateScript,
+	legion: Legion,
+	action: ActionDefinitionScript,
+	from_coords: Vector2i,
+	to_coords: Vector2i
+) -> Dictionary:
+	var from_tile: Tile = state.tile_at(from_coords)
+	var to_tile: Tile = state.tile_at(to_coords)
+	if to_tile == null or not to_tile.walkable or to_tile.has_legion():
+		return _fail("Invalid teleport destination")
+	from_tile.legion = null
+	to_tile.legion = legion
+	legion.tile_coords = to_coords
+	legion.spend_ap(action.ap_cost)
+	_apply_terminal(state, legion, action, from_coords)
+	state.turn_manager.clear_wait(to_coords)
+	return _ok(["legion_teleported"], {
+		"action_id": action.id,
+		"from": from_coords,
+		"to": to_coords,
+		"legion": legion,
+		"caster_legion": legion,
 	})
 
 static func _apply_heal_to_legion(legion: Legion, heal_amount: int) -> Dictionary:

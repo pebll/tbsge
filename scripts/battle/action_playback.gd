@@ -272,6 +272,54 @@ func play_heal(coords: Vector2i, payload: Dictionary, options: Dictionary = {}) 
 		[target_visu]
 	)
 
+func play_teleport(
+	from_coords: Vector2i,
+	to_coords: Vector2i,
+	payload: Dictionary,
+	options: Dictionary = {}
+) -> void:
+	var from_tile: TileVisu = _tile_visu_at.call(from_coords)
+	var legion_visu: LegionVisu = from_tile.legion_visu if from_tile else null
+	if legion_visu == null and options.has("rewire"):
+		# Model already moved; try destination after rewire.
+		pass
+
+	const FADE := 0.18
+	if legion_visu:
+		var fade_out := _host.create_tween()
+		fade_out.tween_property(legion_visu, "modulate:a", 0.0, FADE)
+		await fade_out.finished
+
+	if options.has("rewire"):
+		var rewire: Callable = options["rewire"]
+		if rewire.is_valid():
+			rewire.call()
+
+	var to_tile: TileVisu = _tile_visu_at.call(to_coords)
+	legion_visu = to_tile.legion_visu if to_tile else legion_visu
+	if legion_visu == null:
+		var legion: Legion = payload.get("legion")
+		if legion and _legion_visu_at.is_valid():
+			legion_visu = _legion_visu_at.call(legion)
+
+	if legion_visu:
+		legion_visu.modulate.a = 0.0
+		var fade_in := _host.create_tween()
+		fade_in.tween_property(legion_visu, "modulate:a", 1.0, FADE)
+		await fade_in.finished
+		legion_visu.modulate.a = 1.0
+
+	var legion: Legion = payload.get("legion")
+	if options.has("on_ap_changed"):
+		var on_ap_changed: Callable = options["on_ap_changed"]
+		if on_ap_changed.is_valid() and legion:
+			on_ap_changed.call(legion)
+
+	if options.get("deselect_after", false) and options.has("deselect"):
+		var deselect: Callable = options["deselect"]
+		if deselect.is_valid():
+			deselect.call()
+
 func _play_heal_shot(
 	caster_visu: LegionVisu,
 	target_visu: LegionVisu,

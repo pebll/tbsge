@@ -156,7 +156,13 @@ static func _target_summary_for_action(
 	if action_id == "heal_ally":
 		var target_legion: Legion = payload.get("target_legion", session.get_legion_at(to))
 		return _legion_summary(target_legion)
-	if action_id == "move" or action_id == "swap" or "legions_swapped" in events:
+	if (
+		action_id == "move"
+		or action_id == "teleport"
+		or action_id == "swap"
+		or "legions_swapped" in events
+		or "legion_teleported" in events
+	):
 		return "(%d,%d)" % [to.x, to.y]
 	var at_to: Legion = session.get_legion_at(to)
 	if at_to:
@@ -170,6 +176,8 @@ static func _result_summary_for_action(action_id: String, payload: Dictionary, e
 		return "moved"
 	if "legion_healed" in events or action_id in ["self_heal", "heal_ally"]:
 		return "healed %d" % int(payload.get("healed_total", 0))
+	if "legion_teleported" in events or action_id == "teleport":
+		return "teleported"
 	if "combat_resolved" in events:
 		return _combat_result_summary(payload.get("combat", {}))
 	if action_id == "pass":

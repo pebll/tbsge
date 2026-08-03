@@ -185,6 +185,10 @@ Checklist:
 - Visible empty walkable tiles (fog later); recommend terminal + 1-turn CD (overridable per unit).  
 - Exit/appear VFX.  
 - Checklist: action, CD, visu, tests.
+- [x] `teleport` action (`EMPTY_IN_RANGE`) + Assassin kit  
+- [x] Cooldown after use + purple teleportable overlays  
+- [x] Fade-out / fade-in playback  
+- [x] Tests: blink, occupied/OOR reject, terminal + CD
 
 ---
 

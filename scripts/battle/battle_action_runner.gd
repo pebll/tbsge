@@ -21,7 +21,7 @@ func play_result(
 	var payload: Dictionary = result.get("payload", {})
 	var to_coords: Vector2i = payload.get("to", from_coords)
 
-	if not ("legion_healed" in events or "combat_resolved" in events):
+	if not ("legion_healed" in events or "combat_resolved" in events or "legion_teleported" in events):
 		_call_hook(hooks, "clear_overlays")
 
 	if "legion_moved" in events:
@@ -31,6 +31,24 @@ func play_result(
 		if tween:
 			await tween.finished
 		_call_hook(hooks, "on_ap_changed", legion)
+	elif "legion_teleported" in events:
+		var legion: Legion = payload.get("legion")
+		await playback.play_teleport(from_coords, to_coords, payload, {
+			"deselect_after": true,
+			"deselect": hooks.get("deselect", Callable()),
+			"on_ap_changed": hooks.get("on_ap_changed", Callable()),
+			"rewire": func() -> void:
+				presenter.rewire_legion_tile(legion, from_coords, to_coords)
+				var lv: LegionVisu = presenter.get_legion_visu(legion)
+				if lv:
+					var to_visu: TileVisu = presenter.tile_visu_at(to_coords)
+					if to_visu:
+						lv.global_position = to_visu.global_position,
+		})
+		_call_hook(hooks, "deselect")
+		_call_hook(hooks, "clear_overlays")
+		_call_hook(hooks, "on_finished")
+		return true
 	elif "legions_swapped" in events:
 		var legion_a: Legion = session.grid.get(to_coords).legion
 		var legion_b: Legion = session.grid.get(from_coords).legion
