@@ -48,7 +48,7 @@ var _pause_menu: PauseMenu
 
 func _ready() -> void:
 	AudioManager.ensure_music()
-	var config: MinigameConfig = load(config_path)
+	var config: MinigameConfig = GameSettings.resolve_minigame_config(config_path)
 	if config == null:
 		push_error("Failed to load minigame config: %s" % config_path)
 		return
@@ -106,6 +106,7 @@ func _on_pause_resume() -> void:
 		_pause_menu.close_menu()
 
 func _on_pause_abandon() -> void:
+	GameSettings.clear_match_launch()
 	get_tree().change_scene_to_file(MENU_SCENE)
 
 func inspect_tile(coords: Vector2i) -> void:
@@ -283,4 +284,5 @@ func _on_game_over_new_game() -> void:
 	get_tree().change_scene_to_file(MINIGAME_SCENE)
 
 func _on_game_over_main_menu() -> void:
+	GameSettings.clear_match_launch()
 	get_tree().change_scene_to_file(MENU_SCENE)

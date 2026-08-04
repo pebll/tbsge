@@ -23,7 +23,7 @@ func _init(p_config) -> void:
 	grid = MapBuilderScript.build_grid(config.map_radius, -1, config.team_ids)
 	_rng.seed = 1337
 	for team_id in config.team_ids:
-		drafts[team_id] = DraftStateScript.new(team_id, config.budget)
+		drafts[team_id] = DraftStateScript.new(team_id, config.budget_for_team(team_id))
 		deploy_slots[team_id] = _walkable_deploy_slots(
 			MinigameRulesScript.deploy_zone_coords(
 				config.map_radius,
