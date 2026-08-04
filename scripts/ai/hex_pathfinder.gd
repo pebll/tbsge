@@ -14,14 +14,12 @@ static func hex_distance(a: Vector2i, b: Vector2i) -> int:
 
 ## blocked_coords: hard blocks (unwalkable intent / optional).
 ## soft_ignore_occupied: occupied tiles stay traversable at SOFT_OCCUPANCY_COST (never hard-blocked).
-## hard_block_near: unused when soft (kept for call-site compatibility).
 static func find_path(
 	grid: Dictionary,
 	from_coords: Vector2i,
 	to_coords: Vector2i,
 	blocked_coords: Dictionary = {},
-	soft_ignore_occupied: bool = false,
-	_hard_block_near: Dictionary = {}
+	soft_ignore_occupied: bool = false
 ) -> Array[Vector2i]:
 	if from_coords == to_coords:
 		return [from_coords]

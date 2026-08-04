@@ -72,16 +72,16 @@ static func _score_teleport(session, legion: Legion, to_coords: Vector2i) -> flo
 	return score
 
 static func _focus_hp_bonus(target: Legion) -> float:
+	return focus_target_bonus(target)
+
+## Prefer support/ranged and low-HP stacks when choosing among equal fights.
+static func focus_target_bonus(target: Legion) -> float:
 	if target == null:
 		return 0.0
 	var bonus := 0.0
 	if not is_frontline(target):
 		bonus += 3.0
-	var hp := 0.0
-	for u in target.units:
-		if u:
-			hp += float(u.current_health)
-	bonus += 4.0 / maxf(1.0, hp)
+	bonus += 4.0 / maxf(1.0, _total_hp(target))
 	return bonus
 
 static func _score_combat(

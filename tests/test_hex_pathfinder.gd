@@ -69,7 +69,7 @@ func _test_path_around_blocked_legion() -> bool:
 	if Vector2i(1, 0) in path:
 		push_error("Hard path should not pass through an occupied tile")
 		return false
-	var soft := HexPathfinder.find_path(grid, Vector2i(0, 0), Vector2i(2, 0), {}, true, {})
+	var soft := HexPathfinder.find_path(grid, Vector2i(0, 0), Vector2i(2, 0), {}, true)
 	if soft.is_empty():
 		push_error("Expected soft path even through/around occupancy")
 		return false

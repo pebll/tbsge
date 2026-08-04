@@ -73,7 +73,8 @@ Goal: a friend can launch from **main menu → Play → draft → fight → win/
 - [ ] **Dev Test** — keep for sandbox/duel variants but label as “Advanced / Lab”.
 - [ ] **Delete local `git replace` refs** if any reappear (`git replace -l`) so history matches GitHub.
 - [x] **Depth while moving** — legion z-index updates during move tweens from current world Y (no longer only at path end).
-- [x] **Battle log move cards** — path coalesce + move/swap filter; temporary `[BattleLog]` console prints on append/skip/UI receive; Wait no longer reuses the Move boot icon (was easy to misread as a move).
+- [x] **Battle log move cards** — path coalesce + move/swap filter; Wait no longer reuses the Move boot icon (was easy to misread as a move).
+- [x] **AI soft paths** — occupancy cost 3× empty; walk AP-limited empty prefixes; teleport in greedy scoring; focus support/ranged then weakest HP.
 
 ### Nice-to-have (after v0.1)
 - Terrain T3, statuses T4, SFX pass, fog, campaign unlocks (see epics below).

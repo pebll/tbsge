@@ -207,13 +207,9 @@ static func _legion_total_hp(legion: Legion) -> float:
 static func _focus_bonus_at(session: MatchSessionScript, to_coords: Vector2i, enemies: Array[Legion]) -> float:
 	var at: Legion = session.get_legion_at(to_coords)
 	if at == null or at not in enemies:
-		# Teleport onto empty: small bonus if closer to a preferred focus later handled in scorer.
 		return 0.0
-	var bonus := 0.0
-	if not AiActionScorer.is_frontline(at):
-		bonus += 8.0
-	bonus += 12.0 / maxf(1.0, _legion_total_hp(at))
-	return bonus
+	# Scale scorer focus (support + weak HP) for greedy combat/teleport pick.
+	return AiActionScorer.focus_target_bonus(at) * 2.5
 
 ## Soft-plan a path to a stand goal; return legal empty walk prefix up to remaining AP.
 static func _plan_walk_toward(
@@ -233,7 +229,7 @@ static func _plan_walk_toward(
 			# Already on a valid stand hex — no move needed.
 			return []
 		var path := HexPathfinder.find_path(
-			session.grid, from_coords, goal, {}, true, {}
+			session.grid, from_coords, goal, {}, true
 		)
 		if path.size() < 2:
 			continue
