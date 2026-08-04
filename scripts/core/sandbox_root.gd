@@ -104,6 +104,7 @@ func end_team_turn() -> void:
 	if result.get("ok", false) and turn_hud:
 		turn_hud.show_active_team(session.turn_manager.active_team_id)
 		EventBus.turn_changed.emit(session.turn_manager.active_team_id)
+		presenter.sync_spent_visuals(session)
 
 func inspect_tile(coords: Vector2i) -> void:
 	if not tile_info_panel:
@@ -192,6 +193,8 @@ func _setup_battle_context() -> void:
 			use_battle_action("move", path[i - 1], path[i])
 
 func _on_legion_ap_changed(legion: Legion) -> void:
+	if presenter and session:
+		presenter.sync_spent_visuals(session)
 	if not tile_info_panel or not tile_info_panel.visible:
 		return
 	var tile: Tile = session.grid.get(legion.tile_coords)
