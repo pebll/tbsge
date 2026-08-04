@@ -110,12 +110,8 @@ func _test_pass_and_end_turn_log() -> bool:
 	if not pass_result["ok"]:
 		push_error("Pass failed: %s" % pass_result.get("error"))
 		return false
-	var pass_entry: Dictionary = session.action_log.latest()
-	if String(pass_entry.get("action_id", "")) != "pass":
-		push_error("Expected pass log")
-		return false
-	if String(pass_entry.get("result_summary", "")) != "waited":
-		push_error("Expected waited result")
+	if session.action_log.size() != 0:
+		push_error("Wait/pass should not write battle log entries")
 		return false
 
 	var end := session.apply({"type": "end_turn"})
@@ -150,8 +146,8 @@ func _test_filter_defaults() -> bool:
 	if not log.is_entry_visible({"action_id": "melee_attack"}):
 		push_error("Combat entries should stay visible")
 		return false
-	if not log.is_entry_visible({"action_id": "pass"}):
-		push_error("Wait/pass entries should stay visible")
+	if log.is_entry_visible({"action_id": "pass"}):
+		push_error("Wait/pass entries should never show")
 		return false
 	if not log.is_entry_visible({"action_id": "teleport"}):
 		push_error("Teleport entries should stay visible")

@@ -23,6 +23,9 @@ func append(entry: Dictionary) -> void:
 func is_entry_visible(entry: Dictionary) -> bool:
 	var action_id := String(entry.get("action_id", ""))
 	var result_summary := String(entry.get("result_summary", ""))
+	# Wait/pass is never shown (and no longer appended).
+	if action_id == "pass" or result_summary == "waited":
+		return false
 	if (
 		action_id in ["move", "swap"]
 		or result_summary in ["moved", "swapped"]

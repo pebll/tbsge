@@ -139,9 +139,8 @@ func apply_pass_legion(coords: Vector2i) -> Dictionary:
 	if not can_act_legion(legion):
 		return _fail("Legion cannot pass")
 	turn_manager.wait_legion(coords)
-	var ok_result := _ok(["legion_passed"], {"coords": coords})
-	_append_action_log(BattleActionLogFormatterScript.from_pass_legion(self, coords))
-	return ok_result
+	# Wait/pass is silent in the battle log (same boot icon as Move was confusing).
+	return _ok(["legion_passed"], {"coords": coords})
 
 func _append_action_log(entry: Dictionary) -> void:
 	if action_log == null or entry.is_empty():
