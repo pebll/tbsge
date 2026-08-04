@@ -157,6 +157,8 @@ func _setup_battle_context() -> void:
 		func() -> void: clear_inspect(),
 		func() -> Node: return _overlay_layer
 	)
+	battle_context.apply_move_path_fn = func(path: Array) -> void:
+		battle.request_move_path(path)
 	battle_context.battle_phase_fn = func() -> bool: return session.phase == MinigameSessionScript.Phase.BATTLE
 
 func _connect_phase_signals() -> void:
@@ -170,6 +172,7 @@ func _connect_phase_signals() -> void:
 	_tile_info_panel.draft_count_max_pressed.connect(func() -> void: draft.handle_count_max())
 	_tile_info_panel.draft_clear_slot_pressed.connect(func() -> void: draft.handle_clear_slot())
 	_tile_info_panel.draft_change_type_pressed.connect(func() -> void: draft.handle_change_type())
+	_tile_info_panel.draft_move_pressed.connect(func() -> void: draft.handle_move_mode())
 	_pass_continue_btn.pressed.connect(func() -> void: draft.handle_pass_continue())
 	battle_ui.attach_action_bar(_action_bar)
 

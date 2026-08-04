@@ -1,8 +1,7 @@
 class_name PauseMenu
 extends Control
 
-## Fullscreen pause: Resume / Abandon / Sounds / Options. Sounds+Options reuse shared panels.
-## Backdrop fills the screen; the menu box stays naturally sized and centered.
+## Floating pause box over the live battle. Invisible full-rect catcher blocks map clicks.
 
 signal resume_pressed
 signal abandon_pressed
@@ -40,23 +39,30 @@ func is_open() -> bool:
 	return visible
 
 func _build() -> void:
-	var backdrop := PanelContainer.new()
-	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
-	backdrop.add_theme_stylebox_override(
-		"panel",
-		UiTheme.panel_stylebox(UiTheme.COLOR_PANEL, UiTheme.COLOR_BORDER, UiTheme.RADIUS, UiTheme.BORDER_THICK, 24)
-	)
-	add_child(backdrop)
+	# Invisible catcher: blocks battle input without painting a fullscreen panel.
+	var catcher := Control.new()
+	catcher.name = "ClickCatcher"
+	catcher.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	catcher.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(catcher)
 
 	var center := CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(center)
 
+	var box := PanelContainer.new()
+	box.name = "PauseBox"
+	box.mouse_filter = Control.MOUSE_FILTER_STOP
+	box.add_theme_stylebox_override(
+		"panel",
+		UiTheme.panel_stylebox(UiTheme.COLOR_PANEL, UiTheme.COLOR_BORDER, UiTheme.RADIUS, UiTheme.BORDER_THICK, 24)
+	)
+	center.add_child(box)
+
 	_content = VBoxContainer.new()
 	_content.add_theme_constant_override("separation", 20)
-	center.add_child(_content)
+	box.add_child(_content)
 
 	var title := Label.new()
 	title.text = "Paused"

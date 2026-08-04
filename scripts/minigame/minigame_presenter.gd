@@ -15,7 +15,8 @@ func build_map(session) -> void:
 func paint_deploy_zones(
 	deploy_slots: Array,
 	occupied_coords: Array,
-	selected_coords: Vector2i
+	selected_coords: Vector2i,
+	move_mode: bool = false
 ) -> void:
 	clear_deploy_overlays()
 	for coords in deploy_slots:
@@ -24,6 +25,9 @@ func paint_deploy_zones(
 			continue
 		if coords == selected_coords:
 			visu.set_gameplay_overlay("selected", LIFT_SELECTED)
+		elif move_mode:
+			# Highlight all other deploy slots as move targets (empty or swap).
+			visu.set_gameplay_overlay("movable", LIFT_DEPLOY)
 		elif coords in occupied_coords:
 			visu.set_gameplay_overlay("deployed", LIFT_DEPLOY)
 		else:

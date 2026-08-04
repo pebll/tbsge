@@ -63,6 +63,7 @@ func spawn_legion_visu(legion: Legion, formation_seed: int = -1) -> void:
 	tile_visu.legion_visu = legion_visu
 	legion_visu.init(legion, formation_seed)
 	legion_visu.position = tile_visu.position
+	legion_visu.z_index = HexLayoutScript.depth_sort_z(tile_visu.position.y)
 
 func rewire_legion_tile(legion: Legion, from_coords: Vector2i, to_coords: Vector2i) -> void:
 	var visu: LegionVisu = get_legion_visu(legion)

@@ -13,7 +13,7 @@ Agents: use branches + commits per `.cursor/rules/git-workflow.mdc` when impleme
 - UX: tooltips + glossary, battle log, action bar clarity, Options/Sounds, pause menu, parchment theme.
 - Git: `main` aligned with refactor line (Aug 2026).
 
-**Next focus — “fun playable v0.1” (see section below), then**
+**Next focus — Playtest polish (epic P below), then finish playable v0.1, then**
 1. **Terrain (T3)** — LOS, forest defense, terrain inspect.  
 2. **Statuses (T4)** — buffs/debuffs.  
 3. **Campaign / unlock pacing** — tier I→IV, not required for first skirmish loop.
@@ -30,10 +30,27 @@ Agents: use branches + commits per `.cursor/rules/git-workflow.mdc` when impleme
 ### Done
 - [x] Refactor slices A–E; missions board; music → `assets/music/`
 - [x] Range + size icons from batch3
+- [x] Play → game setup (map size / difficulty) + AI debug persistence
 
 ### Still open (your side)
 - [ ] Manual smoke — report ok / what failed (see below)
 - [ ] Later: approve delete list from `assets/_archive/`
+
+---
+
+## Epic P — Playtest polish (Aug 2026)
+
+Ship as separate slices (UX → draft/move → AI). Branch: `cursor/playtest-polish`.
+
+- [ ] **P1** Main menu **Quit game**
+- [ ] **P2** Pause menu floating box (not fullscreen parchment fill)
+- [ ] **P3** Banners always draw in front of neighboring legions
+- [ ] **P4** Legion info panel: Health/Shield → Melee/Ranged → Size/Cost → AP/Range → actions → units
+- [ ] **P5** Draft: move/redeploy a legion to another deploy square
+- [ ] **P6** Multi-AP move highlights; unambiguous path in one go; ambiguous first step re-asks
+- [ ] **P7** Pathfinding soft-blocks: still advance toward target when distant allies block
+- [ ] **P8** AI role positioning: melee/tanks front, healers/ranged behind
+- [ ] **P9** AI greedy net-HP scoring (heal +10 beats deal 18 / take 10 → +8)
 
 ---
 
@@ -42,7 +59,7 @@ Agents: use branches + commits per `.cursor/rules/git-workflow.mdc` when impleme
 Goal: a friend can launch from **main menu → Play → draft → fight → win/lose → play again** without Dev Test, docs, or known UX traps.
 
 ### Must-have (ship blockers)
-- [ ] **Single entry path** — main menu **Play** (not only Dev Test) → default duel scene (pick one: R3/R4/BIG; document choice).
+- [x] **Single entry path** — main menu **Play** → setup (map size / difficulty) → minigame.
 - [ ] **End-to-end loop** — game over → rematch or main menu; no dead ends.
 - [ ] **Manual smoke green** — all items in “How manual smoke works” + pause/tooltips/log/heal/teleport checklist (from recent UX work).
 - [ ] **AI completes a full battle** — no soft-lock; human can win and lose.

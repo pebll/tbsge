@@ -74,6 +74,11 @@ unique_name_in_owner = true
 text = "Options"
 preferred_width = 360
 
+[node name="QuitButton" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox/MainButtons" instance=ExtResource("3_gb")]
+unique_name_in_owner = true
+text = "Quit"
+preferred_width = 360
+
 [node name="SetupPanel" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox" instance=ExtResource("6_setup")]
 unique_name_in_owner = true
 layout_mode = 2

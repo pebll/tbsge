@@ -9,11 +9,16 @@ static func hex_distance(a: Vector2i, b: Vector2i) -> int:
 	var ds := -dq - dr
 	return maxi(absi(dq), maxi(absi(dr), absi(ds)))
 
+## blocked_coords: hard blocks (usually enemy tiles).
+## soft_ignore_occupied: when true, ally/enemy occupancy is ignored except tiles in
+## hard_block_near (typically the mover's adjacent neighborhood where occupancy matters now).
 static func find_path(
 	grid: Dictionary,
 	from_coords: Vector2i,
 	to_coords: Vector2i,
-	blocked_coords: Dictionary = {}
+	blocked_coords: Dictionary = {},
+	soft_ignore_occupied: bool = false,
+	hard_block_near: Dictionary = {}
 ) -> Array[Vector2i]:
 	if from_coords == to_coords:
 		return [from_coords]
@@ -42,7 +47,9 @@ static func find_path(
 			return _reconstruct_path(came_from, current)
 
 		for neighbor in Utils.get_surrounding_coords(current):
-			if not _is_traversable(grid, neighbor, to_coords, blocked_coords):
+			if not _is_traversable(
+				grid, neighbor, to_coords, blocked_coords, soft_ignore_occupied, hard_block_near
+			):
 				continue
 			var tentative_g: float = float(g_score.get(current, INF)) + 1.0
 			if tentative_g >= float(g_score.get(neighbor, INF)):
@@ -60,7 +67,9 @@ static func _is_traversable(
 	grid: Dictionary,
 	coords: Vector2i,
 	goal_coords: Vector2i,
-	blocked_coords: Dictionary
+	blocked_coords: Dictionary,
+	soft_ignore_occupied: bool,
+	hard_block_near: Dictionary
 ) -> bool:
 	var tile: Tile = grid.get(coords)
 	if tile == null or not tile.walkable:
@@ -68,6 +77,14 @@ static func _is_traversable(
 	if coords == goal_coords:
 		return true
 	if blocked_coords.has(coords):
+		return false
+	if soft_ignore_occupied:
+		# Only treat occupancy as blocking when the tile is in the near set
+		# (current move neighborhood). Distant legions are planning ghosts.
+		if hard_block_near.has(coords) and tile.has_legion():
+			return false
+		return true
+	if hard_block_near.has(coords) and tile.has_legion():
 		return false
 	return not tile.has_legion()
 

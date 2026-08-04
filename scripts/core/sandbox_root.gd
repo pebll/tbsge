@@ -185,6 +185,9 @@ func _setup_battle_context() -> void:
 	)
 	battle_context.allows_spawn_fn = func(_coords: Vector2i) -> bool: return session.config.allow_spawn
 	battle_context.spawn_fn = func(coords: Vector2i) -> void: spawn_unit(coords)
+	battle_context.apply_move_path_fn = func(path: Array) -> void:
+		for i in range(1, path.size()):
+			use_battle_action("move", path[i - 1], path[i])
 
 func _on_legion_ap_changed(legion: Legion) -> void:
 	if not tile_info_panel or not tile_info_panel.visible:

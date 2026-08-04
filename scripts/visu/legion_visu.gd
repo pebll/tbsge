@@ -60,6 +60,9 @@ func _apply_team_banner() -> void:
 	banner.texture = BANNER_TEXTURES[idx]
 	banner.self_modulate = team.color
 	banner.visible = true
+	# Absolute high z so banners stay above neighboring legion units.
+	banner.z_as_relative = false
+	banner.z_index = 2800
 
 func _get_formation_scale() -> float:
 	if legion == null:
@@ -191,9 +194,14 @@ func juice_move(target_pos: Vector2) -> Tween:
 	move_tween = create_tween()
 	active_tween = move_tween
 	move_tween.tween_property(self, "position", target_pos, move_time).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	move_tween.tween_callback(_sync_depth_sort)
 	for unit in units.get_children():
 		unit.juice_move(target_pos)
 	return move_tween
+
+func _sync_depth_sort() -> void:
+	const HexLayoutScript = preload("res://scripts/core/hex_layout.gd")
+	z_index = HexLayoutScript.depth_sort_z(position.y)
 
 func juice_attack(direction: Vector2) -> void:
 	for unit in units.get_children():

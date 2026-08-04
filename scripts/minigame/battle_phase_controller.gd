@@ -52,6 +52,26 @@ func request_use_action(action_id: String, from_coords: Vector2i, to_coords: Vec
 		return
 	await perform_use_action(action_id, from_coords, to_coords, randi())
 
+func request_move_path(path: Array) -> void:
+	if is_input_locked():
+		return
+	if path.size() < 2:
+		return
+	deps.battle_ui.deselect()
+	deps.battle_ui.clear_overlays()
+	for i in range(1, path.size()):
+		var from_c: Vector2i = path[i - 1]
+		var to_c: Vector2i = path[i]
+		var ok := await perform_use_action("move", from_c, to_c, 0)
+		if not ok:
+			break
+	var end_coords: Vector2i = path[mini(path.size() - 1, path.size() - 1)]
+	# Use last successfully intended end; if mid-fail, legion may be elsewhere.
+	var tile: Tile = deps.session.grid.get(end_coords)
+	if tile and tile.has_legion() and deps.session.can_act_legion(tile.legion):
+		deps.battle_ui.select_tile(end_coords)
+	maybe_start_ai_turn()
+
 func perform_use_action(
 	action_id: String,
 	from_coords: Vector2i,
