@@ -42,15 +42,15 @@ Agents: use branches + commits per `.cursor/rules/git-workflow.mdc` when impleme
 
 Ship as separate slices (UX → draft/move → AI). Branch: `cursor/playtest-polish`.
 
-- [ ] **P1** Main menu **Quit game**
-- [ ] **P2** Pause menu floating box (not fullscreen parchment fill)
-- [ ] **P3** Banners always draw in front of neighboring legions
-- [ ] **P4** Legion info panel: Health/Shield → Melee/Ranged → Size/Cost → AP/Range → actions → units
-- [ ] **P5** Draft: move/redeploy a legion to another deploy square
-- [ ] **P6** Multi-AP move highlights; unambiguous path in one go; ambiguous first step re-asks
-- [ ] **P7** Pathfinding soft-blocks: still advance toward target when distant allies block
-- [ ] **P8** AI role positioning: melee/tanks front, healers/ranged behind
-- [ ] **P9** AI greedy net-HP scoring (heal +10 beats deal 18 / take 10 → +8)
+- [x] **P1** Main menu **Quit game**
+- [x] **P2** Pause menu floating box (not fullscreen parchment fill)
+- [x] **P3** Banners always draw in front of neighboring legions
+- [x] **P4** Legion info panel: Health/Shield → Melee/Ranged → Size/Cost → AP/Range → actions → units
+- [x] **P5** Draft: move/redeploy a legion to another deploy square
+- [x] **P6** Multi-AP move highlights; unambiguous path in one go; ambiguous first step re-asks
+- [x] **P7** Pathfinding soft-blocks: still advance toward target when distant allies block
+- [x] **P8** AI role positioning: melee/tanks front, healers/ranged behind
+- [x] **P9** AI greedy net-HP scoring (heal +10 beats deal 18 / take 10 → +8)
 
 ---
 
