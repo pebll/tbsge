@@ -427,15 +427,25 @@ func _render_unit_type_stats(unit0: Unit, unit_type: String) -> void:
 func _ensure_stat_rows_layout() -> void:
 	if _stat_rows_ready:
 		return
+	var header_text: VBoxContainer = get_node_or_null("%LegionHeaderText") as VBoxContainer
+	var legion_stats: HBoxContainer = get_node_or_null("%LegionStats") as HBoxContainer
+	var type_stats: HBoxContainer = get_node_or_null("%TypeStats") as HBoxContainer
+	if header_text == null or legion_stats == null or type_stats == null:
+		push_error("TileInfoPanel: missing stat layout nodes")
+		return
 	_stat_rows_ready = true
-	var header_text: VBoxContainer = %LegionHeaderText
-	var legion_stats: HBoxContainer = %LegionStats
-	var type_stats: HBoxContainer = %TypeStats
 	var health_stat: HBoxContainer = health_icon.get_parent() as HBoxContainer
 	var attack_stat: HBoxContainer = attack_icon.get_parent() as HBoxContainer
 	var unit_count_stat: HBoxContainer = unit_count_icon.get_parent() as HBoxContainer
 	var size_stat: HBoxContainer = size_icon.get_parent() as HBoxContainer
 	var price_stat: HBoxContainer = price_icon.get_parent() as HBoxContainer
+	if (
+		health_stat == null or attack_stat == null or unit_count_stat == null
+		or size_stat == null or price_stat == null or shield_stat == null or ap_stat == null
+	):
+		push_error("TileInfoPanel: missing stat row parents")
+		_stat_rows_ready = false
+		return
 
 	# Detach existing stat widgets from old rows.
 	for child in legion_stats.get_children():
@@ -499,14 +509,19 @@ func _ensure_actions_block() -> void:
 	_actions_list = VBoxContainer.new()
 	_actions_list.add_theme_constant_override("separation", 4)
 	_actions_block.add_child(_actions_list)
-	var units_scroll: Control = %UnitsScroll
-	var idx := legion_block.get_children().find(units_scroll)
-	legion_block.add_child(_actions_block)
-	if idx >= 0:
-		legion_block.move_child(_actions_block, idx)
+	var units_scroll: Control = get_node_or_null("%UnitsScroll") as Control
+	var idx := -1
+	if legion_block and units_scroll:
+		idx = legion_block.get_children().find(units_scroll)
+	if legion_block:
+		legion_block.add_child(_actions_block)
+		if idx >= 0:
+			legion_block.move_child(_actions_block, idx)
 
 func _ensure_move_button() -> void:
 	if _move_button != null:
+		return
+	if draft_controls == null:
 		return
 	var GameButtonScene := preload("res://scenes/ui/game_button.tscn")
 	_move_button = GameButtonScene.instantiate()
@@ -523,10 +538,13 @@ func _ensure_move_button() -> void:
 
 func _render_actions(legion: Legion) -> void:
 	_ensure_actions_block()
+	if _actions_list == null:
+		return
 	for c in _actions_list.get_children():
 		c.queue_free()
 	if _draft_mode:
-		_actions_block.hide()
+		if _actions_block:
+			_actions_block.hide()
 		return
 	_actions_block.show()
 	for action in ActionTargeting.listed_actions(legion):
