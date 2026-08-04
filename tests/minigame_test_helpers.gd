@@ -41,7 +41,7 @@ static func start_two_legion_battle(session) -> Dictionary:
 		"type": "draft_set_legion",
 		"team": team_b_id,
 		"coords": slots_b[0],
-		"unit_type": "RAT_SPEAR",
+		"unit_type": "GOBLIN",
 		"unit_count": 2,
 	})
 	session.apply({"type": "draft_ready", "team": team_b_id})

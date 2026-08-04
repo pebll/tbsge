@@ -13,4 +13,6 @@ attack_range = 2
 ranged_attack = 5
 projectile_id = "arrow"
 size = 1.0
+price = 5
 icon = ExtResource("2_icon")
+action_ids = Array[String](["move", "melee_attack", "ranged_attack", "self_heal"])

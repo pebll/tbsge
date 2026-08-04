@@ -7,6 +7,7 @@ signal draft_count_increase_pressed
 signal draft_count_decrease_pressed
 signal draft_change_type_pressed
 signal draft_clear_slot_pressed
+signal draft_move_pressed
 
 const MinigameRulesScript = preload("res://scripts/minigame/minigame_rules.gd")
 
@@ -75,10 +76,24 @@ var _range_stat: HBoxContainer
 var _range_value: Label
 var _tooltip: TooltipController = null
 var _stat_tooltips_wired: bool = false
+var _stat_rows_ready: bool = false
+var _row_vitals: HBoxContainer
+var _row_damage: HBoxContainer
+var _row_economy: HBoxContainer
+var _row_mobility: HBoxContainer
+var _actions_block: VBoxContainer
+var _inspect_action_bar: BattleActionBar = null
+var _units_header: HBoxContainer = null
+var _units_header_count: Label = null
+var _units_header_icon: TextureRect = null
+var _move_button: GameButton = null
 
 func _ready() -> void:
 	_apply_style()
+	_ensure_stat_rows_layout()
 	_ensure_ranged_stat_rows()
+	_ensure_actions_block()
+	_ensure_move_button()
 	min_button.pressed.connect(func(): draft_count_min_pressed.emit())
 	minus_button.pressed.connect(func(): draft_count_decrease_pressed.emit())
 	plus_button.pressed.connect(func(): draft_count_increase_pressed.emit())
@@ -91,6 +106,8 @@ func _ready() -> void:
 func set_tooltip_controller(controller: TooltipController) -> void:
 	_tooltip = controller
 	_wire_stat_tooltips()
+	if _inspect_action_bar:
+		_inspect_action_bar.set_tooltip_controller(controller)
 
 func _apply_style() -> void:
 	var sb := StyleBoxFlat.new()
@@ -128,25 +145,35 @@ func _apply_style() -> void:
 	price_icon.texture = ICON_PRICE
 	shield_icon.texture = ICON_SHIELD
 
-	_configure_stat_icon(unit_icon, Vector2(96, 132))
-	_configure_stat_icon(attack_icon, Vector2(44, 44))
-	_configure_stat_icon(health_icon, Vector2(44, 44))
+	_configure_stat_icon(unit_icon, Vector2(148, 200))
+	_configure_stat_icon(attack_icon, Vector2(52, 52))
+	_configure_stat_icon(health_icon, Vector2(52, 52))
 	_configure_stat_icon(unit_count_icon, Vector2(44, 44))
-	_configure_stat_icon(ap_icon, Vector2(40, 40))
-	_configure_stat_icon(size_icon, Vector2(40, 40))
-	_configure_stat_icon(price_icon, Vector2(40, 40))
-	_configure_stat_icon(shield_icon, Vector2(40, 40))
+	_configure_stat_icon(ap_icon, Vector2(48, 48))
+	_configure_stat_icon(size_icon, Vector2(48, 48))
+	_configure_stat_icon(price_icon, Vector2(48, 48))
+	_configure_stat_icon(shield_icon, Vector2(48, 48))
 
+	legion_name.add_theme_font_size_override("font_size", 34)
 	for value_label in [
 		attack_value, health_value, unit_count_value, ap_value,
 		size_value, price_value, shield_value,
 	]:
-		value_label.add_theme_font_size_override("font_size", 24)
+		value_label.add_theme_font_size_override("font_size", 28)
 
 	var legion_stats: HBoxContainer = %LegionStats
 	legion_stats.add_theme_constant_override("separation", 8)
 	var type_stats: HBoxContainer = %TypeStats
 	type_stats.add_theme_constant_override("separation", 8)
+
+	# Center the hero portrait in its frame.
+	var icon_frame := unit_icon.get_parent() as Control
+	if icon_frame:
+		icon_frame.custom_minimum_size = Vector2(160, 210)
+		if icon_frame is BoxContainer:
+			(icon_frame as BoxContainer).alignment = BoxContainer.ALIGNMENT_CENTER
+	unit_icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	unit_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 
 func _configure_stat_icon(icon: TextureRect, min_size: Vector2 = Vector2(72, 72)) -> void:
 	icon.custom_minimum_size = min_size
@@ -179,7 +206,14 @@ func show_legion(legion: Legion) -> void:
 func set_draft_mode(enabled: bool) -> void:
 	_draft_mode = enabled
 	draft_controls.visible = enabled
-	ap_stat.visible = not enabled
+	if _row_mobility:
+		_row_mobility.visible = not enabled
+	else:
+		ap_stat.visible = not enabled
+	if _actions_block:
+		_actions_block.visible = not enabled
+	if _move_button:
+		_move_button.visible = enabled
 
 func show_draft_legion(
 	legion: Legion,
@@ -244,11 +278,21 @@ func _render_legion(legion: Legion) -> void:
 
 	unit_icon.texture = unit0.definition.icon if unit0 and unit0.definition and unit0.definition.icon else _load_unit_icon(legion.unit_type)
 
+	_render_actions(legion)
+	_render_units_header(legion)
+
 	for c in units_list.get_children():
 		c.queue_free()
 
-	for i in range(legion.units.size()):
-		var u: Unit = legion.units[i]
+	var sorted_units: Array = legion.units.duplicate()
+	sorted_units.sort_custom(func(a: Unit, b: Unit) -> bool:
+		if a == null or b == null:
+			return a != null
+		if a.current_health != b.current_health:
+			return a.current_health > b.current_health
+		return a.get_instance_id() < b.get_instance_id()
+	)
+	for u in sorted_units:
 		units_list.add_child(_build_unit_row(legion.unit_type, u))
 
 func _build_unit_row(unit_type: String, u: Unit) -> Control:
@@ -403,21 +447,201 @@ func _render_unit_type_stats(unit0: Unit, unit_type: String) -> void:
 		shield_stat.hide()
 	_update_ranged_stat_rows(unit0 if unit0 else null, def)
 
+func _ensure_stat_rows_layout() -> void:
+	if _stat_rows_ready:
+		return
+	var header_text: VBoxContainer = get_node_or_null("%LegionHeaderText") as VBoxContainer
+	var legion_stats: HBoxContainer = get_node_or_null("%LegionStats") as HBoxContainer
+	var type_stats: HBoxContainer = get_node_or_null("%TypeStats") as HBoxContainer
+	if header_text == null or legion_stats == null or type_stats == null:
+		push_error("TileInfoPanel: missing stat layout nodes")
+		return
+	_stat_rows_ready = true
+	var health_stat: HBoxContainer = health_icon.get_parent() as HBoxContainer
+	var attack_stat: HBoxContainer = attack_icon.get_parent() as HBoxContainer
+	var unit_count_stat: HBoxContainer = unit_count_icon.get_parent() as HBoxContainer
+	var size_stat: HBoxContainer = size_icon.get_parent() as HBoxContainer
+	var price_stat: HBoxContainer = price_icon.get_parent() as HBoxContainer
+	if (
+		health_stat == null or attack_stat == null or unit_count_stat == null
+		or size_stat == null or price_stat == null or shield_stat == null or ap_stat == null
+	):
+		push_error("TileInfoPanel: missing stat row parents")
+		_stat_rows_ready = false
+		return
+
+	# Detach existing stat widgets from old rows.
+	for child in legion_stats.get_children():
+		legion_stats.remove_child(child)
+	for child in type_stats.get_children():
+		type_stats.remove_child(child)
+	if ap_stat.get_parent() == header_text:
+		header_text.remove_child(ap_stat)
+
+	legion_stats.hide()
+	type_stats.hide()
+
+	_row_vitals = _make_stat_line()
+	_row_damage = _make_stat_line()
+	_row_economy = _make_stat_line()
+	_row_mobility = _make_stat_line()
+
+	# Row 1: Health, Shield
+	_row_vitals.add_child(health_stat)
+	_row_vitals.add_child(shield_stat)
+	# Row 2: Melee, Ranged (ranged added later)
+	_row_damage.add_child(attack_stat)
+	# Row 3: Size, Cost
+	_row_economy.add_child(size_stat)
+	_row_economy.add_child(price_stat)
+	# Row 4: AP, Range (range added later)
+	_row_mobility.add_child(ap_stat)
+
+	# Hide the old unit-count chip from the header — count lives above the unit list.
+	var count_line := _make_stat_line()
+	count_line.add_child(unit_count_stat)
+	count_line.hide()
+
+	var insert_at := header_text.get_children().find(legion_name) + 1
+	header_text.add_child(count_line)
+	header_text.move_child(count_line, insert_at)
+	header_text.add_child(_row_vitals)
+	header_text.move_child(_row_vitals, insert_at + 1)
+	header_text.add_child(_row_damage)
+	header_text.move_child(_row_damage, insert_at + 2)
+	header_text.add_child(_row_economy)
+	header_text.move_child(_row_economy, insert_at + 3)
+	header_text.add_child(_row_mobility)
+	header_text.move_child(_row_mobility, insert_at + 4)
+
+func _make_stat_line() -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 14)
+	return row
+
+func _ensure_actions_block() -> void:
+	if _actions_block != null:
+		return
+	_actions_block = VBoxContainer.new()
+	_actions_block.name = "ActionsBlock"
+	_actions_block.add_theme_constant_override("separation", 6)
+	var title := Label.new()
+	title.text = "Actions"
+	title.add_theme_color_override("font_color", COLOR_TEXT)
+	title.add_theme_font_size_override("font_size", 22)
+	_actions_block.add_child(title)
+
+	var bar_host := Control.new()
+	bar_host.custom_minimum_size = Vector2(0, 130)
+	bar_host.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_actions_block.add_child(bar_host)
+
+	var bar_scene := preload("res://scenes/ui/battle_action_bar.tscn")
+	_inspect_action_bar = bar_scene.instantiate()
+	_inspect_action_bar.set_display_only(true)
+	bar_host.add_child(_inspect_action_bar)
+	_inspect_action_bar.configure_embedded()
+	if _tooltip:
+		_inspect_action_bar.set_tooltip_controller(_tooltip)
+
+	_ensure_units_header()
+
+	var units_scroll: Control = get_node_or_null("%UnitsScroll") as Control
+	var idx := -1
+	if legion_block and units_scroll:
+		idx = legion_block.get_children().find(units_scroll)
+	if legion_block:
+		legion_block.add_child(_actions_block)
+		if idx >= 0:
+			legion_block.move_child(_actions_block, idx)
+		# Units header sits just above the scroll list.
+		if _units_header and units_scroll:
+			var scroll_idx := legion_block.get_children().find(units_scroll)
+			legion_block.add_child(_units_header)
+			if scroll_idx >= 0:
+				legion_block.move_child(_units_header, scroll_idx)
+
+func _ensure_units_header() -> void:
+	if _units_header != null:
+		return
+	_units_header = HBoxContainer.new()
+	_units_header.name = "UnitsHeader"
+	_units_header.alignment = BoxContainer.ALIGNMENT_CENTER
+	_units_header.add_theme_constant_override("separation", 12)
+	_units_header_count = Label.new()
+	_units_header_count.add_theme_color_override("font_color", COLOR_TEXT)
+	_units_header_count.add_theme_font_size_override("font_size", 32)
+	_units_header.add_child(_units_header_count)
+	var times := Label.new()
+	times.text = "×"
+	times.add_theme_color_override("font_color", COLOR_TEXT)
+	times.add_theme_font_size_override("font_size", 32)
+	_units_header.add_child(times)
+	_units_header_icon = TextureRect.new()
+	_units_header_icon.custom_minimum_size = Vector2(64, 64)
+	_units_header_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_units_header_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_units_header.add_child(_units_header_icon)
+
+func _render_units_header(legion: Legion) -> void:
+	_ensure_units_header()
+	if _units_header == null:
+		return
+	_units_header.show()
+	_units_header_count.text = str(legion.units.size())
+	var tex: Texture2D = null
+	if not legion.units.is_empty() and legion.units[0] and legion.units[0].definition:
+		tex = legion.units[0].definition.icon
+	if tex == null:
+		tex = _load_unit_icon(legion.unit_type)
+	_units_header_icon.texture = tex
+
+func _ensure_move_button() -> void:
+	if _move_button != null:
+		return
+	if draft_controls == null:
+		return
+	var GameButtonScene := preload("res://scenes/ui/game_button.tscn")
+	_move_button = GameButtonScene.instantiate()
+	_move_button.text = "Move legion"
+	_move_button.font_size = 20
+	_move_button.preferred_width = 280
+	_move_button.visible = false
+	_move_button.pressed.connect(func() -> void: draft_move_pressed.emit())
+	# Insert above Change type.
+	var idx := draft_controls.get_children().find(change_type_button)
+	draft_controls.add_child(_move_button)
+	if idx >= 0:
+		draft_controls.move_child(_move_button, idx)
+
+func _render_actions(legion: Legion) -> void:
+	_ensure_actions_block()
+	if _inspect_action_bar == null:
+		return
+	if _draft_mode:
+		if _actions_block:
+			_actions_block.hide()
+		return
+	_actions_block.show()
+	_inspect_action_bar.set_tooltip_context_legion(legion)
+	var actions: Array[ActionDefinition] = []
+	for action in ActionTargeting.listed_actions(legion):
+		actions.append(action)
+	_inspect_action_bar.set_actions(actions, null, {})
+
 func _ensure_ranged_stat_rows() -> void:
 	if _ranged_stat != null:
 		return
-	var stats: HBoxContainer = %LegionStats
+	_ensure_stat_rows_layout()
 	_ranged_stat = _make_stat_row(ICON_BOW)
 	_ranged_value = _ranged_stat.get_child(1) as Label
 	_ranged_stat.hide()
-	stats.add_child(_ranged_stat)
-	stats.move_child(_ranged_stat, 1)
+	_row_damage.add_child(_ranged_stat)
 
 	_range_stat = _make_stat_row(ICON_RANGE)
 	_range_value = _range_stat.get_child(1) as Label
 	_range_stat.hide()
-	stats.add_child(_range_stat)
-	stats.move_child(_range_stat, 2)
+	_row_mobility.add_child(_range_stat)
 
 func _make_stat_row(icon_tex: Texture2D, text_prefix_icon: bool = false) -> HBoxContainer:
 	var row := HBoxContainer.new()

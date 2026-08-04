@@ -1,6 +1,7 @@
 extends RefCounted
 
 const MinigameSessionScript = preload("res://scripts/minigame/minigame_session.gd")
+const MinigameConfigScript = preload("res://scripts/minigame/minigame_config.gd")
 const MinigameTestHelpersScript = preload("res://tests/minigame_test_helpers.gd")
 const AttackNearestEnemyBehavior = preload("res://scripts/ai/behaviors/attack_nearest_enemy.gd")
 const HexPathfinder = preload("res://scripts/ai/hex_pathfinder.gd")
@@ -28,6 +29,16 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_activation_order_closest_first():
 		return false
+	if not _test_prefers_closer_over_same_distance_step():
+		return false
+	if not _test_ally_blocks_direct_approach_flank_or_pass():
+		return false
+	if not _test_ally_wall_does_not_shuffle_backward():
+		return false
+	if not _test_side_step_when_front_ally_blocks_closer():
+		return false
+	if not _test_pass_when_only_useless_lateral_moves():
+		return false
 	print("Success: AI attack-nearest tests")
 	return true
 
@@ -52,7 +63,7 @@ func _start_battle_with_legions(
 		"type": "draft_set_legion",
 		"team": team_b_id,
 		"coords": team_b_coords if team_b_coords != Vector2i.ZERO else slots_b[0],
-		"unit_type": "RAT_SPEAR",
+		"unit_type": "GOBLIN",
 		"unit_count": 2,
 	})
 	session.apply({"type": "draft_ready", "team": team_b_id})
@@ -187,7 +198,7 @@ func _test_melees_adjacent_when_nearest_not_attackable() -> bool:
 	_teleport_legion(session, blue_blocked, blocked_coords)
 	session.grid[blocked_coords].walkable = false
 
-	var blue_adj := Legion.new("RAT_SPEAR", 2, adj_coords, team_b)
+	var blue_adj := Legion.new("GOBLIN", 2, adj_coords, team_b)
 	session.grid[adj_coords].legion = blue_adj
 	session.legions.append(blue_adj)
 
@@ -503,3 +514,214 @@ func _test_activation_order_closest_first() -> bool:
 		push_error("At equal distance, fighting unit should activate before mover, got %s" % tie_order)
 		return false
 	return true
+
+func _test_prefers_closer_over_same_distance_step() -> bool:
+	## When a distance-reducing hex is free, never shuffle sideways at same distance.
+	var session := MinigameTestHelpersScript.prepare_session()
+	var legions: Dictionary = _start_battle_with_legions(session, Vector2i.ZERO, Vector2i.ZERO)
+	var green: Legion = legions["a"]
+	var blue: Legion = legions["b"]
+
+	var from_coords := Vector2i(-1, 2)
+	var enemy_coords := Vector2i(0, -2)
+	for c in [from_coords, enemy_coords]:
+		if session.grid.get(c) == null:
+			return true
+
+	_teleport_legion(session, green, from_coords)
+	_teleport_legion(session, blue, enemy_coords)
+
+	var before := HexPathfinder.hex_distance(from_coords, enemy_coords)
+	var cmd: Dictionary = AttackNearestEnemyBehavior.decide(session, green)
+	if cmd.get("type") != "use_action" or cmd.get("action_id") != "move":
+		push_error("Expected a move toward enemy, got %s" % cmd)
+		return false
+	var to_coords: Vector2i = cmd.get("to")
+	var after := HexPathfinder.hex_distance(to_coords, enemy_coords)
+	if after >= before:
+		push_error(
+			"Expected a strictly closer step (d=%d -> %d), got %s"
+			% [before, after, to_coords]
+		)
+		return false
+	return true
+
+func _prepare_radius5_session() -> MinigameSessionScript:
+	var config: MinigameConfigScript = MinigameTestHelpersScript.load_duel_config()
+	config = config.duplicate(true)
+	config.map_radius = 5
+	config.budget = 200
+	var session := MinigameSessionScript.new(config)
+	for tile in session.grid.values():
+		tile.terrain_type = "GRASS"
+		tile.walkable = true
+	session.refresh_deploy_slots()
+	return session
+
+func _test_ally_blocks_direct_approach_flank_or_pass() -> bool:
+	## Ally sits on the only distance-reducing hex. Step must not worsen distance.
+	## Prefer a same-dist flank that shortens the soft path; otherwise PASS.
+	var session := MinigameTestHelpersScript.prepare_session()
+	var legions: Dictionary = _start_battle_with_legions(session, Vector2i.ZERO, Vector2i.ZERO)
+	var green: Legion = legions["a"]
+	var blue: Legion = legions["b"]
+	var team_a: String = MinigameTestHelpersScript.team_a(session)
+
+	var from_coords := Vector2i(-1, 0)
+	var enemy_coords := Vector2i(-2, -1)
+	var ally_coords := Vector2i(-2, 0)
+	for c in [from_coords, enemy_coords, ally_coords]:
+		if session.grid.get(c) == null:
+			return true
+
+	_teleport_legion(session, green, from_coords)
+	_teleport_legion(session, blue, enemy_coords)
+	var ally := Legion.new("GOBLIN", 1, ally_coords, team_a)
+	session.grid[ally_coords].legion = ally
+	session.legions.append(ally)
+	green.refresh_ap()
+	session.turn_manager.waited_coords.clear()
+
+	var before := HexPathfinder.hex_distance(from_coords, enemy_coords)
+	var cmd: Dictionary = AttackNearestEnemyBehavior.decide(session, green)
+	if cmd.get("type") == "pass":
+		return true
+	if cmd.get("type") != "use_action" or cmd.get("action_id") != "move":
+		push_error("Expected flank move or pass when blocked, got %s" % cmd)
+		return false
+	var to_coords: Vector2i = cmd.get("to")
+	var after := HexPathfinder.hex_distance(to_coords, enemy_coords)
+	if after > before:
+		push_error("Blocked flank must not increase distance (%s -> %s)" % [before, after])
+		return false
+	return true
+
+func _test_ally_wall_does_not_shuffle_backward() -> bool:
+	## Wall of allies directly toward the enemy: rear unit must not step away from enemy.
+	var session := _prepare_radius5_session()
+	var legions: Dictionary = _start_battle_with_legions(session, Vector2i.ZERO, Vector2i.ZERO)
+	var rear: Legion = legions["a"]
+	var enemy: Legion = legions["b"]
+	var team_a: String = MinigameTestHelpersScript.team_a(session)
+
+	var enemy_coords := Vector2i(0, -2)
+	var rear_coords := Vector2i(0, 3)
+	var wall := [Vector2i(0, 2), Vector2i(-1, 2), Vector2i(1, 2)]
+	for c in [enemy_coords, rear_coords] + wall:
+		if session.grid.get(c) == null:
+			push_error("Missing hex for ally-wall test")
+			return false
+
+	_teleport_legion(session, rear, rear_coords)
+	_teleport_legion(session, enemy, enemy_coords)
+	for wc in wall:
+		var ally := Legion.new("GOBLIN", 1, wc, team_a)
+		session.grid[wc].legion = ally
+		session.legions.append(ally)
+	rear.refresh_ap()
+	session.turn_manager.waited_coords.clear()
+
+	var before := HexPathfinder.hex_distance(rear_coords, enemy_coords)
+	var cmd: Dictionary = AttackNearestEnemyBehavior.decide(session, rear)
+	if cmd.get("type") == "pass":
+		return true
+	if cmd.get("type") != "use_action" or cmd.get("action_id") != "move":
+		push_error("Expected move or pass behind ally wall, got %s" % cmd)
+		return false
+	var to_coords: Vector2i = cmd.get("to")
+	var after := HexPathfinder.hex_distance(to_coords, enemy_coords)
+	if after > before:
+		push_error("Must not step away behind ally wall (%s -> %s via %s)" % [before, after, to_coords])
+		return false
+	# Soft path may begin a go-around with a same-dist lateral first step.
+	return true
+
+func _test_side_step_when_front_ally_blocks_closer() -> bool:
+	## Single ally on the forward hex: AI must still make progress (side-step closer
+	## onto an empty hex, or swap forward onto the ally).
+	var session := MinigameTestHelpersScript.prepare_session()
+	var legions: Dictionary = _start_battle_with_legions(session, Vector2i.ZERO, Vector2i.ZERO)
+	var green: Legion = legions["a"]
+	var blue: Legion = legions["b"]
+	var team_a: String = MinigameTestHelpersScript.team_a(session)
+
+	var from_coords := Vector2i(0, 2)
+	var enemy_coords := Vector2i(0, -2)
+	var ally_coords := Vector2i(0, 1)
+	for c in [from_coords, enemy_coords, ally_coords]:
+		if session.grid.get(c) == null:
+			return true
+
+	_teleport_legion(session, green, from_coords)
+	_teleport_legion(session, blue, enemy_coords)
+	var ally := Legion.new("GOBLIN", 1, ally_coords, team_a)
+	ally.refresh_ap()
+	session.grid[ally_coords].legion = ally
+	session.legions.append(ally)
+	green.refresh_ap()
+	session.turn_manager.waited_coords.clear()
+
+	var before := HexPathfinder.hex_distance(from_coords, enemy_coords)
+	var cmd: Dictionary = AttackNearestEnemyBehavior.decide(session, green)
+	if cmd.get("type") != "use_action" or cmd.get("action_id") != "move":
+		push_error("Expected progress move around/through front ally, got %s" % cmd)
+		return false
+	var to_coords: Vector2i = cmd.get("to")
+	var after := HexPathfinder.hex_distance(to_coords, enemy_coords)
+	if after > before:
+		push_error("Must not increase distance (%s -> %s via %s)" % [before, after, to_coords])
+		return false
+	# Empty go-around may start with a same-dist lateral; path should still be planned.
+	var path: Array = cmd.get("path", [])
+	if after == before and path.size() < 3:
+		push_error("Same-dist step should start a multi-step path around ally, got %s" % cmd)
+		return false
+	return true
+
+func _test_pass_when_only_useless_lateral_moves() -> bool:
+	## Closer neighbors occupied: soft plan may path through them, but the legal
+	## walk prefix stops before occupied tiles → PASS (or a non-worsening step).
+	var session := MinigameTestHelpersScript.prepare_session()
+	var legions: Dictionary = _start_battle_with_legions(session, Vector2i.ZERO, Vector2i.ZERO)
+	var green: Legion = legions["a"]
+	var blue: Legion = legions["b"]
+	var team_a: String = MinigameTestHelpersScript.team_a(session)
+
+	var from_coords := Vector2i(0, 0)
+	var enemy_coords := Vector2i(3, -3)
+	if session.grid.get(from_coords) == null or session.grid.get(enemy_coords) == null:
+		return true
+
+	_teleport_legion(session, green, from_coords)
+	_teleport_legion(session, blue, enemy_coords)
+
+	var before := HexPathfinder.hex_distance(from_coords, enemy_coords)
+	var Utils = preload("res://scripts/core/utils.gd")
+	for adj in Utils.get_surrounding_coords(from_coords):
+		var tile: Tile = session.grid.get(adj)
+		if tile == null:
+			continue
+		var d := HexPathfinder.hex_distance(adj, enemy_coords)
+		if d < before:
+			var blocker := Legion.new("GOBLIN", 1, adj, team_a)
+			tile.legion = blocker
+			session.legions.append(blocker)
+
+	green.refresh_ap()
+	session.turn_manager.waited_coords.clear()
+	var movable := session.get_movable_coords(from_coords)
+	for m in movable:
+		if HexPathfinder.hex_distance(m, enemy_coords) < before:
+			return true
+
+	var cmd: Dictionary = AttackNearestEnemyBehavior.decide(session, green)
+	if cmd.get("type") == "pass":
+		return true
+	if cmd.get("type") == "use_action" and cmd.get("action_id") == "move":
+		var to_coords: Vector2i = cmd.get("to")
+		if HexPathfinder.hex_distance(to_coords, enemy_coords) > before:
+			push_error("Must not step farther from enemy, got %s" % to_coords)
+			return false
+		return true
+	push_error("Expected PASS or non-worsening move, got %s" % cmd)
+	return false

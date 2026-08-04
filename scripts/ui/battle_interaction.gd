@@ -4,6 +4,7 @@ extends RefCounted
 const ActionDefinitionScript = preload("res://scripts/actions/action_definition.gd")
 const ActionTargetingScript = preload("res://scripts/actions/action_targeting.gd")
 const BattleStateScript = preload("res://scripts/actions/battle_state.gd")
+const MoveReachabilityScript = preload("res://scripts/battle/move_reachability.gd")
 const UiTheme = preload("res://scripts/ui/ui_theme.gd")
 
 const LIFT_NONE := 0.0
@@ -24,6 +25,7 @@ var tile_visu_fn: Callable
 var is_locked_fn: Callable
 var can_act_fn: Callable
 var apply_action_fn: Callable
+var apply_move_path_fn: Callable = Callable()
 var allows_spawn_fn: Callable = func(_coords: Vector2i) -> bool: return false
 var spawn_fn: Callable = func(_coords: Vector2i) -> void: pass
 var battle_phase_fn: Callable = func() -> bool: return true
@@ -45,15 +47,22 @@ var turn_manager_fn: Callable
 var legions_fn: Callable
 var _events_bound: bool = false
 var _attack_choice_popup: Control = null
+var _pending_move_dest: Vector2i
+var _pending_move_active: bool = false
+var _pending_first_steps: Array[Vector2i] = []
+var _pending_parents: Dictionary = {}
+var _context = null
 
 func bind_from_context(context) -> void:
 	## Single wiring entry so hosts don't re-declare the same Callables.
+	_context = context
 	battle_state_fn = func(): return context.battle_state()
 	tile_visu_fn = func(coords: Vector2i) -> TileVisu: return context.tile_visu_at(coords)
 	is_locked_fn = func() -> bool: return context.is_input_locked()
 	can_act_fn = func(legion: Legion) -> bool: return context.can_act_legion(legion)
 	apply_action_fn = func(action_id: String, from_coords: Vector2i, to_coords: Vector2i) -> void:
 		context.apply_action(action_id, from_coords, to_coords)
+	apply_move_path_fn = func(path: Array) -> void: context.apply_move_path(path)
 	battle_phase_fn = func() -> bool: return context.in_battle_phase()
 	allows_spawn_fn = func(coords: Vector2i) -> bool: return context.allows_spawn(coords)
 	spawn_fn = func(coords: Vector2i) -> void: context.spawn_at(coords)
@@ -99,6 +108,9 @@ func deselect() -> void:
 	selected_action = null
 	target_coords.clear()
 	default_target_actions.clear()
+	_pending_move_active = false
+	_pending_first_steps.clear()
+	_pending_parents.clear()
 	_info_visible_for_tile = false
 	_clear_inspect_fn.call()
 	if action_bar:
@@ -150,7 +162,11 @@ func select_action(action: ActionDefinitionScript) -> void:
 
 	_clear_overlay_visuals()
 	selected_action = action
-	target_coords = ActionTargetingScript.get_targets(state, legion, action)
+	if action.id == "move":
+		var reach := MoveReachabilityScript.compute(state, legion)
+		target_coords = reach["reachable"]
+	else:
+		target_coords = ActionTargetingScript.get_targets(state, legion, action)
 	default_target_actions.clear()
 	if action_bar:
 		action_bar.set_selected(action)
@@ -179,15 +195,23 @@ func refresh_after_action(legion_coords: Vector2i) -> void:
 	var state: BattleStateScript = battle_state_fn.call()
 	if state == null:
 		deselect()
+		_sync_spent_visuals()
 		return
 	var legion: Legion = _legion_at(state, legion_coords)
 	if legion and bool(can_act_fn.call(legion)):
 		select_tile(legion_coords)
 	else:
 		deselect()
+	_sync_spent_visuals()
 
 func clear_overlays() -> void:
 	_clear_overlay_visuals()
+	_sync_spent_visuals()
+
+func _sync_spent_visuals() -> void:
+	if _context == null or _context.presenter == null or _context.session == null:
+		return
+	_context.presenter.sync_spent_visuals(_context.session)
 
 func _clear_overlay_visuals() -> void:
 	for c in _overlay_coords:
@@ -220,6 +244,7 @@ func pass_current_legion() -> void:
 		var tm: TurnManager = turn_manager_fn.call()
 		tm.wait_legion(selected_coords)
 		deselect()
+		_sync_spent_visuals()
 	cycle_legion_tab()
 
 func _on_action_bar_pressed(action: ActionDefinitionScript) -> void:
@@ -287,13 +312,25 @@ func _dispatch_click(coords: Vector2i) -> void:
 		_hide_attack_choice_popup()
 		return
 
+	if _pending_move_active:
+		if coords in _pending_first_steps:
+			var path: Array[Vector2i] = MoveReachabilityScript.path_after_first_step(
+				selected_coords, _pending_move_dest, coords, _pending_parents
+			)
+			_pending_move_active = false
+			_execute_move_path(path)
+		return
+
 	if has_selected and selected_action:
 		var is_self_target := (
 			selected_action.targeting == ActionDefinitionScript.TargetingKind.SELF
 			and coords == selected_coords
 		)
 		if coords in target_coords or is_self_target:
-			apply_action_fn.call(selected_action.id, selected_coords, coords)
+			if selected_action.id == "move":
+				_try_move_to(coords)
+			else:
+				apply_action_fn.call(selected_action.id, selected_coords, coords)
 			return
 		return
 	if has_selected and default_target_actions.has(coords):
@@ -303,7 +340,11 @@ func _dispatch_click(coords: Vector2i) -> void:
 			_show_attack_choice_popup(coords, attack_ids)
 			return
 		if not actions.is_empty():
-			apply_action_fn.call(String(actions[0]), selected_coords, coords)
+			var aid := String(actions[0])
+			if aid == "move":
+				_try_move_to(coords)
+			else:
+				apply_action_fn.call(aid, selected_coords, coords)
 		return
 	if has_selected and coords == selected_coords:
 		deselect()
@@ -324,13 +365,49 @@ func _dispatch_click(coords: Vector2i) -> void:
 	if bool(allows_spawn_fn.call(coords)):
 		spawn_fn.call(coords)
 
+func _try_move_to(dest: Vector2i) -> void:
+	var state: BattleStateScript = battle_state_fn.call()
+	if state == null:
+		return
+	var legion: Legion = _legion_at(state, selected_coords)
+	if legion == null:
+		return
+	var analysis := MoveReachabilityScript.analyze_destination(state, legion, dest)
+	if not analysis.get("ok", false):
+		apply_action_fn.call("move", selected_coords, dest)
+		return
+	if bool(analysis.get("ambiguous", false)):
+		_pending_move_active = true
+		_pending_move_dest = dest
+		_pending_first_steps = analysis["first_steps"]
+		_pending_parents = MoveReachabilityScript.compute(state, legion)["parents"]
+		_clear_overlay_visuals()
+		_paint_tile(selected_coords, "selected", LIFT_SELECTED)
+		for step in _pending_first_steps:
+			_paint_tile(step, "movable", LIFT_OPTION)
+		return
+	_execute_move_path(analysis["path"])
+
+func _execute_move_path(path: Array) -> void:
+	if path.size() < 2:
+		return
+	if apply_move_path_fn.is_valid():
+		apply_move_path_fn.call(path)
+		return
+	# Fallback: only first step if no path runner (should not happen in minigame).
+	apply_action_fn.call("move", path[0], path[1])
+
 func _paint_default_targets(state: BattleStateScript, legion: Legion) -> void:
 	default_target_actions.clear()
 	for action_id in DEFAULT_HIGHLIGHT_ACTION_IDS:
 		var action: ActionDefinitionScript = ActionDefs.get_def(action_id)
 		if action == null or not ActionTargetingScript.can_use(state, legion, action):
 			continue
-		for c in ActionTargetingScript.get_targets(state, legion, action):
+		var targets: Array[Vector2i] = ActionTargetingScript.get_targets(state, legion, action)
+		if action_id == "move":
+			var reach := MoveReachabilityScript.compute(state, legion)
+			targets = reach["reachable"]
+		for c in targets:
 			if c == selected_coords:
 				continue
 			if not default_target_actions.has(c):

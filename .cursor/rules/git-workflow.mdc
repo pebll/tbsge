@@ -1,0 +1,16 @@
+---
+description: Use branches and commits automatically when implementing features or fixes
+alwaysApply: true
+---
+
+# Git workflow (FableQuest)
+
+When the user asks you to **implement**, **fix**, or **build** something (not question-only / review-only):
+
+1. **Branch** — Work on a short-lived branch off `main`, e.g. `cursor/<topic>`. Create it if you are still on `main` and the task is non-trivial.
+2. **Commits** — Commit logical chunks with clear messages (why, not only what). Run `./run_tests.sh` (or the headless test command) before committing when code changed.
+3. **Do not** force-push, rewrite shared history, or open/push PRs unless the user asks.
+4. **Noise** — Do not commit `.import` churn or `.uid` files unless the user wants them.
+5. **User override** — If the user says “no commit” or tutor-only mode, skip commits until they say otherwise.
+
+After a feature slice is green, commit on the branch. Mention branch name and latest commit in the summary.

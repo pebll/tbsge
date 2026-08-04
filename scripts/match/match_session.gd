@@ -84,8 +84,21 @@ func resolve_use_action(cmd: Dictionary) -> Dictionary:
 	var payload: Dictionary = result.get("payload", {})
 	_collect_cleanup_coords(payload)
 	var ok_result := _ok(result.get("events", []).duplicate(), payload)
-	_append_action_log(BattleActionLogFormatterScript.from_use_action(self, ok_result))
+	# Multi-hex paths skip per-step logs and emit one coalesced entry afterward.
+	if not bool(cmd.get("skip_action_log", false)):
+		_append_action_log(BattleActionLogFormatterScript.from_use_action(self, ok_result))
 	return ok_result
+
+## One battle-log card for a walk/swap from `from` to `to` (e.g. after a path).
+func log_move_relocation(from: Vector2i, to: Vector2i, swapped: bool = false) -> void:
+	var events: Array = ["legions_swapped"] if swapped else ["legion_moved"]
+	var payload := {
+		"action_id": "move",
+		"from": from,
+		"to": to,
+		"legion": get_legion_at(to),
+	}
+	_append_action_log(BattleActionLogFormatterScript.from_use_action(self, _ok(events, payload)))
 
 func apply_end_turn() -> Dictionary:
 	var ending_team: String = turn_manager.active_team_id
@@ -115,9 +128,8 @@ func apply_pass_legion(coords: Vector2i) -> Dictionary:
 	if not can_act_legion(legion):
 		return _fail("Legion cannot pass")
 	turn_manager.wait_legion(coords)
-	var ok_result := _ok(["legion_passed"], {"coords": coords})
-	_append_action_log(BattleActionLogFormatterScript.from_pass_legion(self, coords))
-	return ok_result
+	# Wait/pass is silent in the battle log (same boot icon as Move was confusing).
+	return _ok(["legion_passed"], {"coords": coords})
 
 func _append_action_log(entry: Dictionary) -> void:
 	if action_log == null or entry.is_empty():

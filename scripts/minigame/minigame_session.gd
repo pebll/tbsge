@@ -23,7 +23,7 @@ func _init(p_config) -> void:
 	grid = MapBuilderScript.build_grid(config.map_radius, -1, config.team_ids)
 	_rng.seed = 1337
 	for team_id in config.team_ids:
-		drafts[team_id] = DraftStateScript.new(team_id, config.budget)
+		drafts[team_id] = DraftStateScript.new(team_id, config.budget_for_team(team_id))
 		deploy_slots[team_id] = _walkable_deploy_slots(
 			MinigameRulesScript.deploy_zone_coords(
 				config.map_radius,
@@ -107,6 +107,8 @@ func _apply_draft(cmd_type: String, cmd: Dictionary) -> Dictionary:
 			return _draft_set_legion(cmd)
 		"draft_clear_slot":
 			return _draft_clear_slot(cmd)
+		"draft_move_legion":
+			return _draft_move_legion(cmd)
 		"draft_ready":
 			return _draft_ready(cmd)
 		_:
@@ -173,6 +175,34 @@ func _draft_clear_slot(cmd: Dictionary) -> Dictionary:
 	draft.remaining_budget += MinigameRulesScript.legion_cost(existing.unit_type, existing.unit_count)
 	draft.remove_placement(coords)
 	return _ok(["draft_updated"], {"team": team_id, "coords": coords})
+
+func _draft_move_legion(cmd: Dictionary) -> Dictionary:
+	var team_id: String = String(cmd.get("team", ""))
+	if team_id != active_draft_team:
+		return _fail("Not this team's draft turn")
+	var from_coords: Vector2i = cmd.get("from", Vector2i.ZERO)
+	var to_coords: Vector2i = cmd.get("to", Vector2i.ZERO)
+	var draft = drafts.get(team_id)
+	if draft == null:
+		return _fail("Unknown team")
+	if draft.ready:
+		return _fail("Team already ready")
+	if from_coords == to_coords:
+		return _fail("Same slot")
+	var slots: Array = deploy_slots.get(team_id, [])
+	if from_coords not in slots or to_coords not in slots:
+		return _fail("Not a deploy slot")
+	var from_placement = draft.find_placement(from_coords)
+	if from_placement == null:
+		return _fail("No legion to move")
+	var to_placement = draft.find_placement(to_coords)
+	if to_placement == null:
+		from_placement.coords = to_coords
+		return _ok(["draft_updated"], {"team": team_id, "from": from_coords, "to": to_coords})
+	# Swap placements.
+	from_placement.coords = to_coords
+	to_placement.coords = from_coords
+	return _ok(["draft_updated"], {"team": team_id, "from": from_coords, "to": to_coords, "swapped": true})
 
 func _draft_ready(cmd: Dictionary) -> Dictionary:
 	var team_id: String = String(cmd.get("team", ""))

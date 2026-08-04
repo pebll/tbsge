@@ -10,8 +10,11 @@ const BANNER_TEXTURES := [
 var legion: Legion
 var _unit_to_visu: Dictionary = {}
 
+const HexLayoutScript = preload("res://scripts/core/hex_layout.gd")
+
 @onready var units: Node2D = $Units
 @onready var banner: Sprite2D = $Banner
+@onready var shadow: Sprite2D = get_node_or_null("Shadow") as Sprite2D
 var corpses: Node2D
 @onready var idle_tween: Tween
 @onready var active_tween: Tween
@@ -19,6 +22,9 @@ var corpses: Node2D
 
 var current_offset: Vector2 = Vector2(0, 0)
 var _formation_seed: int = 0
+## While tweening a move, depth uses the southernmost Y of the path so the
+## legion stays above destination tiles (old +10 unit bias did this by accident).
+var _move_depth_y: float = INF
 
 const FORMATION_BASE_SPACING := 30.0
 const FORMATION_MAX_RADIUS := 58.0
@@ -31,8 +37,8 @@ func init(p_legion: Legion, formation_seed: int = -1) -> void:
 	if corpses == null:
 		corpses = Node2D.new()
 		corpses.name = "Corpses"
-		corpses.z_index = units.z_index
 		add_child(corpses)
+		_sync_internal_layers()
 	for unit in legion.units:
 		var unit_visu: UnitVisu = preload("res://scenes/unit.tscn").instantiate()
 		unit_visu.init(unit)
@@ -60,6 +66,31 @@ func _apply_team_banner() -> void:
 	banner.texture = BANNER_TEXTURES[idx]
 	banner.self_modulate = team.color
 	banner.visible = true
+	_sync_internal_layers()
+
+func _sync_depth_sort() -> void:
+	var y := position.y
+	if _move_depth_y < INF:
+		y = maxf(y, _move_depth_y)
+	# Row base only — child layers (shadow/banner/units) stack within the stride.
+	z_index = HexLayoutScript.depth_sort_z(y, HexLayoutScript.DEPTH_LAYER_TILE)
+	_sync_internal_layers()
+
+## Within one hex: tile (sibling) < shadow < banner < units.
+## Cross-hex order comes from the row base on this LegionVisu.
+func _sync_internal_layers() -> void:
+	if shadow:
+		shadow.z_as_relative = true
+		shadow.z_index = HexLayoutScript.DEPTH_LAYER_SHADOW
+	if banner:
+		banner.z_as_relative = true
+		banner.z_index = HexLayoutScript.DEPTH_LAYER_BANNER
+	if units:
+		units.z_as_relative = true
+		units.z_index = HexLayoutScript.DEPTH_LAYER_UNITS
+	if corpses:
+		corpses.z_as_relative = true
+		corpses.z_index = HexLayoutScript.DEPTH_LAYER_UNITS
 
 func _get_formation_scale() -> float:
 	if legion == null:
@@ -188,12 +219,28 @@ func start_idle_animation() -> void:
 func juice_move(target_pos: Vector2) -> Tween:
 	var move_time := 0.4
 	update_local_positions()
+	if move_tween and move_tween.is_valid():
+		move_tween.kill()
+	# Hold the southernmost path depth for the whole slide (see _move_depth_y).
+	_move_depth_y = maxf(position.y, target_pos.y)
+	_sync_depth_sort()
 	move_tween = create_tween()
 	active_tween = move_tween
+	move_tween.set_parallel(true)
 	move_tween.tween_property(self, "position", target_pos, move_time).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	move_tween.tween_method(_on_move_depth_tick, 0.0, 1.0, move_time)
+	move_tween.set_parallel(false)
+	move_tween.tween_callback(_finish_move_depth)
 	for unit in units.get_children():
 		unit.juice_move(target_pos)
 	return move_tween
+
+func _on_move_depth_tick(_t: float) -> void:
+	_sync_depth_sort()
+
+func _finish_move_depth() -> void:
+	_move_depth_y = INF
+	_sync_depth_sort()
 
 func juice_attack(direction: Vector2) -> void:
 	for unit in units.get_children():
@@ -206,6 +253,18 @@ func juice_hitted(direction: Vector2) -> void:
 func juice_squish() -> void:
 	for unit in units.get_children():
 		unit.juice_squish()
+
+## Light grey-out when the legion has no AP left / has waited this turn.
+func set_spent_visual(spent: bool) -> void:
+	var tint := Color(0.62, 0.62, 0.65, 1.0) if spent else Color.WHITE
+	if units:
+		for child in units.get_children():
+			if child is CanvasItem:
+				(child as CanvasItem).modulate = tint
+	if corpses:
+		for child in corpses.get_children():
+			if child is CanvasItem:
+				(child as CanvasItem).modulate = tint
 
 func juice_direct(direction: Vector2) -> void:
 	for unit in units.get_children():

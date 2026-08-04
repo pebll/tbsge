@@ -14,7 +14,8 @@ var legion_to_visu: Dictionary = {}
 var tiles_container: Node
 
 func _ready() -> void:
-	tiles_container = Node.new()
+	# Node2D so tile CanvasItems share a clear parent with legion siblings.
+	tiles_container = Node2D.new()
 	tiles_container.name = "Tiles"
 	add_child(tiles_container)
 
@@ -27,7 +28,9 @@ func build_map_from_grid(grid: Dictionary) -> void:
 			coords, tile_size, tile_size_xy_ratio
 		)
 		hex_tile.position = world_pos
-		hex_tile.z_index = HexLayoutScript.depth_sort_z(world_pos.y)
+		hex_tile.z_index = HexLayoutScript.depth_sort_z(
+			world_pos.y, HexLayoutScript.DEPTH_LAYER_TILE
+		)
 		tiles_container.add_child(hex_tile)
 		hex_tile.init(tile)
 		grid_visu[coords] = hex_tile
@@ -52,6 +55,33 @@ func sync_legions(session: MatchSessionScript) -> void:
 		if legion_to_visu.has(legion):
 			continue
 		spawn_legion_visu(legion)
+	sync_spent_visuals(session)
+
+## Grey out legions (and their tiles) that have spent all AP or waited this turn.
+## Only the active team is marked spent — inactive teams keep full color so grey
+## clears as soon as the turn changes, and again when their turn returns with fresh AP.
+func sync_spent_visuals(session: MatchSessionScript) -> void:
+	if session == null:
+		return
+	var active := ""
+	var waited: Array = []
+	if session.turn_manager:
+		active = session.turn_manager.active_team_id
+		waited = session.turn_manager.waited_coords
+	for coords in grid_visu.keys():
+		var tile_visu: TileVisu = grid_visu[coords]
+		if tile_visu == null:
+			continue
+		var legion: Legion = null
+		var tile: Tile = session.grid.get(coords)
+		if tile and tile.has_legion() and not tile.legion.units.is_empty():
+			legion = tile.legion
+		var spent := false
+		if legion != null and legion.team_id == active:
+			spent = (not legion.has_ap()) or (legion.tile_coords in waited)
+		tile_visu.set_spent(spent)
+		if tile_visu.legion_visu:
+			tile_visu.legion_visu.set_spent_visual(spent)
 
 func spawn_legion_visu(legion: Legion, formation_seed: int = -1) -> void:
 	var tile_visu: TileVisu = grid_visu.get(legion.tile_coords)
@@ -63,6 +93,8 @@ func spawn_legion_visu(legion: Legion, formation_seed: int = -1) -> void:
 	tile_visu.legion_visu = legion_visu
 	legion_visu.init(legion, formation_seed)
 	legion_visu.position = tile_visu.position
+	# Depth must be applied after position — init runs at (0,0) before placement.
+	legion_visu._sync_depth_sort()
 
 func rewire_legion_tile(legion: Legion, from_coords: Vector2i, to_coords: Vector2i) -> void:
 	var visu: LegionVisu = get_legion_visu(legion)

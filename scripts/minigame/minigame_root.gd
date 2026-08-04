@@ -48,7 +48,7 @@ var _pause_menu: PauseMenu
 
 func _ready() -> void:
 	AudioManager.ensure_music()
-	var config: MinigameConfig = load(config_path)
+	var config: MinigameConfig = GameSettings.resolve_minigame_config(config_path)
 	if config == null:
 		push_error("Failed to load minigame config: %s" % config_path)
 		return
@@ -106,6 +106,7 @@ func _on_pause_resume() -> void:
 		_pause_menu.close_menu()
 
 func _on_pause_abandon() -> void:
+	GameSettings.clear_match_launch()
 	get_tree().change_scene_to_file(MENU_SCENE)
 
 func inspect_tile(coords: Vector2i) -> void:
@@ -156,6 +157,8 @@ func _setup_battle_context() -> void:
 		func() -> void: clear_inspect(),
 		func() -> Node: return _overlay_layer
 	)
+	battle_context.apply_move_path_fn = func(path: Array) -> void:
+		battle.request_move_path(path)
 	battle_context.battle_phase_fn = func() -> bool: return session.phase == MinigameSessionScript.Phase.BATTLE
 
 func _connect_phase_signals() -> void:
@@ -169,6 +172,7 @@ func _connect_phase_signals() -> void:
 	_tile_info_panel.draft_count_max_pressed.connect(func() -> void: draft.handle_count_max())
 	_tile_info_panel.draft_clear_slot_pressed.connect(func() -> void: draft.handle_clear_slot())
 	_tile_info_panel.draft_change_type_pressed.connect(func() -> void: draft.handle_change_type())
+	_tile_info_panel.draft_move_pressed.connect(func() -> void: draft.handle_move_mode())
 	_pass_continue_btn.pressed.connect(func() -> void: draft.handle_pass_continue())
 	battle_ui.attach_action_bar(_action_bar)
 
@@ -273,6 +277,8 @@ func _on_battle_log_entry_added(entry: Dictionary) -> void:
 		_action_log_panel.receive_entry(entry)
 
 func _on_legion_ap_changed(legion: Legion) -> void:
+	if presenter and session:
+		presenter.sync_spent_visuals(session)
 	if not _tile_info_panel or not _tile_info_panel.visible:
 		return
 	var tile: Tile = session.grid.get(legion.tile_coords)
@@ -283,4 +289,5 @@ func _on_game_over_new_game() -> void:
 	get_tree().change_scene_to_file(MINIGAME_SCENE)
 
 func _on_game_over_main_menu() -> void:
+	GameSettings.clear_match_launch()
 	get_tree().change_scene_to_file(MENU_SCENE)

@@ -13,6 +13,7 @@ var deps: MinigamePhaseDeps
 var viewing_team: String = ""
 var selected_coords: Vector2i = INVALID_COORDS
 var picker_for_change_type: bool = false
+var move_mode: bool = false
 
 func _init(phase_deps: MinigamePhaseDeps) -> void:
 	deps = phase_deps
@@ -47,7 +48,28 @@ func handle_tile_clicked(coords: Vector2i) -> void:
 		return
 	_play_draft_click_sound(coords)
 
+	if move_mode and selected_coords != INVALID_COORDS and _slot_is_occupied(selected_coords):
+		if coords == selected_coords:
+			move_mode = false
+			refresh_view()
+			return
+		var move_result: Dictionary = deps.session.apply({
+			"type": "draft_move_legion",
+			"team": viewing_team,
+			"from": selected_coords,
+			"to": coords,
+		})
+		move_mode = false
+		if move_result["ok"]:
+			selected_coords = coords
+			refresh_view()
+		else:
+			_show_error_toast(String(move_result.get("error", "Move failed")))
+			refresh_view()
+		return
+
 	selected_coords = coords
+	move_mode = false
 	if _slot_is_occupied(coords):
 		_show_draft_tile_info(coords)
 		refresh_view()
@@ -82,7 +104,8 @@ func inspect_tile(coords: Vector2i) -> void:
 		deps.presenter.paint_deploy_zones(
 			deps.session.get_deploy_slots(viewing_team),
 			_collect_occupied_coords(draft),
-			selected_coords
+			selected_coords,
+			move_mode
 		)
 		return
 	deps.tile_info_panel.hide()
@@ -179,6 +202,7 @@ func handle_count_max() -> void:
 func handle_clear_slot() -> void:
 	if selected_coords == INVALID_COORDS:
 		return
+	move_mode = false
 	var result: Dictionary = deps.session.apply({
 		"type": "draft_clear_slot",
 		"team": viewing_team,
@@ -187,6 +211,15 @@ func handle_clear_slot() -> void:
 	if result["ok"]:
 		selected_coords = INVALID_COORDS
 		refresh_view()
+
+func handle_move_mode() -> void:
+	if selected_coords == INVALID_COORDS:
+		return
+	if not _slot_is_occupied(selected_coords):
+		return
+	move_mode = true
+	refresh_view()
+	_show_error_toast("Click a deploy square to move this legion")
 
 func refresh_view() -> void:
 	var view: Dictionary = deps.session.get_view_state(viewing_team)
@@ -198,7 +231,7 @@ func refresh_view() -> void:
 	for p in draft.get("placements", []):
 		occupied.append(p.get("coords", Vector2i.ZERO))
 
-	deps.presenter.paint_deploy_zones(slots, occupied, selected_coords)
+	deps.presenter.paint_deploy_zones(slots, occupied, selected_coords, move_mode)
 	deps.presenter.sync_draft_previews(draft.get("placements", []), viewing_team)
 
 	if selected_coords != INVALID_COORDS:

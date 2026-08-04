@@ -19,9 +19,17 @@ func append(entry: Dictionary) -> void:
 	entry_added.emit(entry)
 
 ## Visibility always follows GameSettings so UI never desyncs from Options.
+## Teleport stays visible; only walk/swap relocations follow "Show moves".
 func is_entry_visible(entry: Dictionary) -> bool:
 	var action_id := String(entry.get("action_id", ""))
-	if action_id in ["move", "swap"]:
+	var result_summary := String(entry.get("result_summary", ""))
+	# Wait/pass is never shown (and no longer appended).
+	if action_id == "pass" or result_summary == "waited":
+		return false
+	if (
+		action_id in ["move", "swap"]
+		or result_summary in ["moved", "swapped"]
+	):
 		return GameSettings.show_battle_log_moves
 	if action_id == "end_turn":
 		return GameSettings.show_battle_log_end_turns

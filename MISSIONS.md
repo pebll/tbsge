@@ -1,20 +1,22 @@
 # FableQuest missions
 
 Living checklist. Update as items are done; keep **short-term** small and shippable.  
-You own git — agents should not commit unless you ask.
+Agents: use branches + commits per `.cursor/rules/git-workflow.mdc` when implementing.
 
 ---
 
 ## Status snapshot
 
-**Done recently**
-- Engine vs modes refactor; shared battle host wiring; asset archive; icon batch (`range` / `size` wired).
-- Combat basics: melee, ranged, self-heal, shield, terminal vs non-terminal AP.
+**Done recently (on `main`)**
+- Engine vs modes refactor; minigame draft → battle; AI; balance runner.
+- Combat: melee, ranged, self-heal, shield, ally heal (focused), cooldowns, teleport.
+- UX: tooltips + glossary, battle log, action bar clarity, Options/Sounds, pause menu, parchment theme.
+- Git: `main` aligned with refactor line (Aug 2026).
 
-**Next focus (order)**
-1. **UX foundations** — general tooltips, then a left-side **action log** (before stacking more skills).  
-2. **Tactical skill variety** — ally heal → cooldowns/teleport → terrain → statuses → more actions.  
-3. **Unit complexity tiers** — teach the player; gate complicated kits via missions/unlocks later.
+**Next focus — Playtest polish (epic P below), then finish playable v0.1, then**
+1. **Terrain (T3)** — LOS, forest defense, terrain inspect.  
+2. **Statuses (T4)** — buffs/debuffs.  
+3. **Campaign / unlock pacing** — tier I→IV, not required for first skirmish loop.
 
 **Parked**
 - Full SFX content pass.
@@ -28,10 +30,57 @@ You own git — agents should not commit unless you ask.
 ### Done
 - [x] Refactor slices A–E; missions board; music → `assets/music/`
 - [x] Range + size icons from batch3
+- [x] Play → game setup (map size / difficulty) + AI debug persistence
 
 ### Still open (your side)
 - [ ] Manual smoke — report ok / what failed (see below)
 - [ ] Later: approve delete list from `assets/_archive/`
+
+---
+
+## Epic P — Playtest polish (Aug 2026)
+
+Ship as separate slices (UX → draft/move → AI). Branch: `cursor/playtest-polish`.
+
+- [x] **P1** Main menu **Quit game**
+- [x] **P2** Pause menu floating box (not fullscreen parchment fill)
+- [x] **P3** Banners always draw in front of neighboring legions
+- [x] **P4** Legion info panel: Health/Shield → Melee/Ranged → Size/Cost → AP/Range → actions → units
+- [x] **P5** Draft: move/redeploy a legion to another deploy square
+- [x] **P6** Multi-AP move highlights; unambiguous path in one go; ambiguous first step re-asks
+- [x] **P7** Pathfinding soft-blocks: still advance toward target when distant allies block
+- [x] **P8** AI role positioning: melee/tanks front, healers/ranged behind
+- [x] **P9** AI greedy net-HP scoring (heal +10 beats deal 18 / take 10 → +8)
+
+---
+
+## Playable v0.1 — “one fun skirmish” (polish before new systems)
+
+Goal: a friend can launch from **main menu → Play → draft → fight → win/lose → play again** without Dev Test, docs, or known UX traps.
+
+### Must-have (ship blockers)
+- [x] **Single entry path** — main menu **Play** → setup (map size / difficulty) → minigame.
+- [ ] **End-to-end loop** — game over → rematch or main menu; no dead ends.
+- [ ] **Manual smoke green** — all items in “How manual smoke works” + pause/tooltips/log/heal/teleport checklist (from recent UX work).
+- [ ] **AI completes a full battle** — no soft-lock; human can win and lose.
+- [x] **Draft is understandable** — budget, unit cap, deploy slots, pass/continue; **8 role-distinct units** in the pool (chaff, shield tank, HP wall, long range, short spit, healer, assassin, AP3 bruiser).
+- [ ] **Fix doc drift** — `README.md` / `AGENT_NOTES.md` panel + action list match current behavior (select-sticky info, full action set).
+
+### Should-have (polish)
+- [ ] **First-run hints** — one line on first select: “Pick a legion, then an action” (coach mark or tooltip footer; no full tutorial yet).
+- [ ] **Turn clarity** — whose turn + end turn obvious (`TurnHud` + wait/pass discoverable).
+- [ ] **Win screen copy** — winner team name, short “Draft again?” CTA.
+- [ ] **Dev Test** — keep for sandbox/duel variants but label as “Advanced / Lab”.
+- [ ] **Delete local `git replace` refs** if any reappear (`git replace -l`) so history matches GitHub.
+- [x] **Depth while moving** — legion z-index updates during move tweens from current world Y (no longer only at path end).
+- [x] **Battle log move cards** — path coalesce + move/swap filter; Wait no longer reuses the Move boot icon (was easy to misread as a move).
+- [x] **AI soft paths** — occupancy cost 3× empty; walk AP-limited empty prefixes; teleport in greedy scoring; focus support/ranged then weakest HP.
+
+### Nice-to-have (after v0.1)
+- Terrain T3, statuses T4, SFX pass, fog, campaign unlocks (see epics below).
+
+### Explicitly out of scope for v0.1
+- New actions beyond current roster, balance perfection, multiplayer, save/load campaign.
 
 ---
 

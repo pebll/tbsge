@@ -1,22 +1,15 @@
 [gd_resource type="Resource" format=3 uid="uid://c6v7x3gqut6p8"]
 
 [ext_resource type="Script" path="res://scripts/resources/unit_database.gd" id="1_db"]
-[ext_resource type="Resource" path="res://data/units/spider.tres" id="2_spider"]
-[ext_resource type="Resource" path="res://data/units/goblin.tres" id="3_goblin"]
-[ext_resource type="Resource" path="res://data/units/skeleton.tres" id="4_skeleton"]
-[ext_resource type="Resource" path="res://data/units/rat_spear.tres" id="5_rat_spear"]
-[ext_resource type="Resource" path="res://data/units/assassin.tres" id="6_assassin"]
-[ext_resource type="Resource" path="res://data/units/gargoyle.tres" id="7_gargoyle"]
-[ext_resource type="Resource" path="res://data/units/scorpion_rider.tres" id="8_scorpion_rider"]
-[ext_resource type="Resource" path="res://data/units/ogre.tres" id="9_ogre"]
-[ext_resource type="Resource" path="res://data/units/demon.tres" id="10_demon"]
-[ext_resource type="Resource" path="res://data/units/golem.tres" id="11_golem"]
-[ext_resource type="Resource" path="res://data/units/archer.tres" id="12_archer"]
-[ext_resource type="Resource" path="res://data/units/rat_archer.tres" id="13_rat_archer"]
-[ext_resource type="Resource" path="res://data/units/mage.tres" id="14_mage"]
-[ext_resource type="Resource" path="res://data/units/flame.tres" id="15_flame"]
-[ext_resource type="Resource" path="res://data/units/sand_spirit.tres" id="16_sand_spirit"]
+[ext_resource type="Resource" path="res://data/units/goblin.tres" id="2_goblin"]
+[ext_resource type="Resource" path="res://data/units/gargoyle.tres" id="3_gargoyle"]
+[ext_resource type="Resource" path="res://data/units/golem.tres" id="4_golem"]
+[ext_resource type="Resource" path="res://data/units/archer.tres" id="5_archer"]
+[ext_resource type="Resource" path="res://data/units/spider.tres" id="6_spider"]
+[ext_resource type="Resource" path="res://data/units/mage.tres" id="7_mage"]
+[ext_resource type="Resource" path="res://data/units/assassin.tres" id="8_assassin"]
+[ext_resource type="Resource" path="res://data/units/scorpion_rider.tres" id="9_scorpion_rider"]
 
 [resource]
 script = ExtResource("1_db")
-defs = Array[Resource]([ExtResource("2_spider"), ExtResource("3_goblin"), ExtResource("4_skeleton"), ExtResource("5_rat_spear"), ExtResource("6_assassin"), ExtResource("7_gargoyle"), ExtResource("8_scorpion_rider"), ExtResource("9_ogre"), ExtResource("10_demon"), ExtResource("11_golem"), ExtResource("12_archer"), ExtResource("13_rat_archer"), ExtResource("14_mage"), ExtResource("15_flame"), ExtResource("16_sand_spirit")])
+defs = Array[Resource]([ExtResource("2_goblin"), ExtResource("3_gargoyle"), ExtResource("4_golem"), ExtResource("5_archer"), ExtResource("6_spider"), ExtResource("7_mage"), ExtResource("8_assassin"), ExtResource("9_scorpion_rider")])

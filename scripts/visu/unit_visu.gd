@@ -392,7 +392,9 @@ func start_idle_animation() -> void:
 	if idle_tween and idle_tween.is_running():
 		idle_tween.kill()
 	var base_scale := _get_base_scale()
-	sprite.scale = base_scale
+	if sprite:
+		sprite.rotation = 0.0
+		sprite.scale = base_scale
 	var stretch_percentage := 0.02
 	var scale_a := Vector2(
 		base_scale.x * (1.0 - stretch_percentage),
@@ -462,6 +464,9 @@ func _stop_motion_tweens() -> void:
 		idle_tween.kill()
 	if move_tween and move_tween.is_running():
 		move_tween.kill()
+	# Killing mid-hit left sprites upside-down when squish used a full-circle angle.
+	if sprite:
+		sprite.rotation = 0.0
 
 func juice_heal_jump() -> Tween:
 	_stop_motion_tweens()
@@ -496,7 +501,8 @@ func juice_hitted(_direction: Vector2, shield_absorbed: float = 0.0) -> Tween:
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
 	var base_scale := _get_base_scale()
-	var squish_angle := rng.randf_range(0.0, TAU)
+	# Small tilt only — full-circle angles + interrupted tweens left units upside-down.
+	var squish_angle := rng.randf_range(-0.35, 0.35)
 	var fat := rng.randf_range(1.35, 1.65)
 	var thin := rng.randf_range(0.55, 0.72)
 	var squish_scale := Vector2(base_scale.x * fat, base_scale.y * thin)
@@ -506,7 +512,11 @@ func juice_hitted(_direction: Vector2, shield_absorbed: float = 0.0) -> Tween:
 	active_tween.parallel().tween_property(sprite, "scale", squish_scale, 0.07).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
 	active_tween.tween_property(sprite, "scale", base_scale, 0.28).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
 	active_tween.parallel().tween_property(sprite, "rotation", 0.0, 0.28).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	active_tween.tween_callback(start_idle_animation)
+	active_tween.tween_callback(func() -> void:
+		if sprite:
+			sprite.rotation = 0.0
+		start_idle_animation()
+	)
 	return active_tween
 
 func _spawn_shield_hit_icon() -> void:

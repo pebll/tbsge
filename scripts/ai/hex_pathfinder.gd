@@ -3,17 +3,23 @@ extends RefCounted
 
 const Utils = preload("res://scripts/core/utils.gd")
 
+## Soft planning: stepping onto an occupied tile costs this many "hexes".
+const SOFT_OCCUPANCY_COST := 3.0
+
 static func hex_distance(a: Vector2i, b: Vector2i) -> int:
 	var dq := a.x - b.x
 	var dr := a.y - b.y
 	var ds := -dq - dr
 	return maxi(absi(dq), maxi(absi(dr), absi(ds)))
 
+## blocked_coords: hard blocks (unwalkable intent / optional).
+## soft_ignore_occupied: occupied tiles stay traversable at SOFT_OCCUPANCY_COST (never hard-blocked).
 static func find_path(
 	grid: Dictionary,
 	from_coords: Vector2i,
 	to_coords: Vector2i,
-	blocked_coords: Dictionary = {}
+	blocked_coords: Dictionary = {},
+	soft_ignore_occupied: bool = false
 ) -> Array[Vector2i]:
 	if from_coords == to_coords:
 		return [from_coords]
@@ -21,13 +27,13 @@ static func find_path(
 	var goal_tile: Tile = grid.get(to_coords)
 	if goal_tile == null or not goal_tile.walkable:
 		return []
-	if blocked_coords.has(to_coords):
+	if blocked_coords.has(to_coords) and not soft_ignore_occupied:
 		return []
 
 	var open: Array[Vector2i] = [from_coords]
 	var open_set: Dictionary = {from_coords: true}
 	var came_from: Dictionary = {}
-	var g_score: Dictionary = {from_coords: 0}
+	var g_score: Dictionary = {from_coords: 0.0}
 	var f_score: Dictionary = {from_coords: float(hex_distance(from_coords, to_coords))}
 
 	while not open.is_empty():
@@ -42,9 +48,12 @@ static func find_path(
 			return _reconstruct_path(came_from, current)
 
 		for neighbor in Utils.get_surrounding_coords(current):
-			if not _is_traversable(grid, neighbor, to_coords, blocked_coords):
+			if not _is_traversable(
+				grid, neighbor, to_coords, blocked_coords, soft_ignore_occupied
+			):
 				continue
-			var tentative_g: float = float(g_score.get(current, INF)) + 1.0
+			var step_cost := _step_cost(grid, neighbor, soft_ignore_occupied)
+			var tentative_g: float = float(g_score.get(current, INF)) + step_cost
 			if tentative_g >= float(g_score.get(neighbor, INF)):
 				continue
 			came_from[neighbor] = current
@@ -56,16 +65,28 @@ static func find_path(
 
 	return []
 
+static func _step_cost(grid: Dictionary, coords: Vector2i, soft_ignore_occupied: bool) -> float:
+	if not soft_ignore_occupied:
+		return 1.0
+	var tile: Tile = grid.get(coords)
+	if tile != null and tile.has_legion():
+		return SOFT_OCCUPANCY_COST
+	return 1.0
+
 static func _is_traversable(
 	grid: Dictionary,
 	coords: Vector2i,
 	goal_coords: Vector2i,
-	blocked_coords: Dictionary
+	blocked_coords: Dictionary,
+	soft_ignore_occupied: bool
 ) -> bool:
 	var tile: Tile = grid.get(coords)
 	if tile == null or not tile.walkable:
 		return false
 	if coords == goal_coords:
+		return true
+	if soft_ignore_occupied:
+		# Occupancy is never a hard block — only cost (see _step_cost).
 		return true
 	if blocked_coords.has(coords):
 		return false

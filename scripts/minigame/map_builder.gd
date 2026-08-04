@@ -38,8 +38,9 @@ static func _ensure_deploy_back_rows_walkable(
 	team_ids: Array[String],
 	rng: RandomNumberGenerator
 ) -> void:
+	var row_count := MinigameRulesScript.obstacle_free_back_row_count(radius)
 	for team_id in team_ids.slice(0, 2):
-		for coords in MinigameRulesScript.deploy_back_row_coords(radius, team_id, team_ids):
+		for coords in MinigameRulesScript.deploy_back_rows_coords(radius, team_id, team_ids, row_count):
 			var tile: Tile = grid.get(coords)
 			if tile:
 				_set_random_walkable(tile, rng)
@@ -55,7 +56,7 @@ static func _ensure_deploy_zones_connected(
 	if zone_a.is_empty() or zone_b.is_empty():
 		return
 
-	var protected := _back_row_coords_set(radius, team_ids)
+	var protected := _obstacle_free_coords_set(radius, team_ids)
 	var attempts := 0
 	while not _deploy_zones_have_path(grid, zone_a, zone_b):
 		attempts += 1
@@ -76,12 +77,16 @@ static func _set_random_walkable(tile: Tile, rng: RandomNumberGenerator) -> void
 	tile.terrain_type = WALKABLE_TERRAINS[rng.randi() % WALKABLE_TERRAINS.size()]
 	tile.walkable = true
 
-static func _back_row_coords_set(radius: int, team_ids: Array[String]) -> Dictionary:
+static func _obstacle_free_coords_set(radius: int, team_ids: Array[String]) -> Dictionary:
 	var out: Dictionary = {}
+	var row_count := MinigameRulesScript.obstacle_free_back_row_count(radius)
 	for team_id in team_ids.slice(0, 2):
-		for coords in MinigameRulesScript.deploy_back_row_coords(radius, team_id, team_ids):
+		for coords in MinigameRulesScript.deploy_back_rows_coords(radius, team_id, team_ids, row_count):
 			out[coords] = true
 	return out
+
+static func _back_row_coords_set(radius: int, team_ids: Array[String]) -> Dictionary:
+	return _obstacle_free_coords_set(radius, team_ids)
 
 static func _impassable_tiles_outside_back_rows(
 	grid: Dictionary,

@@ -25,6 +25,9 @@ var base_y: float
 var _gameplay_state: String = ""
 var _gameplay_lift: float = 0.0
 var _hover_boost: bool = false
+var _spent: bool = false
+
+const COLOR_SPENT := Color(0.72, 0.72, 0.74, 1.0)
 
 func init(p_tile: Tile) -> void:
 	tile = p_tile
@@ -63,6 +66,13 @@ func set_gameplay_overlay(state: String, lift: float) -> void:
 func set_hover_boost(enabled: bool) -> void:
 	_hover_boost = enabled
 	_sync_lift()
+
+func set_spent(spent: bool) -> void:
+	if _spent == spent:
+		_apply_state()
+		return
+	_spent = spent
+	_apply_state()
 
 func _sync_lift() -> void:
 	var target := _gameplay_lift
@@ -109,5 +119,7 @@ func _apply_state() -> void:
 		base_sprite.self_modulate = color_healable
 	elif _gameplay_state == "teleportable":
 		base_sprite.self_modulate = color_teleportable
+	elif _spent:
+		base_sprite.self_modulate = COLOR_SPENT
 	else:
 		base_sprite.self_modulate = Color.WHITE

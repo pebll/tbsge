@@ -51,6 +51,16 @@ var _button_disabled: bool = false
 @export var hover_scale: float = 1.035
 @export var play_sounds: bool = true
 
+var _selected: bool = false
+@export var selected: bool = false:
+	set(value):
+		if _selected == value:
+			return
+		_selected = value
+		_apply_theme()
+	get:
+		return _selected
+
 const COLOR_BORDER := UiTheme.COLOR_BORDER
 const COLOR_TEXT := UiTheme.COLOR_TEXT
 const COLOR_TEXT_DISABLED := UiTheme.COLOR_TEXT_DISABLED
@@ -76,10 +86,17 @@ var _resolved_width: int = 0
 var _pad_v: int = 0
 var _pad_h: int = 0
 
+func _set(property: StringName, value: Variant) -> bool:
+	# Forward Control.tooltip_text onto the inner Button (mouse hits the Button).
+	if property == &"tooltip_text" and _button:
+		_button.tooltip_text = String(value)
+	return false
+
 func _ready() -> void:
 	_apply_size_preset()
 	_apply_theme()
 	_button.text = text
+	_button.tooltip_text = tooltip_text
 	_apply_font_size()
 	_apply_width()
 	_button.focus_mode = Control.FOCUS_NONE
@@ -189,9 +206,16 @@ func _apply_font_size() -> void:
 		_button.add_theme_font_size_override("font_size", font_size)
 
 func _apply_theme() -> void:
+	if not _button:
+		return
 	_button.clip_text = true
 	_button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	UiTheme.apply_button_chrome(_button, RADIUS, BORDER_THICK, 20, 14)
+	if _selected:
+		var pressed := UiTheme.button_stylebox(UiTheme.COLOR_PRESSED, RADIUS, BORDER_THICK, 20, 14)
+		_button.add_theme_stylebox_override("normal", pressed)
+		_button.add_theme_stylebox_override("hover", pressed)
+		_button.add_theme_stylebox_override("focus", pressed)
 	_button.add_theme_font_size_override("font_size", font_size)
 
 func _capture_rest_position() -> void:

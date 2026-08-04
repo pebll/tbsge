@@ -5,6 +5,8 @@ extends Resource
 @export var display_name: String = "Duel"
 @export var map_radius: int = 3
 @export var budget: int = 50
+## Multiplier applied to `budget` for AI teams (1.0 = same gold as the player).
+@export var ai_budget_mult: float = 1.0
 @export var deploy_slot_count: int = 7
 @export var team_ids: Array[String] = ["GREEN", "BLUE"]
 @export var ai_team_ids: Array[String] = ["BLUE"]
@@ -18,3 +20,8 @@ func second_team_id() -> String:
 
 func is_ai_team(team_id: String) -> bool:
 	return team_id in ai_team_ids
+
+func budget_for_team(team_id: String) -> int:
+	if is_ai_team(team_id):
+		return int(round(float(budget) * ai_budget_mult))
+	return budget

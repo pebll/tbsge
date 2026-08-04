@@ -9,6 +9,7 @@ var session: MatchSessionScript
 var presenter: GridPresenterScript
 var is_locked_fn: Callable = func() -> bool: return false
 var apply_action_fn: Callable = func(_id: String, _from: Vector2i, _to: Vector2i) -> void: pass
+var apply_move_path_fn: Callable = Callable()
 var battle_phase_fn: Callable = func() -> bool: return true
 var allows_spawn_fn: Callable = func(_coords: Vector2i) -> bool: return false
 var spawn_fn: Callable = func(_coords: Vector2i) -> void: pass
@@ -49,6 +50,10 @@ func legions() -> Array:
 func apply_action(action_id: String, from_coords: Vector2i, to_coords: Vector2i) -> void:
 	if apply_action_fn.is_valid():
 		apply_action_fn.call(action_id, from_coords, to_coords)
+
+func apply_move_path(path: Array) -> void:
+	if apply_move_path_fn.is_valid():
+		apply_move_path_fn.call(path)
 
 func in_battle_phase() -> bool:
 	if battle_phase_fn.is_valid():

@@ -25,7 +25,7 @@ const ICON_UNIT := Vector2(84, 84)
 const ICON_ACTION := Vector2(52, 52)
 const ICON_STAT := Vector2(42, 42)
 
-const ICON_WAIT := preload("res://assets/icons/base_icons_sprites/boot.png")
+const ICON_WAIT := preload("res://assets/icons/base_icons_sprites/torso.png")
 const ICON_END_TURN := preload("res://assets/icons/base_icons_sprites/strong.png")
 const ICON_DAMAGE := preload("res://assets/icons/base_icons_sprites/damage.png")
 const ICON_DEATH := preload("res://assets/icons/base_icons_sprites/skull.png")
@@ -87,14 +87,18 @@ func bind_log(action_log: BattleActionLog) -> void:
 func clear_entries() -> void:
 	if _list == null:
 		return
-	for child in _list.get_children():
-		child.queue_free()
+	# Free immediately so rebuilds cannot briefly keep stale (e.g. move) cards.
+	while _list.get_child_count() > 0:
+		var child: Node = _list.get_child(0)
+		_list.remove_child(child)
+		child.free()
 
 ## Hosts call this for live EventBus entries. Combat lines may queue.
 func receive_entry(entry: Dictionary) -> void:
 	if not _battle_mode or entry.is_empty():
 		return
-	if not _is_visible(entry):
+	var visible := _is_visible(entry)
+	if not visible:
 		return
 	if BattleActionLog.should_defer_ui(entry):
 		_pending.append(entry)
@@ -244,7 +248,13 @@ func _is_visible(entry: Dictionary) -> bool:
 	if _bound_log:
 		return _bound_log.is_entry_visible(entry)
 	var action_id := String(entry.get("action_id", ""))
-	if action_id in ["move", "swap"]:
+	var result_summary := String(entry.get("result_summary", ""))
+	if action_id == "pass" or result_summary == "waited":
+		return false
+	if (
+		action_id in ["move", "swap"]
+		or result_summary in ["moved", "swapped"]
+	):
 		return GameSettings.show_battle_log_moves
 	if action_id == "end_turn":
 		return GameSettings.show_battle_log_end_turns
