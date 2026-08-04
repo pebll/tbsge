@@ -51,12 +51,6 @@ var _button_disabled: bool = false
 @export var hover_scale: float = 1.035
 @export var play_sounds: bool = true
 
-@export var tooltip_text: String = "":
-	set(value):
-		tooltip_text = value
-		if _button:
-			_button.tooltip_text = value
-
 var _selected: bool = false
 @export var selected: bool = false:
 	set(value):
@@ -91,6 +85,12 @@ var _resolved_height: int = HEIGHT_NORMAL
 var _resolved_width: int = 0
 var _pad_v: int = 0
 var _pad_h: int = 0
+
+func _set(property: StringName, value: Variant) -> bool:
+	# Forward Control.tooltip_text onto the inner Button (mouse hits the Button).
+	if property == &"tooltip_text" and _button:
+		_button.tooltip_text = String(value)
+	return false
 
 func _ready() -> void:
 	_apply_size_preset()
