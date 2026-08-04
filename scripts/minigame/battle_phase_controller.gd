@@ -179,6 +179,7 @@ func _run_ai_turn_async() -> void:
 			var end_result: Dictionary = deps.session.apply({"type": "end_turn"})
 			if end_result["ok"]:
 				deps.turn_hud.show_active_team(deps.session.turn_manager.active_team_id)
+				deps.presenter.sync_spent_visuals(deps.session)
 			break
 
 		var coords: Vector2i = actionable[0]
@@ -187,6 +188,7 @@ func _run_ai_turn_async() -> void:
 			if AttackNearestEnemyBehavior.debug_enabled:
 				print("[AI] stale legion slot @ %s, skipping" % coords)
 			deps.session.pass_legion_or_force_wait(coords)
+			deps.presenter.sync_spent_visuals(deps.session)
 			await deps.host.get_tree().create_timer(AI_LEGION_DELAY).timeout
 			continue
 
@@ -203,8 +205,10 @@ func _run_ai_turn_async() -> void:
 					if AttackNearestEnemyBehavior.debug_enabled:
 						print("[AI] action failed for %s @ %s, passing legion" % [legion.team_id, coords])
 					deps.session.pass_legion_or_force_wait(coords)
+					deps.presenter.sync_spent_visuals(deps.session)
 			_:
 				deps.session.pass_legion_or_force_wait(coords)
+				deps.presenter.sync_spent_visuals(deps.session)
 
 		await deps.host.get_tree().create_timer(AI_LEGION_DELAY).timeout
 		if deps.session.phase == MinigameSessionScript.Phase.ENDED:
