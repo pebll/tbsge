@@ -269,13 +269,45 @@ static func _best_step_toward(
 			best_goal_score = goal_pref
 			best_path = path
 
+	var from_dist := HexPathfinder.hex_distance(from_coords, enemy_coords)
+
+	# Soft-path first step must strictly close distance. Same-dist soft steps caused
+	# traffic-jam shuffles along the back rank while free closer hexes existed.
 	if best_path.size() >= 2:
 		for i in range(1, best_path.size()):
 			var step: Vector2i = best_path[i]
-			if step in movable:
+			if step not in movable:
+				continue
+			if HexPathfinder.hex_distance(step, enemy_coords) < from_dist:
 				return step
 
+	# Prefer any free neighbor that reduces distance (even if soft path disagreed).
+	var closer: Variant = _best_closer_step(from_coords, enemy_coords, movable)
+	if closer != null:
+		return closer
+
 	return _choose_step_toward(from_coords, enemy_coords, movable, frontline)
+
+## Best movable neighbor that strictly reduces hex distance to the enemy.
+static func _best_closer_step(
+	from_coords: Vector2i,
+	enemy_coords: Vector2i,
+	movable: Array[Vector2i]
+) -> Variant:
+	var current_dist := HexPathfinder.hex_distance(from_coords, enemy_coords)
+	var best: Variant = null
+	var best_dist := current_dist
+	var best_align := -INF
+	for coords in movable:
+		var dist := HexPathfinder.hex_distance(coords, enemy_coords)
+		if dist >= current_dist:
+			continue
+		var align := _alignment_toward(from_coords, coords, enemy_coords)
+		if dist < best_dist or (dist == best_dist and align > best_align):
+			best_dist = dist
+			best_align = align
+			best = coords
+	return best
 
 static func _choose_step_toward(
 	from_coords: Vector2i,
@@ -291,10 +323,15 @@ static func _choose_step_toward(
 
 	var best_closer: Vector2i = Vector2i(2147483646, 2147483646)
 	var best_closer_dist := current_dist
+	var best_closer_align := -INF
 	for coords in movable:
 		var dist := HexPathfinder.hex_distance(coords, enemy_coords)
-		if dist < best_closer_dist:
+		if dist > best_closer_dist:
+			continue
+		var align := _alignment_toward(from_coords, coords, enemy_coords)
+		if dist < best_closer_dist or (dist == best_closer_dist and align > best_closer_align):
 			best_closer_dist = dist
+			best_closer_align = align
 			best_closer = coords
 	if prefer_closer and best_closer_dist < current_dist:
 		return best_closer
@@ -314,40 +351,21 @@ static func _choose_step_toward(
 	if best_closer_dist < current_dist:
 		return best_closer
 
-	# Same-distance flank steps: prefer positive alignment, but accept any.
-	var best_lateral: Vector2i = Vector2i(2147483646, 2147483646)
-	var best_lateral_align := -INF
-	var any_lateral: Variant = null
+	# Same-distance flank: only positive alignment (real progress sideways toward goal).
+	var best_lateral: Variant = null
+	var best_lateral_align := 0.0
 	for coords in movable:
 		var dist := HexPathfinder.hex_distance(coords, enemy_coords)
 		if dist != current_dist:
 			continue
-		if any_lateral == null:
-			any_lateral = coords
 		var align := _alignment_toward(from_coords, coords, enemy_coords)
 		if align > best_lateral_align:
 			best_lateral_align = align
 			best_lateral = coords
-	if best_lateral_align > 0.0:
+	if best_lateral != null:
 		return best_lateral
-	if any_lateral != null:
-		return any_lateral
 
-	var best_fallback: Vector2i = Vector2i(2147483646, 2147483646)
-	var best_fallback_align := -INF
-	for coords in movable:
-		var align := _alignment_toward(from_coords, coords, enemy_coords)
-		if align > best_fallback_align:
-			best_fallback_align = align
-			best_fallback = coords
-	if best_fallback_align > 0.0:
-		return best_fallback
-
-	# Last resort: any legal step that does not increase distance.
-	for coords in movable:
-		if HexPathfinder.hex_distance(coords, enemy_coords) <= current_dist:
-			return coords
-
+	# No productive step — pass rather than shuffle sideways/backwards.
 	return null
 
 static func _alignment_toward(from_coords: Vector2i, step_coords: Vector2i, goal_coords: Vector2i) -> float:

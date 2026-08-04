@@ -60,9 +60,33 @@ func _apply_team_banner() -> void:
 	banner.texture = BANNER_TEXTURES[idx]
 	banner.self_modulate = team.color
 	banner.visible = true
-	# Absolute high z so banners stay above neighboring legion units.
+	_sync_banner_depth()
+
+func _sync_depth_sort() -> void:
+	const HexLayoutScript = preload("res://scripts/core/hex_layout.gd")
+	var base := HexLayoutScript.depth_sort_z(position.y)
+	z_index = base
+	_sync_banner_depth()
+
+## Own units always above this legion's banner. Banner gets a south-biased absolute
+## z so it can sit above a neighboring legion's body, still far below map UI (8k+).
+func _sync_banner_depth() -> void:
+	if banner == null:
+		return
+	const HexLayoutScript = preload("res://scripts/core/hex_layout.gd")
+	var own := HexLayoutScript.depth_sort_z(position.y)
+	var biased := HexLayoutScript.depth_sort_z(
+		position.y + HexLayoutScript.DEFAULT_TILE_SIZE * 1.15
+	)
 	banner.z_as_relative = false
-	banner.z_index = 2800
+	banner.z_index = biased * 10 + 4
+	var body_z := maxi(own * 10 + 20, banner.z_index + 6)
+	if units:
+		units.z_as_relative = false
+		units.z_index = body_z
+	if corpses:
+		corpses.z_as_relative = false
+		corpses.z_index = body_z
 
 func _get_formation_scale() -> float:
 	if legion == null:
@@ -198,10 +222,6 @@ func juice_move(target_pos: Vector2) -> Tween:
 	for unit in units.get_children():
 		unit.juice_move(target_pos)
 	return move_tween
-
-func _sync_depth_sort() -> void:
-	const HexLayoutScript = preload("res://scripts/core/hex_layout.gd")
-	z_index = HexLayoutScript.depth_sort_z(position.y)
 
 func juice_attack(direction: Vector2) -> void:
 	for unit in units.get_children():

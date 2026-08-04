@@ -82,7 +82,10 @@ var _row_damage: HBoxContainer
 var _row_economy: HBoxContainer
 var _row_mobility: HBoxContainer
 var _actions_block: VBoxContainer
-var _actions_list: VBoxContainer
+var _inspect_action_bar: BattleActionBar = null
+var _units_header: HBoxContainer = null
+var _units_header_count: Label = null
+var _units_header_icon: TextureRect = null
 var _move_button: GameButton = null
 
 func _ready() -> void:
@@ -103,6 +106,8 @@ func _ready() -> void:
 func set_tooltip_controller(controller: TooltipController) -> void:
 	_tooltip = controller
 	_wire_stat_tooltips()
+	if _inspect_action_bar:
+		_inspect_action_bar.set_tooltip_controller(controller)
 
 func _apply_style() -> void:
 	var sb := StyleBoxFlat.new()
@@ -140,25 +145,35 @@ func _apply_style() -> void:
 	price_icon.texture = ICON_PRICE
 	shield_icon.texture = ICON_SHIELD
 
-	_configure_stat_icon(unit_icon, Vector2(96, 132))
-	_configure_stat_icon(attack_icon, Vector2(44, 44))
-	_configure_stat_icon(health_icon, Vector2(44, 44))
+	_configure_stat_icon(unit_icon, Vector2(148, 200))
+	_configure_stat_icon(attack_icon, Vector2(52, 52))
+	_configure_stat_icon(health_icon, Vector2(52, 52))
 	_configure_stat_icon(unit_count_icon, Vector2(44, 44))
-	_configure_stat_icon(ap_icon, Vector2(40, 40))
-	_configure_stat_icon(size_icon, Vector2(40, 40))
-	_configure_stat_icon(price_icon, Vector2(40, 40))
-	_configure_stat_icon(shield_icon, Vector2(40, 40))
+	_configure_stat_icon(ap_icon, Vector2(48, 48))
+	_configure_stat_icon(size_icon, Vector2(48, 48))
+	_configure_stat_icon(price_icon, Vector2(48, 48))
+	_configure_stat_icon(shield_icon, Vector2(48, 48))
 
+	legion_name.add_theme_font_size_override("font_size", 34)
 	for value_label in [
 		attack_value, health_value, unit_count_value, ap_value,
 		size_value, price_value, shield_value,
 	]:
-		value_label.add_theme_font_size_override("font_size", 24)
+		value_label.add_theme_font_size_override("font_size", 28)
 
 	var legion_stats: HBoxContainer = %LegionStats
 	legion_stats.add_theme_constant_override("separation", 8)
 	var type_stats: HBoxContainer = %TypeStats
 	type_stats.add_theme_constant_override("separation", 8)
+
+	# Center the hero portrait in its frame.
+	var icon_frame := unit_icon.get_parent() as Control
+	if icon_frame:
+		icon_frame.custom_minimum_size = Vector2(160, 210)
+		if icon_frame is BoxContainer:
+			(icon_frame as BoxContainer).alignment = BoxContainer.ALIGNMENT_CENTER
+	unit_icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	unit_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 
 func _configure_stat_icon(icon: TextureRect, min_size: Vector2 = Vector2(72, 72)) -> void:
 	icon.custom_minimum_size = min_size
@@ -264,6 +279,7 @@ func _render_legion(legion: Legion) -> void:
 	unit_icon.texture = unit0.definition.icon if unit0 and unit0.definition and unit0.definition.icon else _load_unit_icon(legion.unit_type)
 
 	_render_actions(legion)
+	_render_units_header(legion)
 
 	for c in units_list.get_children():
 		c.queue_free()
@@ -474,9 +490,10 @@ func _ensure_stat_rows_layout() -> void:
 	# Row 4: AP, Range (range added later)
 	_row_mobility.add_child(ap_stat)
 
-	# Unit count stays near the name as a compact chip under the title rows.
+	# Hide the old unit-count chip from the header — count lives above the unit list.
 	var count_line := _make_stat_line()
 	count_line.add_child(unit_count_stat)
+	count_line.hide()
 
 	var insert_at := header_text.get_children().find(legion_name) + 1
 	header_text.add_child(count_line)
@@ -506,9 +523,22 @@ func _ensure_actions_block() -> void:
 	title.add_theme_color_override("font_color", COLOR_TEXT)
 	title.add_theme_font_size_override("font_size", 22)
 	_actions_block.add_child(title)
-	_actions_list = VBoxContainer.new()
-	_actions_list.add_theme_constant_override("separation", 4)
-	_actions_block.add_child(_actions_list)
+
+	var bar_host := Control.new()
+	bar_host.custom_minimum_size = Vector2(0, 130)
+	bar_host.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_actions_block.add_child(bar_host)
+
+	var bar_scene := preload("res://scenes/ui/battle_action_bar.tscn")
+	_inspect_action_bar = bar_scene.instantiate()
+	_inspect_action_bar.set_display_only(true)
+	bar_host.add_child(_inspect_action_bar)
+	_inspect_action_bar.configure_embedded()
+	if _tooltip:
+		_inspect_action_bar.set_tooltip_controller(_tooltip)
+
+	_ensure_units_header()
+
 	var units_scroll: Control = get_node_or_null("%UnitsScroll") as Control
 	var idx := -1
 	if legion_block and units_scroll:
@@ -517,6 +547,47 @@ func _ensure_actions_block() -> void:
 		legion_block.add_child(_actions_block)
 		if idx >= 0:
 			legion_block.move_child(_actions_block, idx)
+		# Units header sits just above the scroll list.
+		if _units_header and units_scroll:
+			var scroll_idx := legion_block.get_children().find(units_scroll)
+			legion_block.add_child(_units_header)
+			if scroll_idx >= 0:
+				legion_block.move_child(_units_header, scroll_idx)
+
+func _ensure_units_header() -> void:
+	if _units_header != null:
+		return
+	_units_header = HBoxContainer.new()
+	_units_header.name = "UnitsHeader"
+	_units_header.alignment = BoxContainer.ALIGNMENT_CENTER
+	_units_header.add_theme_constant_override("separation", 12)
+	_units_header_count = Label.new()
+	_units_header_count.add_theme_color_override("font_color", COLOR_TEXT)
+	_units_header_count.add_theme_font_size_override("font_size", 32)
+	_units_header.add_child(_units_header_count)
+	var times := Label.new()
+	times.text = "×"
+	times.add_theme_color_override("font_color", COLOR_TEXT)
+	times.add_theme_font_size_override("font_size", 32)
+	_units_header.add_child(times)
+	_units_header_icon = TextureRect.new()
+	_units_header_icon.custom_minimum_size = Vector2(64, 64)
+	_units_header_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_units_header_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_units_header.add_child(_units_header_icon)
+
+func _render_units_header(legion: Legion) -> void:
+	_ensure_units_header()
+	if _units_header == null:
+		return
+	_units_header.show()
+	_units_header_count.text = str(legion.units.size())
+	var tex: Texture2D = null
+	if not legion.units.is_empty() and legion.units[0] and legion.units[0].definition:
+		tex = legion.units[0].definition.icon
+	if tex == null:
+		tex = _load_unit_icon(legion.unit_type)
+	_units_header_icon.texture = tex
 
 func _ensure_move_button() -> void:
 	if _move_button != null:
@@ -538,31 +609,18 @@ func _ensure_move_button() -> void:
 
 func _render_actions(legion: Legion) -> void:
 	_ensure_actions_block()
-	if _actions_list == null:
+	if _inspect_action_bar == null:
 		return
-	for c in _actions_list.get_children():
-		c.queue_free()
 	if _draft_mode:
 		if _actions_block:
 			_actions_block.hide()
 		return
 	_actions_block.show()
+	_inspect_action_bar.set_tooltip_context_legion(legion)
+	var actions: Array[ActionDefinition] = []
 	for action in ActionTargeting.listed_actions(legion):
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 8)
-		if action.icon:
-			var icon := TextureRect.new()
-			icon.custom_minimum_size = Vector2(28, 28)
-			icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			icon.texture = action.icon
-			row.add_child(icon)
-		var label := Label.new()
-		label.text = action.display_name
-		label.add_theme_color_override("font_color", COLOR_TEXT)
-		label.add_theme_font_size_override("font_size", 18)
-		row.add_child(label)
-		_actions_list.add_child(row)
+		actions.append(action)
+	_inspect_action_bar.set_actions(actions, null, {})
 
 func _ensure_ranged_stat_rows() -> void:
 	if _ranged_stat != null:

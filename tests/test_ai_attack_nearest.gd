@@ -28,6 +28,8 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_activation_order_closest_first():
 		return false
+	if not _test_prefers_closer_over_same_distance_step():
+		return false
 	print("Success: AI attack-nearest tests")
 	return true
 
@@ -501,5 +503,36 @@ func _test_activation_order_closest_first() -> bool:
 	)
 	if tie_order.is_empty() or tie_order[0] != mid.tile_coords:
 		push_error("At equal distance, fighting unit should activate before mover, got %s" % tie_order)
+		return false
+	return true
+
+func _test_prefers_closer_over_same_distance_step() -> bool:
+	## When a distance-reducing hex is free, never shuffle sideways at same distance.
+	var session := MinigameTestHelpersScript.prepare_session()
+	var legions: Dictionary = _start_battle_with_legions(session, Vector2i.ZERO, Vector2i.ZERO)
+	var green: Legion = legions["a"]
+	var blue: Legion = legions["b"]
+
+	var from_coords := Vector2i(-1, 5)
+	var enemy_coords := Vector2i(0, -2)
+	for c in [from_coords, enemy_coords]:
+		if session.grid.get(c) == null:
+			return true
+
+	_teleport_legion(session, green, from_coords)
+	_teleport_legion(session, blue, enemy_coords)
+
+	var before := HexPathfinder.hex_distance(from_coords, enemy_coords)
+	var cmd: Dictionary = AttackNearestEnemyBehavior.decide(session, green)
+	if cmd.get("type") != "use_action" or cmd.get("action_id") != "move":
+		push_error("Expected a move toward enemy, got %s" % cmd)
+		return false
+	var to_coords: Vector2i = cmd.get("to")
+	var after := HexPathfinder.hex_distance(to_coords, enemy_coords)
+	if after >= before:
+		push_error(
+			"Expected a strictly closer step (d=%d -> %d), got %s"
+			% [before, after, to_coords]
+		)
 		return false
 	return true

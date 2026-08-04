@@ -19,6 +19,8 @@ var _disabled_reasons: Dictionary = {}
 var _panel: PanelContainer
 var _visibility_tween: Tween
 var _showing: bool = false
+## When true: show actions for inspect only (no press, always "enabled" look, tooltips work).
+var _display_only: bool = false
 
 @onready var _row: HBoxContainer = %ActionRow
 @onready var _hint: Label = %HintLabel
@@ -40,6 +42,24 @@ func set_tooltip_controller(controller: TooltipController) -> void:
 func set_tooltip_context_legion(legion: Legion) -> void:
 	_tooltip_legion = legion
 
+func set_display_only(enabled: bool) -> void:
+	_display_only = enabled
+	if _hint:
+		_hint.visible = false
+
+## Re-anchor for embedding inside another panel (inspect UI), not screen-bottom HUD.
+func configure_embedded() -> void:
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	offset_left = 0
+	offset_top = 0
+	offset_right = 0
+	offset_bottom = 0
+	grow_horizontal = Control.GROW_DIRECTION_BOTH
+	grow_vertical = Control.GROW_DIRECTION_BOTH
+	mouse_filter = Control.MOUSE_FILTER_STOP
+	if _hint:
+		_hint.hide()
+
 func _apply_panel_style() -> void:
 	%Panel.add_theme_stylebox_override(
 		"panel",
@@ -60,7 +80,9 @@ func set_actions(
 		return
 	for action in actions:
 		_add_action_button(action)
-	if selected:
+	if _display_only:
+		set_hint("")
+	elif selected:
 		set_hint(_hint_for_action(selected))
 	else:
 		set_hint("")
@@ -95,20 +117,27 @@ func _clear_buttons() -> void:
 
 func _add_action_button(action: ActionDefinitionScript) -> void:
 	var btn := Button.new()
-	btn.toggle_mode = true
-	btn.button_pressed = action.id == _selected_id
+	btn.toggle_mode = not _display_only
+	btn.button_pressed = (not _display_only) and action.id == _selected_id
 	btn.focus_mode = Control.FOCUS_NONE
 	btn.custom_minimum_size = Vector2(96, 96)
 	var reason := String(_disabled_reasons.get(action.id, ""))
-	var disabled := not reason.is_empty()
+	var disabled := (not _display_only) and not reason.is_empty()
 	btn.disabled = disabled
-	if disabled:
+	# Display-only: look enabled, ignore activation, keep right-click tooltips.
+	if _display_only:
+		btn.disabled = false
+		btn.modulate = Color(1, 1, 1, 1)
+		btn.mouse_default_cursor_shape = Control.CURSOR_HELP
+		btn.tooltip_text = "%s — right-click to inspect" % action.display_name
+	elif disabled:
 		btn.tooltip_text = "%s — %s" % [action.display_name, reason]
 	else:
 		btn.tooltip_text = "%s — right-click to inspect" % action.display_name
 
 	UiTheme.apply_button_chrome(btn, RADIUS, BORDER_THICK, 10, 10)
-	btn.modulate = Color(1, 1, 1, 0.55) if disabled else Color(1, 1, 1, 1)
+	if not _display_only:
+		btn.modulate = Color(1, 1, 1, 0.55) if disabled else Color(1, 1, 1, 1)
 
 	if action.icon:
 		btn.icon = action.icon
@@ -121,16 +150,20 @@ func _add_action_button(action: ActionDefinitionScript) -> void:
 
 	var captured_action: ActionDefinitionScript = action
 	var captured_reason := reason
-	if not disabled:
+	if not _display_only and not disabled:
 		btn.pressed.connect(func():
 			UiTheme.juice_press(btn)
 			action_pressed.emit(captured_action)
+		)
+	elif _display_only:
+		btn.pressed.connect(func() -> void:
+			btn.button_pressed = false
 		)
 	btn.gui_input.connect(func(event: InputEvent) -> void:
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
 			if _tooltip:
 				var content := TooltipContent.for_action(captured_action, _tooltip_legion)
-				if not captured_reason.is_empty():
+				if not _display_only and not captured_reason.is_empty():
 					content.body = "%s\n\nUnavailable: %s" % [content.body, captured_reason]
 				_tooltip.show_for_control(btn, content)
 			btn.accept_event()
