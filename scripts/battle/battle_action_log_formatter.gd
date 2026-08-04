@@ -210,10 +210,7 @@ static func _legion_summary(legion: Legion) -> String:
 static func _team_label(team_id: String) -> String:
 	if team_id.is_empty():
 		return "?"
-	var team_res: Resource = TeamDefs.get_def(team_id)
-	if team_res is TeamDefinition:
-		return (team_res as TeamDefinition).display_name
-	return team_id
+	return GameSettings.display_name_for_team(team_id)
 
 static func _target_summary_for_action(
 	session: MatchSession,

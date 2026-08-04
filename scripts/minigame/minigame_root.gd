@@ -173,8 +173,14 @@ func _connect_phase_signals() -> void:
 	_tile_info_panel.draft_clear_slot_pressed.connect(func() -> void: draft.handle_clear_slot())
 	_tile_info_panel.draft_change_type_pressed.connect(func() -> void: draft.handle_change_type())
 	_tile_info_panel.draft_move_pressed.connect(func() -> void: draft.handle_move_mode())
-	_pass_continue_btn.pressed.connect(func() -> void: draft.handle_pass_continue())
+	_pass_continue_btn.pressed.connect(_on_pass_continue_pressed)
 	battle_ui.attach_action_bar(_action_bar)
+
+func _on_pass_continue_pressed() -> void:
+	if session.phase == MinigameSessionScript.Phase.BATTLE:
+		battle.handle_pass_continue()
+	else:
+		draft.handle_pass_continue()
 
 func _setup_ui() -> void:
 	_ui_layer = CanvasLayer.new()

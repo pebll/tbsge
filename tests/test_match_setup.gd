@@ -13,6 +13,10 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_build_match_config():
 		return false
+	if not _test_hotseat_match_config():
+		return false
+	if not _test_display_names_and_opponent_roll():
+		return false
 	print("Success: Match setup / settings tests")
 	return true
 
@@ -83,6 +87,8 @@ func _test_ai_debug_persists_in_settings() -> bool:
 func _test_build_match_config() -> bool:
 	var prev_size := GameSettings.match_map_size
 	var prev_diff := GameSettings.match_difficulty
+	var prev_mode := GameSettings.match_mode
+	GameSettings.set_match_mode(GameSettings.MATCH_MODE_AI, false)
 	GameSettings.set_match_map_size(5, false)
 	GameSettings.set_match_difficulty("hard", false)
 	var config := GameSettings.build_match_config()
@@ -99,8 +105,90 @@ func _test_build_match_config() -> bool:
 	if config.budget_for_team("BLUE") != 300:
 		push_error("Expected AI budget 300, got %d" % config.budget_for_team("BLUE"))
 		ok = false
+	if config.ai_team_ids.size() != 1 or String(config.ai_team_ids[0]) != "BLUE":
+		push_error("Expected AI team BLUE in vs-AI mode")
+		ok = false
 	GameSettings.set_match_map_size(prev_size, false)
 	GameSettings.set_match_difficulty(prev_diff, false)
+	GameSettings.set_match_mode(prev_mode, false)
+	return ok
+
+func _test_hotseat_match_config() -> bool:
+	var prev_mode := GameSettings.match_mode
+	var prev_size := GameSettings.match_map_size
+	var prev_diff := GameSettings.match_difficulty
+	GameSettings.set_match_mode(GameSettings.MATCH_MODE_HOTSEAT, false)
+	GameSettings.set_match_map_size(4, false)
+	GameSettings.set_match_difficulty("impossible", false)
+	var config := GameSettings.build_match_config()
+	var ok := true
+	if not config.ai_team_ids.is_empty():
+		push_error("Hotseat should have no AI teams")
+		ok = false
+	if not is_equal_approx(config.ai_budget_mult, 1.0):
+		push_error("Hotseat ai_budget_mult should be 1.0")
+		ok = false
+	if config.budget_for_team("GREEN") != config.budget_for_team("BLUE"):
+		push_error("Hotseat budgets should match")
+		ok = false
+	if config.budget_for_team("GREEN") != 125:
+		push_error("Expected radius-4 gold 125")
+		ok = false
+	GameSettings.set_match_mode(prev_mode, false)
+	GameSettings.set_match_map_size(prev_size, false)
+	GameSettings.set_match_difficulty(prev_diff, false)
+	return ok
+
+func _test_display_names_and_opponent_roll() -> bool:
+	var prev_mode := GameSettings.match_mode
+	var prev_p1 := GameSettings.player_name
+	var prev_p2 := GameSettings.player2_name
+	var prev_opp := GameSettings.match_opponent_name
+	var prev_launch := GameSettings.is_match_launch_active()
+
+	GameSettings.clear_match_launch()
+	GameSettings.set_match_mode(GameSettings.MATCH_MODE_AI, false)
+	GameSettings.player_name = "TestHero"
+	GameSettings.begin_match_launch()
+	var ok := true
+	if GameSettings.match_opponent_name.is_empty():
+		push_error("Expected AI opponent name after begin_match_launch")
+		ok = false
+	elif GameSettings.match_opponent_name not in GameSettings.AI_FUNNY_NAMES:
+		push_error("Opponent name not in AI pool: %s" % GameSettings.match_opponent_name)
+		ok = false
+	if GameSettings.display_name_for_team("GREEN") != "TestHero":
+		push_error("Expected GREEN display TestHero")
+		ok = false
+	if GameSettings.display_name_for_team("BLUE") != GameSettings.match_opponent_name:
+		push_error("Expected BLUE display to match opponent")
+		ok = false
+
+	# Rematch keeps the same AI name.
+	var kept := GameSettings.match_opponent_name
+	GameSettings.begin_match_launch()
+	if GameSettings.match_opponent_name != kept:
+		push_error("Rematch should keep opponent name")
+		ok = false
+
+	GameSettings.clear_match_launch()
+	GameSettings.set_match_mode(GameSettings.MATCH_MODE_HOTSEAT, false)
+	GameSettings.player2_name = "Buddy"
+	GameSettings.begin_match_launch()
+	if GameSettings.match_opponent_name != "Buddy":
+		push_error("Hotseat opponent should be player2_name")
+		ok = false
+	if not GameSettings.build_match_config().ai_team_ids.is_empty():
+		push_error("Hotseat launch config must clear AI teams")
+		ok = false
+
+	GameSettings.clear_match_launch()
+	GameSettings.match_mode = prev_mode
+	GameSettings.player_name = prev_p1
+	GameSettings.player2_name = prev_p2
+	GameSettings.match_opponent_name = prev_opp
+	if prev_launch:
+		GameSettings.begin_match_launch()
 	return ok
 
 func _restore_ai_debug(flag: bool, behavior: bool) -> void:

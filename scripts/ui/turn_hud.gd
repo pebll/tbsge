@@ -42,11 +42,9 @@ func _apply_panel_style() -> void:
 func show_active_team(team_id: String) -> void:
 	var team_res: Resource = TeamDefs.get_def(team_id)
 	var accent: Color = COLOR_BORDER
-	var label_text: String = team_id if not team_id.is_empty() else "—"
+	var label_text: String = GameSettings.display_name_for_team(team_id) if not team_id.is_empty() else "—"
 	if team_res is TeamDefinition:
-		var team: TeamDefinition = team_res
-		accent = team.color
-		label_text = team.display_name
+		accent = (team_res as TeamDefinition).color
 
 	team_label.text = "%s's turn" % label_text
 	team_label.add_theme_color_override("font_color", _contrasting_text_color(accent))

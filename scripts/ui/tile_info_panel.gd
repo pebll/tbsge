@@ -406,11 +406,9 @@ func _contrasting_text_color(bg: Color) -> Color:
 func _apply_team_accent(team_id: String) -> void:
 	var team_res: Resource = TeamDefs.get_def(team_id)
 	var accent: Color = COLOR_BORDER
-	var label_text: String = team_id
+	var label_text: String = GameSettings.display_name_for_team(team_id)
 	if team_res is TeamDefinition:
-		var team: TeamDefinition = team_res
-		accent = team.color
-		label_text = team.display_name
+		accent = (team_res as TeamDefinition).color
 
 	team_name_label.text = label_text
 	team_name_label.add_theme_color_override("font_color", _contrasting_text_color(accent))

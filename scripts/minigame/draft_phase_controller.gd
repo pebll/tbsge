@@ -259,11 +259,7 @@ func _apply_placement(unit_type: String, unit_count: int) -> void:
 
 func _show_pass_overlay() -> void:
 	var next_team: String = deps.session.active_draft_team
-	var team_res: Resource = TeamDefs.get_def(next_team)
-	var display_name: String = next_team
-	if team_res is TeamDefinition:
-		display_name = (team_res as TeamDefinition).display_name
-	deps.status_label.text = "Pass device to %s" % display_name
+	deps.status_label.text = "Pass device to %s" % GameSettings.display_name_for_team(next_team)
 	deps.pass_overlay.show()
 	deps.setup_panel.hide()
 	deps.unit_picker.hide()

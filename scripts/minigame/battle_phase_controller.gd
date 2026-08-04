@@ -33,10 +33,19 @@ func exit() -> void:
 		deps.action_log_panel.exit_battle()
 
 func is_input_locked() -> bool:
-	return _lock.is_locked() or ai_running or (deps.pause_menu != null and deps.pause_menu.is_open())
+	return (
+		_lock.is_locked()
+		or ai_running
+		or (deps.pause_menu != null and deps.pause_menu.is_open())
+		or (deps.pass_overlay != null and deps.pass_overlay.visible)
+	)
 
 func is_blocking_input() -> bool:
-	return deps.game_over_panel.visible or (deps.pause_menu != null and deps.pause_menu.is_open())
+	return (
+		deps.game_over_panel.visible
+		or (deps.pause_menu != null and deps.pause_menu.is_open())
+		or (deps.pass_overlay != null and deps.pass_overlay.visible)
+	)
 
 func handle_end_turn() -> void:
 	if is_input_locked():
@@ -46,7 +55,15 @@ func handle_end_turn() -> void:
 	if result["ok"]:
 		deps.turn_hud.show_active_team(deps.session.turn_manager.active_team_id)
 		deps.presenter.sync_spent_visuals(deps.session)
+		if _maybe_show_hotseat_pass():
+			return
 		maybe_start_ai_turn()
+
+func handle_pass_continue() -> void:
+	if deps.pass_overlay:
+		deps.pass_overlay.hide()
+	deps.turn_hud.show_active_team(deps.session.turn_manager.active_team_id)
+	maybe_start_ai_turn()
 
 func request_use_action(action_id: String, from_coords: Vector2i, to_coords: Vector2i) -> void:
 	if is_input_locked():
@@ -160,6 +177,8 @@ func check_match_end() -> void:
 	deps.setup_panel.hide()
 	deps.unit_picker.hide()
 	deps.tile_info_panel.hide()
+	if deps.pass_overlay:
+		deps.pass_overlay.hide()
 	if deps.action_bar:
 		deps.action_bar.hide()
 	if deps.action_log_panel:
@@ -174,6 +193,22 @@ func inspect_tile(coords: Vector2i) -> void:
 		deps.tile_info_panel.show_tile(tile)
 	else:
 		deps.tile_info_panel.hide()
+
+## Hotseat: after a human ends turn, pause so the other player can take the device.
+func _maybe_show_hotseat_pass() -> bool:
+	if deps.session.phase != MinigameSessionScript.Phase.BATTLE:
+		return false
+	var cfg = deps.config()
+	if cfg == null or not cfg.ai_team_ids.is_empty():
+		return false
+	var active: String = deps.session.turn_manager.active_team_id
+	if deps.is_ai_team(active):
+		return false
+	deps.battle_ui.deselect()
+	deps.battle_ui.clear_overlays()
+	deps.status_label.text = "Pass device to %s" % GameSettings.display_name_for_team(active)
+	deps.pass_overlay.show()
+	return true
 
 func _run_ai_turn_async() -> void:
 	ai_running = true

@@ -20,6 +20,8 @@ const RADIUS := 18
 
 func _ready() -> void:
 	_apply_style()
+	new_game_button.text = "Draft again"
+	main_menu_button.text = "Main menu"
 	new_game_button.pressed.connect(func(): new_game_pressed.emit())
 	main_menu_button.pressed.connect(func(): main_menu_pressed.emit())
 	hide()
@@ -51,16 +53,19 @@ func _apply_style() -> void:
 	winner_label.add_theme_font_size_override("font_size", 34)
 
 func show_for_winner(winner_team_id: String) -> void:
-	var display_name := winner_team_id
+	var display_name := GameSettings.display_name_for_team(winner_team_id)
 	var accent := COLOR_BORDER
 	var team_res: Resource = TeamDefs.get_def(winner_team_id)
 	if team_res is TeamDefinition:
-		var team: TeamDefinition = team_res
-		display_name = team.display_name
-		accent = team.color
+		accent = (team_res as TeamDefinition).color
 
-	title_label.text = "Victory!"
-	subtitle_label.text = "The battle is over."
+	var defeat := (
+		GameSettings.is_match_launch_active()
+		and not GameSettings.is_hotseat_mode()
+		and winner_team_id == "BLUE"
+	)
+	title_label.text = "Defeat" if defeat else "Victory!"
+	subtitle_label.text = "Draft again, or return to the main menu."
 	winner_label.text = "%s wins" % display_name
 	winner_label.add_theme_color_override("font_color", _contrasting_text_color(accent))
 

@@ -65,8 +65,4 @@ func show_for_team(team_id: String, draft_data: Dictionary) -> void:
 	show()
 
 func _apply_team_accent(team_id: String) -> void:
-	var team_res: Resource = TeamDefs.get_def(team_id)
-	var label_text: String = team_id
-	if team_res is TeamDefinition:
-		label_text = (team_res as TeamDefinition).display_name
-	team_label.text = "%s" % label_text
+	team_label.text = "%s" % GameSettings.display_name_for_team(team_id)

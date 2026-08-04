@@ -71,7 +71,7 @@ theme_override_constants/separation = 12
 [node name="NewGameButton" parent="CenterContainer/Panel/VBox/Buttons" instance=ExtResource("2_gb")]
 unique_name_in_owner = true
 layout_mode = 2
-text = "New Game"
+text = "Draft again"
 font_size = 28
 size_preset = 2
 preferred_width = 280
@@ -79,6 +79,6 @@ preferred_width = 280
 [node name="MainMenuButton" parent="CenterContainer/Panel/VBox/Buttons" instance=ExtResource("2_gb")]
 unique_name_in_owner = true
 layout_mode = 2
-text = "Main Menu"
+text = "Main menu"
 font_size = 24
 preferred_width = 280

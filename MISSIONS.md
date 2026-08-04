@@ -13,7 +13,7 @@ Agents: use branches + commits per `.cursor/rules/git-workflow.mdc` when impleme
 - UX: tooltips + glossary, battle log, action bar clarity, Options/Sounds, pause menu, parchment theme.
 - Git: `main` aligned with refactor line (Aug 2026).
 
-**Next focus — Playtest polish (epic P below), then finish playable v0.1, then**
+**Next focus — finish playable v0.1 (smoke, turn clarity, first-run hints), then**
 1. **Terrain (T3)** — LOS, forest defense, terrain inspect.  
 2. **Statuses (T4)** — buffs/debuffs.  
 3. **Campaign / unlock pacing** — tier I→IV, not required for first skirmish loop.
@@ -60,7 +60,7 @@ Goal: a friend can launch from **main menu → Play → draft → fight → win/
 
 ### Must-have (ship blockers)
 - [x] **Single entry path** — main menu **Play** → setup (map size / difficulty) → minigame.
-- [ ] **End-to-end loop** — game over → rematch or main menu; no dead ends.
+- [x] **End-to-end loop** — game over → rematch or main menu; no dead ends.
 - [ ] **Manual smoke green** — all items in “How manual smoke works” + pause/tooltips/log/heal/teleport checklist (from recent UX work).
 - [ ] **AI completes a full battle** — no soft-lock; human can win and lose.
 - [x] **Draft is understandable** — budget, unit cap, deploy slots, pass/continue; **8 role-distinct units** in the pool (chaff, shield tank, HP wall, long range, short spit, healer, assassin, AP3 bruiser).
@@ -69,7 +69,7 @@ Goal: a friend can launch from **main menu → Play → draft → fight → win/
 ### Should-have (polish)
 - [ ] **First-run hints** — one line on first select: “Pick a legion, then an action” (coach mark or tooltip footer; no full tutorial yet).
 - [ ] **Turn clarity** — whose turn + end turn obvious (`TurnHud` + wait/pass discoverable).
-- [ ] **Win screen copy** — winner team name, short “Draft again?” CTA.
+- [x] **Win screen copy** — winner display name, Victory/Defeat, “Draft again?” / Main menu; Play setup names + Vs AI / Hotseat.
 - [ ] **Dev Test** — keep for sandbox/duel variants but label as “Advanced / Lab”.
 - [ ] **Delete local `git replace` refs** if any reappear (`git replace -l`) so history matches GitHub.
 - [x] **Depth while moving** — legion z-index updates during move tweens from current world Y (no longer only at path end).
