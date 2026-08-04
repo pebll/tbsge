@@ -16,3 +16,4 @@ size = 3.0
 price = 10
 icon = ExtResource("2_icon")
 sfx_move = ExtResource("3_move")
+action_ids = Array[String](["move", "melee_attack", "self_heal"])

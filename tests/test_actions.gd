@@ -633,7 +633,7 @@ func _test_heal_ally_rejects_enemy_and_full_hp() -> bool:
 			return true
 
 	var mage := Legion.new("MAGE", 1, mage_coords, team_a)
-	var enemy := Legion.new("RAT_SPEAR", 1, enemy_coords, team_b)
+	var enemy := Legion.new("GOBLIN", 1, enemy_coords, team_b)
 	var full_ally := Legion.new("GOBLIN", 1, full_ally_coords, team_a)
 	session.grid[mage_coords].legion = mage
 	session.grid[enemy_coords].legion = enemy

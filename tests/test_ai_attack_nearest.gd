@@ -63,7 +63,7 @@ func _start_battle_with_legions(
 		"type": "draft_set_legion",
 		"team": team_b_id,
 		"coords": team_b_coords if team_b_coords != Vector2i.ZERO else slots_b[0],
-		"unit_type": "RAT_SPEAR",
+		"unit_type": "GOBLIN",
 		"unit_count": 2,
 	})
 	session.apply({"type": "draft_ready", "team": team_b_id})
@@ -198,7 +198,7 @@ func _test_melees_adjacent_when_nearest_not_attackable() -> bool:
 	_teleport_legion(session, blue_blocked, blocked_coords)
 	session.grid[blocked_coords].walkable = false
 
-	var blue_adj := Legion.new("RAT_SPEAR", 2, adj_coords, team_b)
+	var blue_adj := Legion.new("GOBLIN", 2, adj_coords, team_b)
 	session.grid[adj_coords].legion = blue_adj
 	session.legions.append(blue_adj)
 

@@ -13,3 +13,4 @@ image_size = 0.94
 size = 1.0
 price = 3
 icon = ExtResource("2_icon")
+action_ids = Array[String](["move", "melee_attack", "self_heal"])

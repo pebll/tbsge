@@ -84,7 +84,7 @@ func _test_victory_by_elimination() -> bool:
 		"type": "draft_set_legion",
 		"team": team_a_id,
 		"coords": slots_a[0],
-		"unit_type": "DEMON",
+		"unit_type": "SCORPION_RIDER",
 		"unit_count": 1,
 	})
 	session.apply({"type": "draft_ready", "team": team_a_id})

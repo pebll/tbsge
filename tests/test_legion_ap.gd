@@ -26,7 +26,7 @@ func _test_move_cost() -> bool:
 
 func _test_attack_spends_attacker_only() -> bool:
 	var attacker := Legion.new("GOBLIN", 2, Vector2i.ZERO, "GREEN")
-	var defender := Legion.new("OGRE", 2, Vector2i.ONE, "BLUE")
+	var defender := Legion.new("GOLEM", 2, Vector2i.ONE, "BLUE")
 	attacker.current_ap = 2
 	defender.current_ap = 2
 	attacker.spend_all_ap()
