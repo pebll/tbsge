@@ -77,18 +77,20 @@ static func from_end_turn(
 	ending_turn: int,
 	next_team: String
 ) -> Dictionary:
+	var turn_no := ending_turn + 1
+	var name := _team_label(next_team)
 	return {
-		"turn": ending_turn,
-		"team": ending_team,
+		"turn": turn_no,
+		"team": next_team,
 		"action_id": "end_turn",
 		"from": Vector2i.ZERO,
 		"to": Vector2i.ZERO,
-		"caster_summary": _team_label(ending_team),
+		"caster_summary": name,
 		"target_summary": "",
-		"result_summary": "ended → %s" % _team_label(next_team),
+		"result_summary": "%s's Turn %d" % [name, turn_no],
 		"caster_unit_type": "",
 		"target_unit_type": "",
-		"caster_team_id": ending_team,
+		"caster_team_id": next_team,
 		"target_team_id": "",
 		"caster_hp_lost": 0,
 		"caster_deaths": 0,
@@ -103,6 +105,7 @@ static func from_end_turn(
 			"active_team": next_team,
 			"ending_team": ending_team,
 			"ending_turn": ending_turn,
+			"turn": turn_no,
 		},
 	}
 

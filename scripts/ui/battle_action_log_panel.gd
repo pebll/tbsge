@@ -20,6 +20,7 @@ const CARD_RADIUS := 14
 const DOCK_WIDTH := 540.0
 const TOGGLE_WIDTH := 40.0
 const CARD_MIN_HEIGHT := 108.0
+const TURN_BANNER_HEIGHT := 36.0
 const BANNER_WIDTH := 10.0
 const ICON_UNIT := Vector2(84, 84)
 const ICON_ACTION := Vector2(52, 52)
@@ -298,6 +299,9 @@ func _apply_toggle_chrome(expanded: bool) -> void:
 func _add_entry_row(entry: Dictionary, animate: bool = false) -> void:
 	if _list == null or entry.is_empty():
 		return
+	if String(entry.get("action_id", "")) == "end_turn":
+		_add_end_turn_banner(entry, animate)
+		return
 
 	var caster_team := String(entry.get("caster_team_id", entry.get("team", "")))
 	var target_team := String(entry.get("target_team_id", ""))
@@ -388,6 +392,62 @@ func _juice_card_in(card: Control) -> void:
 	if card == null or not is_instance_valid(card):
 		return
 	UiTheme.juice_pop_in(card, 0.13)
+
+## Thin turn separator: "{Name}'s Turn {n}" in the active team's color.
+func _add_end_turn_banner(entry: Dictionary, animate: bool = false) -> void:
+	var team_id := String(entry.get("caster_team_id", entry.get("team", "")))
+	var payload: Dictionary = entry.get("payload", {})
+	if team_id.is_empty():
+		team_id = String(payload.get("active_team", ""))
+	var label_text := String(entry.get("result_summary", "")).strip_edges()
+	if label_text.is_empty():
+		var name := GameSettings.display_name_for_team(team_id)
+		var turn_no := int(entry.get("turn", payload.get("turn", 0)))
+		label_text = "%s's Turn %d" % [name, turn_no]
+
+	var card := PanelContainer.new()
+	card.custom_minimum_size = Vector2(0, TURN_BANNER_HEIGHT)
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	card.tooltip_text = "Right-click to inspect"
+
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(COLOR_CARD_BG.r, COLOR_CARD_BG.g, COLOR_CARD_BG.b, 0.72)
+	sb.border_color = COLOR_BORDER
+	sb.border_width_left = 2
+	sb.border_width_right = 2
+	sb.border_width_top = 1
+	sb.border_width_bottom = 1
+	sb.corner_radius_top_left = 8
+	sb.corner_radius_top_right = 8
+	sb.corner_radius_bottom_left = 8
+	sb.corner_radius_bottom_right = 8
+	sb.content_margin_left = 10
+	sb.content_margin_right = 10
+	sb.content_margin_top = 4
+	sb.content_margin_bottom = 4
+	card.add_theme_stylebox_override("panel", sb)
+
+	var label := Label.new()
+	label.text = label_text
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.add_theme_font_size_override("font_size", 18)
+	label.add_theme_color_override("font_color", _team_color(team_id))
+	card.add_child(label)
+
+	var captured: Dictionary = entry.duplicate(true)
+	card.gui_input.connect(func(event: InputEvent) -> void:
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
+			_inspect_entry(captured, card)
+			card.accept_event()
+	)
+	_list.add_child(card)
+	if animate:
+		card.modulate.a = 0.0
+		card.scale = Vector2(0.96, 0.88)
+		call_deferred("_juice_card_in", card)
 
 func _make_banner_cap(team_id: String, left_side: bool) -> PanelContainer:
 	var cap := PanelContainer.new()
@@ -593,9 +653,18 @@ func _card_body_stylebox() -> StyleBoxFlat:
 func _inspect_entry(entry: Dictionary, control: Control) -> void:
 	if _tooltip == null:
 		return
+	var action_id := String(entry.get("action_id", "Event"))
 	var content := TooltipContent.new()
-	content.title = _action_label(String(entry.get("action_id", "Event")))
-	content.icon = _action_icon(String(entry.get("action_id", "")))
+	if action_id == "end_turn":
+		content.title = String(entry.get("result_summary", "Turn"))
+		content.icon = null
+		content.body = "Whose turn it is now."
+		content.footer = "Turn %d" % int(entry.get("turn", 0))
+		_tooltip.show_for_control(control, content)
+		return
+
+	content.title = _action_label(action_id)
+	content.icon = _action_icon(action_id)
 	var body_lines: PackedStringArray = []
 	var caster := String(entry.get("caster_summary", ""))
 	var target := String(entry.get("target_summary", ""))

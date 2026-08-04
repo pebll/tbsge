@@ -122,8 +122,9 @@ func _test_pass_and_end_turn_log() -> bool:
 	if String(end_entry.get("action_id", "")) != "end_turn":
 		push_error("Expected end_turn log")
 		return false
-	if "ended" not in String(end_entry.get("result_summary", "")):
-		push_error("End turn summary wrong")
+	var summary := String(end_entry.get("result_summary", ""))
+	if "Turn" not in summary:
+		push_error("End turn summary should be '{name}'s Turn {n}', got %s" % summary)
 		return false
 	return true
 
