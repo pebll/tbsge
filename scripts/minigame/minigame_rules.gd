@@ -95,6 +95,16 @@ static func deploy_back_row_coords(
 	team_id: String,
 	team_ids: Array[String]
 ) -> Array[Vector2i]:
+	return deploy_back_rows_coords(radius, team_id, team_ids, 1)
+
+## First `row_count` rows from a team's back edge (deploy side). Used to keep spawn
+## approaches clear of mountains/water on larger maps.
+static func deploy_back_rows_coords(
+	radius: int,
+	team_id: String,
+	team_ids: Array[String],
+	row_count: int
+) -> Array[Vector2i]:
 	var by_r: Dictionary = {}
 	for q in range(-radius, radius + 1):
 		for r in range(-radius, radius + 1):
@@ -108,24 +118,33 @@ static func deploy_back_row_coords(
 
 	var r_values: Array = by_r.keys()
 	r_values.sort()
-	if r_values.is_empty() or team_ids.is_empty():
+	if r_values.is_empty() or team_ids.is_empty() or row_count < 1:
 		return []
 
-	var back_r: int
+	var target_rs: Array = []
 	if team_id == team_ids[0]:
-		back_r = r_values[0]
+		for i in range(mini(row_count, r_values.size())):
+			target_rs.append(r_values[i])
 	elif team_ids.size() > 1 and team_id == team_ids[1]:
-		back_r = r_values[r_values.size() - 1]
+		for i in range(mini(row_count, r_values.size())):
+			target_rs.append(r_values[r_values.size() - 1 - i])
 	else:
 		return []
 
 	var out: Array[Vector2i] = []
-	for coords in by_r[back_r]:
-		out.append(coords)
+	for back_r in target_rs:
+		for coords in by_r[back_r]:
+			out.append(coords)
 	out.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		if a.y != b.y:
+			return a.y < b.y
 		return a.x < b.x
 	)
 	return out
+
+## How many back rows must stay obstacle-free for this map size.
+static func obstacle_free_back_row_count(radius: int) -> int:
+	return 2 if radius >= 4 else 1
 
 static func _filter_walkable(coords_list: Array[Vector2i]) -> Array[Vector2i]:
 	var out: Array[Vector2i] = []

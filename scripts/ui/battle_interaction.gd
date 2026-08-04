@@ -51,9 +51,11 @@ var _pending_move_dest: Vector2i
 var _pending_move_active: bool = false
 var _pending_first_steps: Array[Vector2i] = []
 var _pending_parents: Dictionary = {}
+var _context = null
 
 func bind_from_context(context) -> void:
 	## Single wiring entry so hosts don't re-declare the same Callables.
+	_context = context
 	battle_state_fn = func(): return context.battle_state()
 	tile_visu_fn = func(coords: Vector2i) -> TileVisu: return context.tile_visu_at(coords)
 	is_locked_fn = func() -> bool: return context.is_input_locked()
@@ -193,15 +195,23 @@ func refresh_after_action(legion_coords: Vector2i) -> void:
 	var state: BattleStateScript = battle_state_fn.call()
 	if state == null:
 		deselect()
+		_sync_spent_visuals()
 		return
 	var legion: Legion = _legion_at(state, legion_coords)
 	if legion and bool(can_act_fn.call(legion)):
 		select_tile(legion_coords)
 	else:
 		deselect()
+	_sync_spent_visuals()
 
 func clear_overlays() -> void:
 	_clear_overlay_visuals()
+	_sync_spent_visuals()
+
+func _sync_spent_visuals() -> void:
+	if _context == null or _context.presenter == null or _context.session == null:
+		return
+	_context.presenter.sync_spent_visuals(_context.session)
 
 func _clear_overlay_visuals() -> void:
 	for c in _overlay_coords:
@@ -234,6 +244,7 @@ func pass_current_legion() -> void:
 		var tm: TurnManager = turn_manager_fn.call()
 		tm.wait_legion(selected_coords)
 		deselect()
+		_sync_spent_visuals()
 	cycle_legion_tab()
 
 func _on_action_bar_pressed(action: ActionDefinitionScript) -> void:

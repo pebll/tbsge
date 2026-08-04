@@ -164,6 +164,8 @@ func _perform_use_action(cmd: Dictionary, from_coords: Vector2i) -> void:
 		BattleHostWiringScript.action_hooks(session, battle_ui, {
 			"deselect_after_combat": true,
 			"deselect_after_heal": true,
+			"on_finished": func() -> void:
+				presenter.sync_spent_visuals(session),
 		})
 	)
 	if _action_log_panel:

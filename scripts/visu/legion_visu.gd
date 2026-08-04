@@ -235,6 +235,18 @@ func juice_squish() -> void:
 	for unit in units.get_children():
 		unit.juice_squish()
 
+## Light grey-out when the legion has no AP left / has waited this turn.
+func set_spent_visual(spent: bool) -> void:
+	var tint := Color(0.62, 0.62, 0.65, 1.0) if spent else Color.WHITE
+	if units:
+		for child in units.get_children():
+			if child is CanvasItem:
+				(child as CanvasItem).modulate = tint
+	if corpses:
+		for child in corpses.get_children():
+			if child is CanvasItem:
+				(child as CanvasItem).modulate = tint
+
 func juice_direct(direction: Vector2) -> void:
 	for unit in units.get_children():
 		unit.juice_direct(direction)

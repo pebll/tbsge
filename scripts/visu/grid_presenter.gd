@@ -52,6 +52,29 @@ func sync_legions(session: MatchSessionScript) -> void:
 		if legion_to_visu.has(legion):
 			continue
 		spawn_legion_visu(legion)
+	sync_spent_visuals(session)
+
+## Grey out legions (and their tiles) that have spent all AP or waited this turn.
+func sync_spent_visuals(session: MatchSessionScript) -> void:
+	if session == null:
+		return
+	var waited: Array = []
+	if session.turn_manager:
+		waited = session.turn_manager.waited_coords
+	for coords in grid_visu.keys():
+		var tile_visu: TileVisu = grid_visu[coords]
+		if tile_visu == null:
+			continue
+		var legion: Legion = null
+		var tile: Tile = session.grid.get(coords)
+		if tile and tile.has_legion() and not tile.legion.units.is_empty():
+			legion = tile.legion
+		var spent := false
+		if legion != null:
+			spent = (not legion.has_ap()) or (legion.tile_coords in waited)
+		tile_visu.set_spent(spent)
+		if tile_visu.legion_visu:
+			tile_visu.legion_visu.set_spent_visual(spent)
 
 func spawn_legion_visu(legion: Legion, formation_seed: int = -1) -> void:
 	var tile_visu: TileVisu = grid_visu.get(legion.tile_coords)

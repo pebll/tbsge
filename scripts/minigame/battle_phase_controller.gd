@@ -45,6 +45,7 @@ func handle_end_turn() -> void:
 	var result: Dictionary = deps.session.apply({"type": "end_turn"})
 	if result["ok"]:
 		deps.turn_hud.show_active_team(deps.session.turn_manager.active_team_id)
+		deps.presenter.sync_spent_visuals(deps.session)
 		maybe_start_ai_turn()
 
 func request_use_action(action_id: String, from_coords: Vector2i, to_coords: Vector2i) -> void:
@@ -219,11 +220,14 @@ func _battle_action_hooks() -> Dictionary:
 	var hooks := BattleHostWiringScript.action_hooks(deps.session, deps.battle_ui, {
 		"deselect_before_combat": true,
 		"deselect_after_heal": true,
+		"on_finished": func() -> void:
+			deps.presenter.sync_spent_visuals(deps.session),
 	})
 	# AI turns must not re-select / paint move-attack highlights after resolving.
 	if ai_running:
 		hooks["refresh_after_action"] = func(_coords: Vector2i) -> void:
 			deps.battle_ui.deselect()
 			deps.battle_ui.clear_overlays()
+			deps.presenter.sync_spent_visuals(deps.session)
 		hooks["deselect_after_combat"] = true
 	return hooks

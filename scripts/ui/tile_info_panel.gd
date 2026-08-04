@@ -284,8 +284,15 @@ func _render_legion(legion: Legion) -> void:
 	for c in units_list.get_children():
 		c.queue_free()
 
-	for i in range(legion.units.size()):
-		var u: Unit = legion.units[i]
+	var sorted_units: Array = legion.units.duplicate()
+	sorted_units.sort_custom(func(a: Unit, b: Unit) -> bool:
+		if a == null or b == null:
+			return a != null
+		if a.current_health != b.current_health:
+			return a.current_health > b.current_health
+		return a.get_instance_id() < b.get_instance_id()
+	)
+	for u in sorted_units:
 		units_list.add_child(_build_unit_row(legion.unit_type, u))
 
 func _build_unit_row(unit_type: String, u: Unit) -> Control:
