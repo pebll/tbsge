@@ -55,11 +55,15 @@ func sync_legions(session: MatchSessionScript) -> void:
 	sync_spent_visuals(session)
 
 ## Grey out legions (and their tiles) that have spent all AP or waited this turn.
+## Only the active team is marked spent — inactive teams keep full color so grey
+## clears as soon as the turn changes, and again when their turn returns with fresh AP.
 func sync_spent_visuals(session: MatchSessionScript) -> void:
 	if session == null:
 		return
+	var active := ""
 	var waited: Array = []
 	if session.turn_manager:
+		active = session.turn_manager.active_team_id
 		waited = session.turn_manager.waited_coords
 	for coords in grid_visu.keys():
 		var tile_visu: TileVisu = grid_visu[coords]
@@ -70,7 +74,7 @@ func sync_spent_visuals(session: MatchSessionScript) -> void:
 		if tile and tile.has_legion() and not tile.legion.units.is_empty():
 			legion = tile.legion
 		var spent := false
-		if legion != null:
+		if legion != null and legion.team_id == active:
 			spent = (not legion.has_ap()) or (legion.tile_coords in waited)
 		tile_visu.set_spent(spent)
 		if tile_visu.legion_visu:

@@ -221,16 +221,17 @@ static func _best_step_toward(
 	legion: Legion = null
 ) -> Variant:
 	var blocked := _blocked_enemy_coords(session, team_id, from_coords)
-	# Near set: occupied tiles in the current movable neighborhood are hard blocks for planning.
+	# Adjacent occupied tiles are hard blocks for soft planning; distant allies are ghosts.
 	var hard_near: Dictionary = {}
-	for step in movable:
-		var tile: Tile = session.grid.get(step)
-		if tile and tile.has_legion():
-			hard_near[step] = true
+	for adj in Utils.get_surrounding_coords(from_coords):
+		var adj_tile: Tile = session.grid.get(adj)
+		if adj_tile and adj_tile.has_legion():
+			hard_near[adj] = true
 
 	var frontline := legion == null or AiActionScorer.is_frontline(legion)
 	var best_path: Array[Vector2i] = []
 	var best_goal_score := INF
+	var from_dist := HexPathfinder.hex_distance(from_coords, enemy_coords)
 
 	var approach_hexes: Array[Vector2i] = []
 	for goal in Utils.get_surrounding_coords(enemy_coords):
@@ -269,10 +270,7 @@ static func _best_step_toward(
 			best_goal_score = goal_pref
 			best_path = path
 
-	var from_dist := HexPathfinder.hex_distance(from_coords, enemy_coords)
-
-	# Soft-path first step must strictly close distance. Same-dist soft steps caused
-	# traffic-jam shuffles along the back rank while free closer hexes existed.
+	# Soft-path first step must strictly close distance.
 	if best_path.size() >= 2:
 		for i in range(1, best_path.size()):
 			var step: Vector2i = best_path[i]
@@ -281,12 +279,24 @@ static func _best_step_toward(
 			if HexPathfinder.hex_distance(step, enemy_coords) < from_dist:
 				return step
 
-	# Prefer any free neighbor that reduces distance (even if soft path disagreed).
+	# Prefer any free neighbor that reduces distance.
 	var closer: Variant = _best_closer_step(from_coords, enemy_coords, movable)
 	if closer != null:
 		return closer
 
-	return _choose_step_toward(from_coords, enemy_coords, movable, frontline)
+	# No closer hex: only flank if the step improves soft-path length to an approach.
+	var flank: Variant = _best_flank_step(
+		session, from_coords, enemy_coords, movable, blocked, hard_near, approach_hexes, frontline
+	)
+	if flank != null:
+		return flank
+
+	# Backline adjacent to enemy may step away to range 2.
+	if not frontline and from_dist <= 1:
+		return _choose_step_toward(from_coords, enemy_coords, movable, frontline)
+
+	# No productive step — pass rather than shuffle.
+	return null
 
 ## Best movable neighbor that strictly reduces hex distance to the enemy.
 static func _best_closer_step(
@@ -307,6 +317,86 @@ static func _best_closer_step(
 			best_dist = dist
 			best_align = align
 			best = coords
+	return best
+
+## Same-distance flank only when soft-path length to an approach hex strictly improves.
+static func _best_flank_step(
+	session: MatchSessionScript,
+	from_coords: Vector2i,
+	enemy_coords: Vector2i,
+	movable: Array[Vector2i],
+	blocked: Dictionary,
+	hard_near: Dictionary,
+	approach_hexes: Array[Vector2i],
+	frontline: bool
+) -> Variant:
+	var from_dist := HexPathfinder.hex_distance(from_coords, enemy_coords)
+	var current_len := _best_soft_path_len(
+		session, from_coords, enemy_coords, blocked, hard_near, approach_hexes, frontline
+	)
+	var best: Variant = null
+	var best_len := current_len
+	var best_align := -INF
+	for coords in movable:
+		if HexPathfinder.hex_distance(coords, enemy_coords) != from_dist:
+			continue
+		# Stepping onto a near ally is impossible (not in movable); still skip occupied.
+		var tile: Tile = session.grid.get(coords)
+		if tile == null or not tile.walkable or tile.has_legion():
+			continue
+		var step_hard := hard_near.duplicate()
+		# From the new cell, adjacent occupancy is recomputed for fair path length.
+		step_hard.clear()
+		for adj in Utils.get_surrounding_coords(coords):
+			var adj_tile: Tile = session.grid.get(adj)
+			if adj_tile and adj_tile.has_legion() and adj != from_coords:
+				step_hard[adj] = true
+		var plen := _best_soft_path_len(
+			session, coords, enemy_coords, blocked, step_hard, approach_hexes, frontline
+		)
+		var align := _alignment_toward(from_coords, coords, enemy_coords)
+		if plen < best_len or (plen == best_len and plen < INF and align > best_align):
+			# Require strict path improvement over staying put.
+			if plen < current_len:
+				best_len = plen
+				best_align = align
+				best = coords
+	return best
+
+static func _best_soft_path_len(
+	session: MatchSessionScript,
+	from_coords: Vector2i,
+	enemy_coords: Vector2i,
+	blocked: Dictionary,
+	hard_near: Dictionary,
+	approach_hexes: Array[Vector2i],
+	frontline: bool
+) -> float:
+	var best := INF
+	for goal in approach_hexes:
+		if goal == enemy_coords:
+			continue
+		var goal_tile: Tile = session.grid.get(goal)
+		if goal_tile == null or not goal_tile.walkable:
+			continue
+		if goal_tile.has_legion() and hard_near.has(goal):
+			continue
+		# Goal occupied by a distant ally is OK under soft planning; occupied by enemy is blocked.
+		if blocked.has(goal):
+			continue
+		var path := HexPathfinder.find_path(
+			session.grid, from_coords, goal, blocked, true, hard_near
+		)
+		if path.is_empty():
+			continue
+		var score := float(path.size())
+		if frontline:
+			score += float(HexPathfinder.hex_distance(goal, enemy_coords)) * 0.01
+		else:
+			var gd := HexPathfinder.hex_distance(goal, enemy_coords)
+			score += 0.0 if gd >= 2 else 2.0
+		if score < best:
+			best = score
 	return best
 
 static func _choose_step_toward(
@@ -351,21 +441,7 @@ static func _choose_step_toward(
 	if best_closer_dist < current_dist:
 		return best_closer
 
-	# Same-distance flank: only positive alignment (real progress sideways toward goal).
-	var best_lateral: Variant = null
-	var best_lateral_align := 0.0
-	for coords in movable:
-		var dist := HexPathfinder.hex_distance(coords, enemy_coords)
-		if dist != current_dist:
-			continue
-		var align := _alignment_toward(from_coords, coords, enemy_coords)
-		if align > best_lateral_align:
-			best_lateral_align = align
-			best_lateral = coords
-	if best_lateral != null:
-		return best_lateral
-
-	# No productive step — pass rather than shuffle sideways/backwards.
+	# No productive closer/role step.
 	return null
 
 static func _alignment_toward(from_coords: Vector2i, step_coords: Vector2i, goal_coords: Vector2i) -> float:
