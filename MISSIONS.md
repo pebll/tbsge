@@ -1,20 +1,22 @@
 # FableQuest missions
 
 Living checklist. Update as items are done; keep **short-term** small and shippable.  
-You own git — agents should not commit unless you ask.
+Agents: use branches + commits per `.cursor/rules/git-workflow.mdc` when implementing.
 
 ---
 
 ## Status snapshot
 
-**Done recently**
-- Engine vs modes refactor; shared battle host wiring; asset archive; icon batch (`range` / `size` wired).
-- Combat basics: melee, ranged, self-heal, shield, terminal vs non-terminal AP.
+**Done recently (on `main`)**
+- Engine vs modes refactor; minigame draft → battle; AI; balance runner.
+- Combat: melee, ranged, self-heal, shield, ally heal (focused), cooldowns, teleport.
+- UX: tooltips + glossary, battle log, action bar clarity, Options/Sounds, pause menu, parchment theme.
+- Git: `main` aligned with refactor line (Aug 2026).
 
-**Next focus (order)**
-1. **UX foundations** — general tooltips, then a left-side **action log** (before stacking more skills).  
-2. **Tactical skill variety** — ally heal → cooldowns/teleport → terrain → statuses → more actions.  
-3. **Unit complexity tiers** — teach the player; gate complicated kits via missions/unlocks later.
+**Next focus — “fun playable v0.1” (see section below), then**
+1. **Terrain (T3)** — LOS, forest defense, terrain inspect.  
+2. **Statuses (T4)** — buffs/debuffs.  
+3. **Campaign / unlock pacing** — tier I→IV, not required for first skirmish loop.
 
 **Parked**
 - Full SFX content pass.
@@ -32,6 +34,33 @@ You own git — agents should not commit unless you ask.
 ### Still open (your side)
 - [ ] Manual smoke — report ok / what failed (see below)
 - [ ] Later: approve delete list from `assets/_archive/`
+
+---
+
+## Playable v0.1 — “one fun skirmish” (polish before new systems)
+
+Goal: a friend can launch from **main menu → Play → draft → fight → win/lose → play again** without Dev Test, docs, or known UX traps.
+
+### Must-have (ship blockers)
+- [ ] **Single entry path** — main menu **Play** (not only Dev Test) → default duel scene (pick one: R3/R4/BIG; document choice).
+- [ ] **End-to-end loop** — game over → rematch or main menu; no dead ends.
+- [ ] **Manual smoke green** — all items in “How manual smoke works” + pause/tooltips/log/heal/teleport checklist (from recent UX work).
+- [ ] **AI completes a full battle** — no soft-lock; human can win and lose.
+- [ ] **Draft is understandable** — budget, unit cap, deploy slots, pass/continue; at least 3–4 distinct unit roles in the pool (frontline, ranged, healer/support, assassin).
+- [ ] **Fix doc drift** — `README.md` / `AGENT_NOTES.md` panel + action list match current behavior (select-sticky info, full action set).
+
+### Should-have (polish)
+- [ ] **First-run hints** — one line on first select: “Pick a legion, then an action” (coach mark or tooltip footer; no full tutorial yet).
+- [ ] **Turn clarity** — whose turn + end turn obvious (`TurnHud` + wait/pass discoverable).
+- [ ] **Win screen copy** — winner team name, short “Draft again?” CTA.
+- [ ] **Dev Test** — keep for sandbox/duel variants but label as “Advanced / Lab”.
+- [ ] **Delete local `git replace` refs** if any reappear (`git replace -l`) so history matches GitHub.
+
+### Nice-to-have (after v0.1)
+- Terrain T3, statuses T4, SFX pass, fog, campaign unlocks (see epics below).
+
+### Explicitly out of scope for v0.1
+- New actions beyond current roster, balance perfection, multiplayer, save/load campaign.
 
 ---
 
