@@ -213,13 +213,22 @@ func start_idle_animation() -> void:
 func juice_move(target_pos: Vector2) -> Tween:
 	var move_time := 0.4
 	update_local_positions()
+	if move_tween and move_tween.is_valid():
+		move_tween.kill()
 	move_tween = create_tween()
 	active_tween = move_tween
+	move_tween.set_parallel(true)
 	move_tween.tween_property(self, "position", target_pos, move_time).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	# Keep iso depth in sync while Y changes so we don't slide under southern tiles.
+	move_tween.tween_method(_on_move_depth_tick, 0.0, 1.0, move_time)
+	move_tween.set_parallel(false)
 	move_tween.tween_callback(_sync_depth_sort)
 	for unit in units.get_children():
 		unit.juice_move(target_pos)
 	return move_tween
+
+func _on_move_depth_tick(_t: float) -> void:
+	_sync_depth_sort()
 
 func juice_attack(direction: Vector2) -> void:
 	for unit in units.get_children():

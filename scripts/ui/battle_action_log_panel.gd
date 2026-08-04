@@ -25,7 +25,7 @@ const ICON_UNIT := Vector2(84, 84)
 const ICON_ACTION := Vector2(52, 52)
 const ICON_STAT := Vector2(42, 42)
 
-const ICON_WAIT := preload("res://assets/icons/base_icons_sprites/boot.png")
+const ICON_WAIT := preload("res://assets/icons/base_icons_sprites/torso.png")
 const ICON_END_TURN := preload("res://assets/icons/base_icons_sprites/strong.png")
 const ICON_DAMAGE := preload("res://assets/icons/base_icons_sprites/damage.png")
 const ICON_DEATH := preload("res://assets/icons/base_icons_sprites/skull.png")
@@ -97,7 +97,26 @@ func clear_entries() -> void:
 func receive_entry(entry: Dictionary) -> void:
 	if not _battle_mode or entry.is_empty():
 		return
-	if not _is_visible(entry):
+	var action_id := String(entry.get("action_id", ""))
+	var result_summary := String(entry.get("result_summary", ""))
+	var move_like := (
+		action_id in ["move", "swap"]
+		or result_summary in ["moved", "swapped"]
+		or bool(entry.get("show_coords", false))
+	)
+	var visible := _is_visible(entry)
+	if move_like:
+		print(
+			"[BattleLog] UI receive action_id=%s result=%s visible=%s show_moves=%s battle_mode=%s"
+			% [
+				action_id,
+				result_summary,
+				visible,
+				GameSettings.show_battle_log_moves,
+				_battle_mode,
+			]
+		)
+	if not visible:
 		return
 	if BattleActionLog.should_defer_ui(entry):
 		_pending.append(entry)

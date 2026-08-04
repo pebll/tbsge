@@ -63,7 +63,7 @@ Goal: a friend can launch from **main menu → Play → draft → fight → win/
 - [ ] **End-to-end loop** — game over → rematch or main menu; no dead ends.
 - [ ] **Manual smoke green** — all items in “How manual smoke works” + pause/tooltips/log/heal/teleport checklist (from recent UX work).
 - [ ] **AI completes a full battle** — no soft-lock; human can win and lose.
-- [ ] **Draft is understandable** — budget, unit cap, deploy slots, pass/continue; at least 3–4 distinct unit roles in the pool (frontline, ranged, healer/support, assassin).
+- [x] **Draft is understandable** — budget, unit cap, deploy slots, pass/continue; **8 role-distinct units** in the pool (chaff, shield tank, HP wall, long range, short thrower, healer, assassin, AP3 bruiser).
 - [ ] **Fix doc drift** — `README.md` / `AGENT_NOTES.md` panel + action list match current behavior (select-sticky info, full action set).
 
 ### Should-have (polish)
@@ -72,8 +72,8 @@ Goal: a friend can launch from **main menu → Play → draft → fight → win/
 - [ ] **Win screen copy** — winner team name, short “Draft again?” CTA.
 - [ ] **Dev Test** — keep for sandbox/duel variants but label as “Advanced / Lab”.
 - [ ] **Delete local `git replace` refs** if any reappear (`git replace -l`) so history matches GitHub.
-- [ ] **Depth while moving** — legion z-index must update during move tweens so units don’t slide under a southern (higher-Y) tile mid-path; sync from current world Y each frame / tween step, not only at path end.
-- [ ] **Battle log move cards** — intermittent move/swap lines still appear with Show moves off (or path coalesce misses); add temporary console prints (`action_id`, `skip_action_log`, visibility) when appending move logs, then fix the filter/path path.
+- [x] **Depth while moving** — legion z-index updates during move tweens from current world Y (no longer only at path end).
+- [x] **Battle log move cards** — path coalesce + move/swap filter; temporary `[BattleLog]` console prints on append/skip/UI receive; Wait no longer reuses the Move boot icon (was easy to misread as a move).
 
 ### Nice-to-have (after v0.1)
 - Terrain T3, statuses T4, SFX pass, fog, campaign unlocks (see epics below).

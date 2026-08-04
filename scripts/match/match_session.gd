@@ -85,7 +85,18 @@ func resolve_use_action(cmd: Dictionary) -> Dictionary:
 	_collect_cleanup_coords(payload)
 	var ok_result := _ok(result.get("events", []).duplicate(), payload)
 	# Multi-hex paths skip per-step logs and emit one coalesced entry afterward.
-	if not bool(cmd.get("skip_action_log", false)):
+	var skip_log := bool(cmd.get("skip_action_log", false))
+	if skip_log:
+		print(
+			"[BattleLog] skip_action_log action_id=%s from=%s to=%s events=%s"
+			% [
+				String(payload.get("action_id", cmd.get("action_id", ""))),
+				cmd.get("from", Vector2i.ZERO),
+				cmd.get("to", Vector2i.ZERO),
+				ok_result.get("events", []),
+			]
+		)
+	if not skip_log:
 		_append_action_log(BattleActionLogFormatterScript.from_use_action(self, ok_result))
 	return ok_result
 
@@ -135,6 +146,24 @@ func apply_pass_legion(coords: Vector2i) -> Dictionary:
 func _append_action_log(entry: Dictionary) -> void:
 	if action_log == null or entry.is_empty():
 		return
+	var action_id := String(entry.get("action_id", ""))
+	var result_summary := String(entry.get("result_summary", ""))
+	if (
+		action_id in ["move", "swap"]
+		or result_summary in ["moved", "swapped"]
+		or bool(entry.get("show_coords", false))
+	):
+		print(
+			"[BattleLog] append action_id=%s result=%s show_coords=%s from=%s to=%s show_moves=%s"
+			% [
+				action_id,
+				result_summary,
+				entry.get("show_coords", false),
+				entry.get("from", Vector2i.ZERO),
+				entry.get("to", Vector2i.ZERO),
+				GameSettings.show_battle_log_moves,
+			]
+		)
 	action_log.append(entry)
 	EventBus.battle_log_entry_added.emit(entry)
 
