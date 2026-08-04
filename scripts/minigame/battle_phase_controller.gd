@@ -211,16 +211,23 @@ func _run_ai_turn_async() -> void:
 		var cmd: Dictionary = AttackNearestEnemyBehavior.decide(deps.session, legion)
 		match String(cmd.get("type", "")):
 			"use_action":
-				var step: Dictionary = await perform_use_action(
-					String(cmd.get("action_id", "")),
-					cmd.get("from", coords),
-					cmd.get("to", coords),
-					int(cmd.get("rng_seed", randi()))
-				)
-				if not step.get("ok", false):
+				var action_id := String(cmd.get("action_id", ""))
+				var path: Array = cmd.get("path", [])
+				var ok := false
+				if action_id == "move" and path.size() >= 2:
+					ok = await _ai_walk_move_path(path)
+				else:
+					var step: Dictionary = await perform_use_action(
+						action_id,
+						cmd.get("from", coords),
+						cmd.get("to", coords),
+						int(cmd.get("rng_seed", randi()))
+					)
+					ok = step.get("ok", false)
+				if not ok:
 					if AttackNearestEnemyBehavior.debug_enabled:
 						print("[AI] action failed for %s @ %s, passing legion" % [legion.team_id, coords])
-					deps.session.pass_legion_or_force_wait(coords)
+					deps.session.pass_legion_or_force_wait(legion.tile_coords)
 					deps.presenter.sync_spent_visuals(deps.session)
 			_:
 				deps.session.pass_legion_or_force_wait(coords)
@@ -235,6 +242,26 @@ func _run_ai_turn_async() -> void:
 	ai_turn_finished.emit()
 	if deps.session.phase == MinigameSessionScript.Phase.BATTLE and deps.is_ai_team(deps.session.turn_manager.active_team_id):
 		maybe_start_ai_turn()
+
+## Walk a planned path in one AI activation (skip per-step log; one coalesced card).
+func _ai_walk_move_path(path: Array) -> bool:
+	if path.size() < 2:
+		return false
+	var start: Vector2i = path[0]
+	var last_ok: Vector2i = start
+	var steps_ok := 0
+	for i in range(1, path.size()):
+		var from_c: Vector2i = path[i - 1]
+		var to_c: Vector2i = path[i]
+		var step: Dictionary = await perform_use_action("move", from_c, to_c, 0, true)
+		if not step.get("ok", false):
+			break
+		steps_ok += 1
+		last_ok = to_c
+	if steps_ok > 0:
+		deps.session.log_move_relocation(start, last_ok, false)
+		return true
+	return false
 
 func _battle_action_hooks() -> Dictionary:
 	var hooks := BattleHostWiringScript.action_hooks(deps.session, deps.battle_ui, {

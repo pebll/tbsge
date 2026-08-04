@@ -40,10 +40,12 @@ func _test_soft_pathfinding() -> bool:
 	if not hard.is_empty():
 		push_error("Expected hard path blocked by ally")
 		return false
-	var near := {Vector2i(1, 0): true}
-	var soft := HexPathfinder.find_path(grid, from, goal, {}, true, near)
+	var soft := HexPathfinder.find_path(grid, from, goal, {}, true, {})
 	if soft.size() < 2:
-		push_error("Expected soft path to ignore distant ally")
+		push_error("Expected soft path through occupied ally (cost 3)")
+		return false
+	if Vector2i(2, 0) not in soft:
+		push_error("Soft path should traverse the occupied hex when it's the corridor")
 		return false
 	return true
 

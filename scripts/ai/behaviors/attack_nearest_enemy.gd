@@ -5,6 +5,7 @@ const HexPathfinder = preload("res://scripts/ai/hex_pathfinder.gd")
 const Utils = preload("res://scripts/core/utils.gd")
 const MatchSessionScript = preload("res://scripts/match/match_session.gd")
 const AiActionScorer = preload("res://scripts/ai/ai_action_scorer.gd")
+const ActionParams = preload("res://scripts/actions/action_params.gd")
 
 static var debug_enabled: bool = false
 
@@ -18,12 +19,7 @@ static func sort_actionable_by_enemy_distance(
 	session: MatchSessionScript,
 	actionable: Array[Vector2i]
 ) -> Array[Vector2i]:
-	## Activation order tree (simple, deterministic):
-	## 1) Closest to any enemy first (hex distance)
-	## 2) Same distance: units that can attack now before pure movers
-	## 3) Stable coord tie-break
-	## Re-queried each activation so after a front unit moves/waits, the new
-	## closest acts — rear units stop blocking each other less often.
+	## Closest to any enemy first; fighters before pure movers; coord tie-break.
 	if actionable.is_empty():
 		return actionable
 	var enemies := _enemy_legions(session, session.turn_manager.active_team_id)
@@ -88,15 +84,17 @@ static func _decide_internal(session: MatchSessionScript, legion: Legion) -> Dic
 	if enemies.is_empty():
 		return _cmd_pass(legion, "no enemies")
 
-	# Greedy: score every legal action/target this activation; pick best net HP delta.
+	# Greedy: score combat / heal / teleport; pick best.
 	var best_score := -INF
 	var best_cmd: Dictionary = {}
 	for action_id in ActionDefs.legion_action_ids(legion):
-		if action_id == "move" or action_id == "teleport":
+		if action_id == "move":
 			continue
 		var targets := session.get_action_targets(legion, action_id)
 		for to_coords in targets:
 			var score := AiActionScorer.score_action(session, legion, action_id, to_coords)
+			if action_id in ["melee_attack", "ranged_attack", "teleport"]:
+				score += _focus_bonus_at(session, to_coords, enemies)
 			if score > best_score:
 				best_score = score
 				best_cmd = {
@@ -107,43 +105,35 @@ static func _decide_internal(session: MatchSessionScript, legion: Legion) -> Dic
 					"reason": "greedy score %.1f (%s -> %s)" % [score, action_id, to_coords],
 				}
 
-	# Prefer any combat/heal over movement — greedy already picked the best among them.
 	if not best_cmd.is_empty():
-		return best_cmd
+		if String(best_cmd.get("action_id", "")) != "teleport" or best_score >= 0.5:
+			return best_cmd
 
-	# Move toward nearest enemy with soft pathfinding + role positioning.
 	if not legion.can_afford(1):
 		return _cmd_pass(legion, "cannot afford move")
 
-	var movable := session.get_movable_coords(legion.tile_coords)
-	if movable.is_empty():
-		return _cmd_pass(legion, "no empty adjacent tiles")
-
-	var nearest: Legion = _find_nearest_enemy(legion.tile_coords, enemies)
-	var best_step: Variant = _best_step_toward(
-		session, legion.tile_coords, nearest.tile_coords, movable, legion.team_id, legion
-	)
-	var step_enemy_coords := nearest.tile_coords
-	if best_step == null:
-		for enemy in enemies:
-			if enemy.tile_coords == nearest.tile_coords:
+	var focus: Legion = _pick_focus_enemy(legion.tile_coords, enemies)
+	var walk := _plan_walk_toward(session, legion, focus)
+	if walk.is_empty() and enemies.size() > 1:
+		for enemy in _enemies_by_focus(legion.tile_coords, enemies):
+			if enemy == focus:
 				continue
-			best_step = _best_step_toward(
-				session, legion.tile_coords, enemy.tile_coords, movable, legion.team_id, legion
-			)
-			if best_step != null:
-				step_enemy_coords = enemy.tile_coords
+			walk = _plan_walk_toward(session, legion, enemy)
+			if not walk.is_empty():
+				focus = enemy
 				break
-	if best_step != null:
-		return {
-			"type": "use_action",
-			"action_id": "move",
-			"from": legion.tile_coords,
-			"to": best_step,
-			"reason": "step toward enemy @ %s" % step_enemy_coords,
-		}
 
-	return _cmd_pass(legion, "no step toward enemy @ %s" % nearest.tile_coords)
+	if walk.size() < 2:
+		return _cmd_pass(legion, "no step toward enemy @ %s" % focus.tile_coords)
+
+	return {
+		"type": "use_action",
+		"action_id": "move",
+		"from": walk[0],
+		"to": walk[1],
+		"path": walk,
+		"reason": "path toward focus @ %s (%d steps)" % [focus.tile_coords, walk.size() - 1],
+	}
 
 static func _cmd_pass(legion: Legion, reason: String) -> Dictionary:
 	return {
@@ -161,9 +151,13 @@ static func _log_decision(legion: Legion, cmd: Dictionary) -> void:
 	var reason := String(cmd.get("reason", ""))
 	match cmd_type:
 		"use_action":
+			var path: Array = cmd.get("path", [])
+			var dest = cmd.get("to", "?")
+			if path.size() >= 2:
+				dest = "%s..%s" % [path[1], path[path.size() - 1]]
 			print(
 				"[AI] %s @ %s %s -> %s (%s)"
-				% [team, coords, cmd.get("action_id", "?"), cmd.get("to", "?"), reason]
+				% [team, coords, cmd.get("action_id", "?"), dest, reason]
 			)
 		_:
 			print("[AI] %s @ %s PASS (%s)" % [team, coords, reason])
@@ -175,281 +169,159 @@ static func _enemy_legions(session: MatchSessionScript, team_id: String) -> Arra
 			out.append(legion)
 	return out
 
-static func _find_nearest_enemy(from_coords: Vector2i, enemies: Array[Legion]) -> Legion:
-	var best: Legion = enemies[0]
-	var best_dist := HexPathfinder.hex_distance(from_coords, best.tile_coords)
-	for i in range(1, enemies.size()):
-		var enemy: Legion = enemies[i]
-		var dist := HexPathfinder.hex_distance(from_coords, enemy.tile_coords)
-		if dist < best_dist:
-			best = enemy
-			best_dist = dist
-	return best
-
-static func _pick_closest_coords(candidates: Array[Vector2i], from_coords: Vector2i) -> Vector2i:
-	var best: Vector2i = candidates[0]
-	var best_dist := HexPathfinder.hex_distance(from_coords, best)
-	for i in range(1, candidates.size()):
-		var c: Vector2i = candidates[i]
-		var dist := HexPathfinder.hex_distance(from_coords, c)
-		if dist < best_dist:
-			best = c
-			best_dist = dist
-	return best
-
 static func _min_enemy_distance(from_coords: Vector2i, enemies: Array[Legion]) -> int:
 	var best := 2147483647
 	for enemy in enemies:
 		best = mini(best, HexPathfinder.hex_distance(from_coords, enemy.tile_coords))
 	return best
 
-static func _blocked_enemy_coords(session: MatchSessionScript, team_id: String, ignore_coords: Vector2i) -> Dictionary:
-	var blocked: Dictionary = {}
-	for legion in session.legions:
-		if legion.tile_coords == ignore_coords:
-			continue
-		if legion.team_id != team_id:
-			blocked[legion.tile_coords] = true
-	return blocked
+## Support/ranged (non-frontline) first, then weakest total HP, then closer.
+static func _pick_focus_enemy(from_coords: Vector2i, enemies: Array[Legion]) -> Legion:
+	var ranked := _enemies_by_focus(from_coords, enemies)
+	return ranked[0]
 
-static func _best_step_toward(
+static func _enemies_by_focus(from_coords: Vector2i, enemies: Array[Legion]) -> Array[Legion]:
+	var ranked: Array[Legion] = enemies.duplicate()
+	ranked.sort_custom(func(a: Legion, b: Legion) -> bool:
+		var sa := 0 if AiActionScorer.is_frontline(a) else 1
+		var sb := 0 if AiActionScorer.is_frontline(b) else 1
+		if sa != sb:
+			return sa > sb
+		var ha := _legion_total_hp(a)
+		var hb := _legion_total_hp(b)
+		if ha != hb:
+			return ha < hb
+		var da := HexPathfinder.hex_distance(from_coords, a.tile_coords)
+		var db := HexPathfinder.hex_distance(from_coords, b.tile_coords)
+		return da < db
+	)
+	return ranked
+
+static func _legion_total_hp(legion: Legion) -> float:
+	var t := 0.0
+	for u in legion.units:
+		if u:
+			t += float(u.current_health)
+	return t
+
+static func _focus_bonus_at(session: MatchSessionScript, to_coords: Vector2i, enemies: Array[Legion]) -> float:
+	var at: Legion = session.get_legion_at(to_coords)
+	if at == null or at not in enemies:
+		# Teleport onto empty: small bonus if closer to a preferred focus later handled in scorer.
+		return 0.0
+	var bonus := 0.0
+	if not AiActionScorer.is_frontline(at):
+		bonus += 8.0
+	bonus += 12.0 / maxf(1.0, _legion_total_hp(at))
+	return bonus
+
+## Soft-plan a path to a stand goal; return legal empty walk prefix up to remaining AP.
+static func _plan_walk_toward(
 	session: MatchSessionScript,
-	from_coords: Vector2i,
-	enemy_coords: Vector2i,
-	movable: Array[Vector2i],
-	team_id: String,
-	legion: Legion = null
-) -> Variant:
-	var blocked := _blocked_enemy_coords(session, team_id, from_coords)
-	# Adjacent occupied tiles are hard blocks for soft planning; distant allies are ghosts.
-	var hard_near: Dictionary = {}
-	for adj in Utils.get_surrounding_coords(from_coords):
-		var adj_tile: Tile = session.grid.get(adj)
-		if adj_tile and adj_tile.has_legion():
-			hard_near[adj] = true
+	legion: Legion,
+	enemy: Legion
+) -> Array[Vector2i]:
+	var from_coords := legion.tile_coords
+	var goals := _stand_goals(session, legion, enemy)
+	if goals.is_empty():
+		return []
 
-	var frontline := legion == null or AiActionScorer.is_frontline(legion)
 	var best_path: Array[Vector2i] = []
-	var best_goal_score := INF
-	var from_dist := HexPathfinder.hex_distance(from_coords, enemy_coords)
-
-	var approach_hexes: Array[Vector2i] = []
-	for goal in Utils.get_surrounding_coords(enemy_coords):
-		approach_hexes.append(goal)
-	# Backline prefers a ring at distance 2 when possible.
-	if not frontline:
-		var ring2: Dictionary = {}
-		for adj in Utils.get_surrounding_coords(enemy_coords):
-			for outer in Utils.get_surrounding_coords(adj):
-				if HexPathfinder.hex_distance(outer, enemy_coords) == 2:
-					ring2[outer] = true
-		for c in ring2.keys():
-			approach_hexes.append(c)
-
-	for goal in approach_hexes:
-		if goal == enemy_coords:
-			continue
-		var goal_tile: Tile = session.grid.get(goal)
-		if goal_tile == null or not goal_tile.walkable:
-			continue
-		if goal_tile.has_legion() and goal in hard_near:
-			continue
+	var best_cost := INF
+	for goal in goals:
+		if goal == from_coords:
+			# Already on a valid stand hex — no move needed.
+			return []
 		var path := HexPathfinder.find_path(
-			session.grid, from_coords, goal, blocked, true, hard_near
+			session.grid, from_coords, goal, {}, true, {}
 		)
 		if path.size() < 2:
 			continue
-		var goal_pref := float(path.size())
-		if frontline:
-			goal_pref += float(HexPathfinder.hex_distance(goal, enemy_coords)) * 0.01
-		else:
-			# Prefer staying at ranged distance (2+) over hugging melee.
-			var gd := HexPathfinder.hex_distance(goal, enemy_coords)
-			goal_pref += 0.0 if gd >= 2 else 2.0
-		if best_path.is_empty() or goal_pref < best_goal_score:
-			best_goal_score = goal_pref
+		var cost := _path_soft_cost(session.grid, path)
+		if cost < best_cost:
+			best_cost = cost
 			best_path = path
 
-	# Soft-path first step must strictly close distance.
-	if best_path.size() >= 2:
-		for i in range(1, best_path.size()):
-			var step: Vector2i = best_path[i]
-			if step not in movable:
-				continue
-			if HexPathfinder.hex_distance(step, enemy_coords) < from_dist:
-				return step
+	if best_path.size() < 2:
+		return []
 
-	# Prefer any free neighbor that reduces distance.
-	var closer: Variant = _best_closer_step(from_coords, enemy_coords, movable)
-	if closer != null:
-		return closer
+	return _legal_move_prefix(session, best_path, legion.current_ap)
 
-	# No closer hex: only flank if the step improves soft-path length to an approach.
-	var flank: Variant = _best_flank_step(
-		session, from_coords, enemy_coords, movable, blocked, hard_near, approach_hexes, frontline
-	)
-	if flank != null:
-		return flank
-
-	# Backline adjacent to enemy may step away to range 2.
-	if not frontline and from_dist <= 1:
-		return _choose_step_toward(from_coords, enemy_coords, movable, frontline)
-
-	# No productive step — pass rather than shuffle.
-	return null
-
-## Best movable neighbor that strictly reduces hex distance to the enemy.
-static func _best_closer_step(
-	from_coords: Vector2i,
-	enemy_coords: Vector2i,
-	movable: Array[Vector2i]
-) -> Variant:
-	var current_dist := HexPathfinder.hex_distance(from_coords, enemy_coords)
-	var best: Variant = null
-	var best_dist := current_dist
-	var best_align := -INF
-	for coords in movable:
-		var dist := HexPathfinder.hex_distance(coords, enemy_coords)
-		if dist >= current_dist:
-			continue
-		var align := _alignment_toward(from_coords, coords, enemy_coords)
-		if dist < best_dist or (dist == best_dist and align > best_align):
-			best_dist = dist
-			best_align = align
-			best = coords
-	return best
-
-## Same-distance flank only when soft-path length to an approach hex strictly improves.
-static func _best_flank_step(
-	session: MatchSessionScript,
-	from_coords: Vector2i,
-	enemy_coords: Vector2i,
-	movable: Array[Vector2i],
-	blocked: Dictionary,
-	hard_near: Dictionary,
-	approach_hexes: Array[Vector2i],
-	frontline: bool
-) -> Variant:
-	var from_dist := HexPathfinder.hex_distance(from_coords, enemy_coords)
-	var current_len := _best_soft_path_len(
-		session, from_coords, enemy_coords, blocked, hard_near, approach_hexes, frontline
-	)
-	var best: Variant = null
-	var best_len := current_len
-	var best_align := -INF
-	for coords in movable:
-		if HexPathfinder.hex_distance(coords, enemy_coords) != from_dist:
-			continue
-		# Stepping onto a near ally is impossible (not in movable); still skip occupied.
-		var tile: Tile = session.grid.get(coords)
-		if tile == null or not tile.walkable or tile.has_legion():
-			continue
-		var step_hard := hard_near.duplicate()
-		# From the new cell, adjacent occupancy is recomputed for fair path length.
-		step_hard.clear()
-		for adj in Utils.get_surrounding_coords(coords):
-			var adj_tile: Tile = session.grid.get(adj)
-			if adj_tile and adj_tile.has_legion() and adj != from_coords:
-				step_hard[adj] = true
-		var plen := _best_soft_path_len(
-			session, coords, enemy_coords, blocked, step_hard, approach_hexes, frontline
-		)
-		var align := _alignment_toward(from_coords, coords, enemy_coords)
-		if plen < best_len or (plen == best_len and plen < INF and align > best_align):
-			# Require strict path improvement over staying put.
-			if plen < current_len:
-				best_len = plen
-				best_align = align
-				best = coords
-	return best
-
-static func _best_soft_path_len(
-	session: MatchSessionScript,
-	from_coords: Vector2i,
-	enemy_coords: Vector2i,
-	blocked: Dictionary,
-	hard_near: Dictionary,
-	approach_hexes: Array[Vector2i],
-	frontline: bool
-) -> float:
-	var best := INF
-	for goal in approach_hexes:
-		if goal == enemy_coords:
-			continue
-		var goal_tile: Tile = session.grid.get(goal)
-		if goal_tile == null or not goal_tile.walkable:
-			continue
-		if goal_tile.has_legion() and hard_near.has(goal):
-			continue
-		# Goal occupied by a distant ally is OK under soft planning; occupied by enemy is blocked.
-		if blocked.has(goal):
-			continue
-		var path := HexPathfinder.find_path(
-			session.grid, from_coords, goal, blocked, true, hard_near
-		)
-		if path.is_empty():
-			continue
-		var score := float(path.size())
-		if frontline:
-			score += float(HexPathfinder.hex_distance(goal, enemy_coords)) * 0.01
+static func _path_soft_cost(grid: Dictionary, path: Array[Vector2i]) -> float:
+	var cost := 0.0
+	for i in range(1, path.size()):
+		var tile: Tile = grid.get(path[i])
+		if tile != null and tile.has_legion():
+			cost += HexPathfinder.SOFT_OCCUPANCY_COST
 		else:
-			var gd := HexPathfinder.hex_distance(goal, enemy_coords)
-			score += 0.0 if gd >= 2 else 2.0
-		if score < best:
-			best = score
+			cost += 1.0
+	return cost
+
+## Empty walkable tiles to stand on: shoot hexes for range>1, else adjacent to enemy.
+static func _stand_goals(
+	session: MatchSessionScript,
+	legion: Legion,
+	enemy: Legion
+) -> Array[Vector2i]:
+	var goals: Array[Vector2i] = []
+	var shoot_range := _legion_shoot_range(legion)
+	if shoot_range > 1:
+		for coords in session.grid.keys():
+			var tile: Tile = session.grid[coords]
+			if tile == null or not tile.walkable:
+				continue
+			if tile.has_legion() and coords != legion.tile_coords:
+				continue
+			var dist := HexPathfinder.hex_distance(coords, enemy.tile_coords)
+			if dist >= 1 and dist <= shoot_range:
+				goals.append(coords)
+		return goals
+
+	for adj in Utils.get_surrounding_coords(enemy.tile_coords):
+		var tile: Tile = session.grid.get(adj)
+		if tile == null or not tile.walkable:
+			continue
+		if tile.has_legion() and adj != legion.tile_coords:
+			continue
+		goals.append(adj)
+	return goals
+
+static func _legion_shoot_range(legion: Legion) -> int:
+	if legion == null:
+		return 0
+	if "ranged_attack" not in ActionDefs.legion_action_ids(legion):
+		return 0
+	var best := 0
+	for u in legion.units:
+		if u and u.attack_range > best and u.ranged_attack > 0:
+			best = u.attack_range
 	return best
 
-static func _choose_step_toward(
-	from_coords: Vector2i,
-	enemy_coords: Vector2i,
-	movable: Array[Vector2i],
-	frontline: bool = true
-) -> Variant:
-	if movable.is_empty():
-		return null
-
-	var current_dist := HexPathfinder.hex_distance(from_coords, enemy_coords)
-	var prefer_closer := frontline or current_dist > 2
-
-	var best_closer: Vector2i = Vector2i(2147483646, 2147483646)
-	var best_closer_dist := current_dist
-	var best_closer_align := -INF
-	for coords in movable:
-		var dist := HexPathfinder.hex_distance(coords, enemy_coords)
-		if dist > best_closer_dist:
-			continue
-		var align := _alignment_toward(from_coords, coords, enemy_coords)
-		if dist < best_closer_dist or (dist == best_closer_dist and align > best_closer_align):
-			best_closer_dist = dist
-			best_closer_align = align
-			best_closer = coords
-	if prefer_closer and best_closer_dist < current_dist:
-		return best_closer
-
-	# Backline at distance 1 tries to step away to 2 if possible.
-	if not frontline and current_dist <= 1:
-		var best_away: Variant = null
-		var best_away_dist := current_dist
-		for coords in movable:
-			var dist := HexPathfinder.hex_distance(coords, enemy_coords)
-			if dist > best_away_dist:
-				best_away_dist = dist
-				best_away = coords
-		if best_away != null:
-			return best_away
-
-	if best_closer_dist < current_dist:
-		return best_closer
-
-	# No productive closer/role step.
-	return null
-
-static func _alignment_toward(from_coords: Vector2i, step_coords: Vector2i, goal_coords: Vector2i) -> float:
-	var to_goal := _axial_to_cube(goal_coords) - _axial_to_cube(from_coords)
-	var step_dir := _axial_to_cube(step_coords) - _axial_to_cube(from_coords)
-	if to_goal == Vector3i.ZERO or step_dir == Vector3i.ZERO:
-		return 0.0
-	return float(to_goal.x * step_dir.x + to_goal.y * step_dir.y + to_goal.z * step_dir.z)
-
-static func _axial_to_cube(axial: Vector2i) -> Vector3i:
-	return Vector3i(axial.x, -axial.x - axial.y, axial.y)
+## Walk the soft path only onto empty tiles, up to `max_steps` AP.
+static func _legal_move_prefix(
+	session: MatchSessionScript,
+	path: Array[Vector2i],
+	max_steps: int
+) -> Array[Vector2i]:
+	if path.size() < 2 or max_steps < 1:
+		return []
+	var out: Array[Vector2i] = [path[0]]
+	var steps := 0
+	for i in range(1, path.size()):
+		if steps >= max_steps:
+			break
+		var step: Vector2i = path[i]
+		var tile: Tile = session.grid.get(step)
+		if tile == null or not tile.walkable:
+			break
+		# Effectively blocked: cannot enter occupied tiles (swap is a separate action).
+		if tile.has_legion():
+			break
+		# Must stay adjacent to previous (path should already be).
+		if HexPathfinder.hex_distance(out[out.size() - 1], step) != 1:
+			break
+		out.append(step)
+		steps += 1
+	if out.size() < 2:
+		return []
+	return out

@@ -22,8 +22,67 @@ static func score_action(
 			return _score_combat(session, legion, to_coords, CombatResolver.MODE_RANGED, dist)
 		"self_heal", "heal_ally":
 			return float(_estimate_heal(session, legion, action_id, to_coords))
+		"teleport":
+			return _score_teleport(session, legion, to_coords)
 		_:
 			return 0.0
+
+static func _score_teleport(session, legion: Legion, to_coords: Vector2i) -> float:
+	## Prefer blinks that enable a fight, then that close on soft targets.
+	var score := 0.0
+	var enemies: Array = []
+	for L in session.legions:
+		if L.team_id != legion.team_id and not L.units.is_empty():
+			enemies.append(L)
+	if enemies.is_empty():
+		return -INF
+
+	# Simulate standing at destination for target checks via temporary coords.
+	var old := legion.tile_coords
+	legion.tile_coords = to_coords
+	var tile_old: Tile = session.grid.get(old)
+	var tile_new: Tile = session.grid.get(to_coords)
+	var prev_new_legion = tile_new.legion if tile_new else null
+	if tile_old and tile_old.legion == legion:
+		tile_old.legion = null
+	if tile_new:
+		tile_new.legion = legion
+
+	var melee_targets: Array = session.get_action_targets(legion, "melee_attack")
+	var ranged_targets: Array = session.get_action_targets(legion, "ranged_attack")
+	if not melee_targets.is_empty() or not ranged_targets.is_empty():
+		score += 20.0
+		for t in melee_targets:
+			score += 5.0 + _focus_hp_bonus(session.get_legion_at(t))
+		for t in ranged_targets:
+			score += 4.0 + _focus_hp_bonus(session.get_legion_at(t))
+	else:
+		# Closer to preferred enemy is still useful.
+		var best_close := INF
+		for e in enemies:
+			best_close = minf(best_close, float(HexPathfinder.hex_distance(to_coords, e.tile_coords)))
+		score += 8.0 - best_close
+
+	# Restore occupancy.
+	legion.tile_coords = old
+	if tile_old:
+		tile_old.legion = legion
+	if tile_new:
+		tile_new.legion = prev_new_legion
+	return score
+
+static func _focus_hp_bonus(target: Legion) -> float:
+	if target == null:
+		return 0.0
+	var bonus := 0.0
+	if not is_frontline(target):
+		bonus += 3.0
+	var hp := 0.0
+	for u in target.units:
+		if u:
+			hp += float(u.current_health)
+	bonus += 4.0 / maxf(1.0, hp)
+	return bonus
 
 static func _score_combat(
 	session,

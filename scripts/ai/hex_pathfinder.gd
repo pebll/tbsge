@@ -3,22 +3,25 @@ extends RefCounted
 
 const Utils = preload("res://scripts/core/utils.gd")
 
+## Soft planning: stepping onto an occupied tile costs this many "hexes".
+const SOFT_OCCUPANCY_COST := 3.0
+
 static func hex_distance(a: Vector2i, b: Vector2i) -> int:
 	var dq := a.x - b.x
 	var dr := a.y - b.y
 	var ds := -dq - dr
 	return maxi(absi(dq), maxi(absi(dr), absi(ds)))
 
-## blocked_coords: hard blocks (usually enemy tiles).
-## soft_ignore_occupied: when true, ally/enemy occupancy is ignored except tiles in
-## hard_block_near (typically the mover's adjacent neighborhood where occupancy matters now).
+## blocked_coords: hard blocks (unwalkable intent / optional).
+## soft_ignore_occupied: occupied tiles stay traversable at SOFT_OCCUPANCY_COST (never hard-blocked).
+## hard_block_near: unused when soft (kept for call-site compatibility).
 static func find_path(
 	grid: Dictionary,
 	from_coords: Vector2i,
 	to_coords: Vector2i,
 	blocked_coords: Dictionary = {},
 	soft_ignore_occupied: bool = false,
-	hard_block_near: Dictionary = {}
+	_hard_block_near: Dictionary = {}
 ) -> Array[Vector2i]:
 	if from_coords == to_coords:
 		return [from_coords]
@@ -26,13 +29,13 @@ static func find_path(
 	var goal_tile: Tile = grid.get(to_coords)
 	if goal_tile == null or not goal_tile.walkable:
 		return []
-	if blocked_coords.has(to_coords):
+	if blocked_coords.has(to_coords) and not soft_ignore_occupied:
 		return []
 
 	var open: Array[Vector2i] = [from_coords]
 	var open_set: Dictionary = {from_coords: true}
 	var came_from: Dictionary = {}
-	var g_score: Dictionary = {from_coords: 0}
+	var g_score: Dictionary = {from_coords: 0.0}
 	var f_score: Dictionary = {from_coords: float(hex_distance(from_coords, to_coords))}
 
 	while not open.is_empty():
@@ -48,10 +51,11 @@ static func find_path(
 
 		for neighbor in Utils.get_surrounding_coords(current):
 			if not _is_traversable(
-				grid, neighbor, to_coords, blocked_coords, soft_ignore_occupied, hard_block_near
+				grid, neighbor, to_coords, blocked_coords, soft_ignore_occupied
 			):
 				continue
-			var tentative_g: float = float(g_score.get(current, INF)) + 1.0
+			var step_cost := _step_cost(grid, neighbor, soft_ignore_occupied)
+			var tentative_g: float = float(g_score.get(current, INF)) + step_cost
 			if tentative_g >= float(g_score.get(neighbor, INF)):
 				continue
 			came_from[neighbor] = current
@@ -63,28 +67,30 @@ static func find_path(
 
 	return []
 
+static func _step_cost(grid: Dictionary, coords: Vector2i, soft_ignore_occupied: bool) -> float:
+	if not soft_ignore_occupied:
+		return 1.0
+	var tile: Tile = grid.get(coords)
+	if tile != null and tile.has_legion():
+		return SOFT_OCCUPANCY_COST
+	return 1.0
+
 static func _is_traversable(
 	grid: Dictionary,
 	coords: Vector2i,
 	goal_coords: Vector2i,
 	blocked_coords: Dictionary,
-	soft_ignore_occupied: bool,
-	hard_block_near: Dictionary
+	soft_ignore_occupied: bool
 ) -> bool:
 	var tile: Tile = grid.get(coords)
 	if tile == null or not tile.walkable:
 		return false
 	if coords == goal_coords:
 		return true
-	if blocked_coords.has(coords):
-		return false
 	if soft_ignore_occupied:
-		# Only treat occupancy as blocking when the tile is in the near set
-		# (current move neighborhood). Distant legions are planning ghosts.
-		if hard_block_near.has(coords) and tile.has_legion():
-			return false
+		# Occupancy is never a hard block — only cost (see _step_cost).
 		return true
-	if hard_block_near.has(coords) and tile.has_legion():
+	if blocked_coords.has(coords):
 		return false
 	return not tile.has_legion()
 
