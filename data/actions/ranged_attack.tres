@@ -12,3 +12,6 @@ ap_cost = 1
 terminal = true
 targeting = 3
 overlay_state = "ranged_attackable"
+tooltip_body = "Shoot an enemy within range. Ends this legion's turn."
+keywords = Array[String](["terminal", "ap", "range"])
+

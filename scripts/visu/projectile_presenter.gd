@@ -21,7 +21,9 @@ func play_parabola(
 	texture: Texture2D,
 	motion: int,
 	duration: float = 0.28,
-	arc_height: float = 48.0
+	arc_height: float = 48.0,
+	thrown_spins: float = 1.75,
+	spin_sign: float = 1.0
 ) -> void:
 	if host == null or _layer == null or texture == null:
 		return
@@ -36,7 +38,7 @@ func play_parabola(
 
 	var mid := (from_global + to_global) * 0.5 + Vector2(0.0, -absf(arc_height))
 	var prev_pos := from_global
-	var spin := 0.0
+	var sign := 1.0 if spin_sign >= 0.0 else -1.0
 
 	var tween := host.create_tween()
 	tween.tween_method(
@@ -48,8 +50,8 @@ func play_parabola(
 				if delta.length_squared() > 0.01:
 					sprite.rotation = delta.angle() - ART_FORWARD_ANGLE
 			else:
-				spin += 0.45
-				sprite.rotation = spin
+				# THROWN: tumble in the throw's handedness (right → clockwise in Godot 2D).
+				sprite.rotation = t * TAU * thrown_spins * sign
 			prev_pos = pos,
 		0.0,
 		1.0,

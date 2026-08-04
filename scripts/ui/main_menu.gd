@@ -1,86 +1,71 @@
 extends Control
 
 const DEV_TEST_SCENE := "res://scenes/runnables/dev_test_menu.tscn"
+const UiTheme = preload("res://scripts/ui/ui_theme.gd")
 
-const COLOR_BG := Color(0.91, 0.86, 0.78)
-const COLOR_BORDER := Color(0.78, 0.70, 0.58)
-const COLOR_TEXT := Color(0.12, 0.10, 0.08)
-const BORDER_THICK := 4
-const RADIUS := 16
+enum View { MAIN, SOUNDS, OPTIONS }
+
+const MENU_BTN_WIDTH := 360
 
 @onready var dev_test_button: GameButton = %DevTestButton
 @onready var sounds_button: GameButton = %SoundsButton
-@onready var back_button: GameButton = %BackButton
+@onready var options_button: GameButton = %OptionsButton
 @onready var main_buttons: VBoxContainer = %MainButtons
-@onready var sounds_panel: VBoxContainer = %SoundsPanel
-@onready var menu_sound_slider: HSlider = %MenuSoundSlider
-@onready var game_sound_slider: HSlider = %GameSoundSlider
-@onready var music_sound_slider: HSlider = %MusicSoundSlider
+@onready var sounds_panel: SoundsSettingsPanel = %SoundsPanel
+@onready var options_panel: OptionsSettingsPanel = %OptionsPanel
+
+var _view: View = View.MAIN
 
 func _ready() -> void:
 	AudioManager.ensure_music()
 	_apply_styles()
-	_sync_sliders_from_audio()
 	dev_test_button.pressed.connect(_on_dev_test_pressed)
 	sounds_button.pressed.connect(_on_sounds_pressed)
-	back_button.pressed.connect(_on_back_pressed)
-	menu_sound_slider.value_changed.connect(_on_menu_volume_changed)
-	game_sound_slider.value_changed.connect(_on_game_volume_changed)
-	music_sound_slider.value_changed.connect(_on_music_volume_changed)
+	options_button.pressed.connect(_on_options_pressed)
+	sounds_panel.back_pressed.connect(_on_back_pressed)
+	options_panel.back_pressed.connect(_on_back_pressed)
+	_show_view(View.MAIN)
 
 func _apply_styles() -> void:
-	var panel_sb := StyleBoxFlat.new()
-	panel_sb.bg_color = COLOR_BG
-	panel_sb.border_color = COLOR_BORDER
-	panel_sb.border_width_left = BORDER_THICK
-	panel_sb.border_width_right = BORDER_THICK
-	panel_sb.border_width_top = BORDER_THICK
-	panel_sb.border_width_bottom = BORDER_THICK
-	panel_sb.corner_radius_top_left = RADIUS
-	panel_sb.corner_radius_top_right = RADIUS
-	panel_sb.corner_radius_bottom_left = RADIUS
-	panel_sb.corner_radius_bottom_right = RADIUS
-	panel_sb.content_margin_left = 28
-	panel_sb.content_margin_right = 28
-	panel_sb.content_margin_top = 28
-	panel_sb.content_margin_bottom = 28
-	%MenuPanel.add_theme_stylebox_override("panel", panel_sb)
+	%MenuPanel.add_theme_stylebox_override(
+		"panel",
+		UiTheme.panel_stylebox(UiTheme.COLOR_PANEL, UiTheme.COLOR_BORDER, UiTheme.RADIUS, UiTheme.BORDER_THICK, 24)
+	)
 
 	var title := %TitleLabel
-	title.add_theme_color_override("font_color", COLOR_TEXT)
+	title.add_theme_color_override("font_color", UiTheme.COLOR_TEXT)
 	title.add_theme_font_size_override("font_size", 42)
 
-	for child in sounds_panel.get_children():
-		if child is VBoxContainer:
-			for row_child in child.get_children():
-				if row_child is Label:
-					row_child.add_theme_color_override("font_color", COLOR_TEXT)
-					row_child.add_theme_font_size_override("font_size", 18)
+	for btn in [dev_test_button, sounds_button, options_button]:
+		btn.preferred_width = MENU_BTN_WIDTH
 
-func _sync_sliders_from_audio() -> void:
-	menu_sound_slider.set_value_no_signal(AudioManager.menu_volume)
-	game_sound_slider.set_value_no_signal(AudioManager.game_volume)
-	music_sound_slider.set_value_no_signal(AudioManager.music_volume)
+	main_buttons.add_theme_constant_override("separation", 16)
 
-func _show_sounds(show_sounds: bool) -> void:
-	main_buttons.visible = not show_sounds
-	sounds_panel.visible = show_sounds
+func _show_view(view: View) -> void:
+	_view = view
+	main_buttons.visible = view == View.MAIN
+	sounds_panel.visible = view == View.SOUNDS
+	options_panel.visible = view == View.OPTIONS
+	var active: Control = main_buttons
+	match view:
+		View.SOUNDS:
+			active = sounds_panel
+		View.OPTIONS:
+			active = options_panel
+		_:
+			active = main_buttons
+	UiTheme.juice_pop_in(active, 0.12)
 
 func _on_dev_test_pressed() -> void:
 	get_tree().change_scene_to_file(DEV_TEST_SCENE)
 
 func _on_sounds_pressed() -> void:
-	_sync_sliders_from_audio()
-	_show_sounds(true)
+	sounds_panel.sync_from_audio()
+	_show_view(View.SOUNDS)
+
+func _on_options_pressed() -> void:
+	options_panel.sync_from_settings()
+	_show_view(View.OPTIONS)
 
 func _on_back_pressed() -> void:
-	_show_sounds(false)
-
-func _on_menu_volume_changed(value: float) -> void:
-	AudioManager.set_menu_volume(value)
-
-func _on_game_volume_changed(value: float) -> void:
-	AudioManager.set_game_volume(value)
-
-func _on_music_volume_changed(value: float) -> void:
-	AudioManager.set_music_volume(value)
+	_show_view(View.MAIN)

@@ -64,14 +64,17 @@ const ICON_BOW := preload("res://assets/icons/base_icons_sprites/bow.png")
 const ICON_HEALTH := preload("res://assets/icons/base_icons_sprites/heart.png")
 const ICON_UNIT_COUNT := preload("res://assets/icons/base_icons_sprites/torso.png")
 const ICON_AP := preload("res://assets/icons/base_icons_sprites/boot.png")
-const ICON_SIZE := preload("res://assets/icons/base_icons_sprites/strong.png")
+const ICON_SIZE := preload("res://assets/icons/base_icons_sprites/size.png")
 const ICON_PRICE := preload("res://assets/icons/base_icons_sprites/coin.png")
 const ICON_SHIELD := preload("res://assets/icons/base_icons_sprites/shield.png")
+const ICON_RANGE := preload("res://assets/icons/base_icons_sprites/range.png")
 
 var _ranged_stat: HBoxContainer
 var _ranged_value: Label
 var _range_stat: HBoxContainer
 var _range_value: Label
+var _tooltip: TooltipController = null
+var _stat_tooltips_wired: bool = false
 
 func _ready() -> void:
 	_apply_style()
@@ -85,6 +88,10 @@ func _ready() -> void:
 	_set_empty_state()
 	set_draft_mode(false)
 
+func set_tooltip_controller(controller: TooltipController) -> void:
+	_tooltip = controller
+	_wire_stat_tooltips()
+
 func _apply_style() -> void:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = COLOR_BG
@@ -97,11 +104,12 @@ func _apply_style() -> void:
 	sb.corner_radius_top_right = RADIUS
 	sb.corner_radius_bottom_left = RADIUS
 	sb.corner_radius_bottom_right = RADIUS
-	sb.content_margin_left = 18
-	sb.content_margin_right = 18
-	sb.content_margin_top = 18
-	sb.content_margin_bottom = 18
+	sb.content_margin_left = 14
+	sb.content_margin_right = 14
+	sb.content_margin_top = 14
+	sb.content_margin_bottom = 14
 	add_theme_stylebox_override("panel", sb)
+	clip_contents = true
 
 	legion_name.add_theme_color_override("font_color", COLOR_TEXT)
 	attack_value.add_theme_color_override("font_color", COLOR_TEXT)
@@ -120,14 +128,25 @@ func _apply_style() -> void:
 	price_icon.texture = ICON_PRICE
 	shield_icon.texture = ICON_SHIELD
 
-	_configure_stat_icon(unit_icon, Vector2(110, 150))
-	_configure_stat_icon(attack_icon)
-	_configure_stat_icon(health_icon)
-	_configure_stat_icon(unit_count_icon)
-	_configure_stat_icon(ap_icon, Vector2(56, 56))
-	_configure_stat_icon(size_icon, Vector2(56, 56))
-	_configure_stat_icon(price_icon, Vector2(56, 56))
-	_configure_stat_icon(shield_icon, Vector2(56, 56))
+	_configure_stat_icon(unit_icon, Vector2(96, 132))
+	_configure_stat_icon(attack_icon, Vector2(44, 44))
+	_configure_stat_icon(health_icon, Vector2(44, 44))
+	_configure_stat_icon(unit_count_icon, Vector2(44, 44))
+	_configure_stat_icon(ap_icon, Vector2(40, 40))
+	_configure_stat_icon(size_icon, Vector2(40, 40))
+	_configure_stat_icon(price_icon, Vector2(40, 40))
+	_configure_stat_icon(shield_icon, Vector2(40, 40))
+
+	for value_label in [
+		attack_value, health_value, unit_count_value, ap_value,
+		size_value, price_value, shield_value,
+	]:
+		value_label.add_theme_font_size_override("font_size", 24)
+
+	var legion_stats: HBoxContainer = %LegionStats
+	legion_stats.add_theme_constant_override("separation", 8)
+	var type_stats: HBoxContainer = %TypeStats
+	type_stats.add_theme_constant_override("separation", 8)
 
 func _configure_stat_icon(icon: TextureRect, min_size: Vector2 = Vector2(72, 72)) -> void:
 	icon.custom_minimum_size = min_size
@@ -236,11 +255,12 @@ func _build_unit_row(unit_type: String, u: Unit) -> Control:
 	var wrapper := PanelContainer.new()
 	wrapper.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	wrapper.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	wrapper.clip_contents = true
 
 	var row := HBoxContainer.new()
 	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.size_flags_vertical = Control.SIZE_FILL
-	row.add_theme_constant_override("separation", 14)
+	row.add_theme_constant_override("separation", 10)
 
 	var row_bg := StyleBoxFlat.new()
 	row_bg.bg_color = COLOR_BLOCK_BG
@@ -253,16 +273,16 @@ func _build_unit_row(unit_type: String, u: Unit) -> Control:
 	row_bg.corner_radius_top_right = RADIUS
 	row_bg.corner_radius_bottom_left = RADIUS
 	row_bg.corner_radius_bottom_right = RADIUS
-	row_bg.content_margin_left = 12
-	row_bg.content_margin_right = 12
-	row_bg.content_margin_top = 12
-	row_bg.content_margin_bottom = 12
+	row_bg.content_margin_left = 10
+	row_bg.content_margin_right = 10
+	row_bg.content_margin_top = 10
+	row_bg.content_margin_bottom = 10
 	wrapper.add_theme_stylebox_override("panel", row_bg)
 
 	wrapper.add_child(row)
 
 	var icon := TextureRect.new()
-	icon.custom_minimum_size = Vector2(78, 78)
+	icon.custom_minimum_size = Vector2(64, 64)
 	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	icon.texture = u.definition.icon if u.definition and u.definition.icon else _load_unit_icon(unit_type)
@@ -286,7 +306,7 @@ func _build_unit_row(unit_type: String, u: Unit) -> Control:
 	bar.show_percentage = false
 	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	bar.custom_minimum_size = Vector2(0, 32)
+	bar.custom_minimum_size = Vector2(0, 28)
 
 	var sb_bg := StyleBoxFlat.new()
 	sb_bg.bg_color = COLOR_BAR_BG
@@ -316,11 +336,13 @@ func _build_unit_row(unit_type: String, u: Unit) -> Control:
 	bar_vbox.add_child(spacer_bottom)
 
 	var hp := Label.new()
-	hp.text = "%d/%d HP" % [int(u.current_health), int(u.max_health)]
+	hp.text = "%d/%d" % [int(u.current_health), int(u.max_health)]
 	hp.add_theme_color_override("font_color", COLOR_TEXT)
-	hp.add_theme_font_size_override("font_size", 22)
+	hp.add_theme_font_size_override("font_size", 18)
 	hp.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	hp.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	hp.custom_minimum_size = Vector2(64, 0)
+	hp.size_flags_horizontal = Control.SIZE_SHRINK_END
 	row.add_child(hp)
 
 	return wrapper
@@ -391,7 +413,7 @@ func _ensure_ranged_stat_rows() -> void:
 	stats.add_child(_ranged_stat)
 	stats.move_child(_ranged_stat, 1)
 
-	_range_stat = _make_stat_row(null, true)
+	_range_stat = _make_stat_row(ICON_RANGE)
 	_range_value = _range_stat.get_child(1) as Label
 	_range_stat.hide()
 	stats.add_child(_range_stat)
@@ -402,7 +424,7 @@ func _make_stat_row(icon_tex: Texture2D, text_prefix_icon: bool = false) -> HBox
 	row.add_theme_constant_override("separation", 2)
 	if icon_tex:
 		var icon := TextureRect.new()
-		icon.custom_minimum_size = Vector2(72, 72)
+		icon.custom_minimum_size = Vector2(44, 44)
 		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		icon.texture = icon_tex
@@ -411,11 +433,11 @@ func _make_stat_row(icon_tex: Texture2D, text_prefix_icon: bool = false) -> HBox
 		var prefix := Label.new()
 		prefix.text = "Rng"
 		prefix.add_theme_color_override("font_color", COLOR_TEXT)
-		prefix.add_theme_font_size_override("font_size", 22)
+		prefix.add_theme_font_size_override("font_size", 18)
 		row.add_child(prefix)
 	var value := Label.new()
 	value.add_theme_color_override("font_color", COLOR_TEXT)
-	value.add_theme_font_size_override("font_size", 32)
+	value.add_theme_font_size_override("font_size", 24)
 	value.text = "0"
 	row.add_child(value)
 	return row
@@ -439,3 +461,34 @@ func _update_ranged_stat_rows(unit0: Unit, def: UnitDefinition = null) -> void:
 func _load_unit_icon(unit_type: String) -> Texture2D:
 	var def := UnitDefs.get_def(unit_type)
 	return def.icon if def else null
+
+func _wire_stat_tooltips() -> void:
+	if _tooltip == null or _stat_tooltips_wired:
+		return
+	_stat_tooltips_wired = true
+	_wire_stat_icon(attack_icon, "attack", func() -> String: return attack_value.text)
+	_wire_stat_icon(health_icon, "health", func() -> String: return health_value.text)
+	_wire_stat_icon(unit_count_icon, "unit_count", func() -> String: return unit_count_value.text)
+	_wire_stat_icon(ap_icon, "ap", func() -> String: return ap_value.text)
+	_wire_stat_icon(size_icon, "size", func() -> String: return size_value.text)
+	_wire_stat_icon(price_icon, "price", func() -> String: return price_value.text)
+	_wire_stat_icon(shield_icon, "shield", func() -> String: return shield_value.text)
+	_ensure_ranged_stat_rows()
+	if _ranged_stat and _ranged_stat.get_child_count() > 0:
+		var ranged_icon := _ranged_stat.get_child(0) as Control
+		_wire_stat_icon(ranged_icon, "ranged_attack", func() -> String: return _ranged_value.text if _ranged_value else "")
+	if _range_stat and _range_stat.get_child_count() > 0:
+		var range_icon := _range_stat.get_child(0) as Control
+		_wire_stat_icon(range_icon, "range", func() -> String: return _range_value.text if _range_value else "")
+
+func _wire_stat_icon(icon: Control, stat_id: String, value_fn: Callable) -> void:
+	if icon == null or _tooltip == null:
+		return
+	icon.mouse_filter = Control.MOUSE_FILTER_STOP
+	icon.mouse_default_cursor_shape = Control.CURSOR_HELP
+	icon.gui_input.connect(func(event: InputEvent) -> void:
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
+			var value_text := String(value_fn.call()) if value_fn.is_valid() else ""
+			_tooltip.show_for_control(icon, TooltipContent.for_stat(stat_id, value_text))
+			icon.accept_event()
+	)

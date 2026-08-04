@@ -64,6 +64,51 @@ static func get_ranged_attackable_tiles(tile: Tile, grid: Dictionary, max_range:
 			out.append(t)
 	return out
 
+## Wounded allies within [1, max_range] hexes (excludes self). No LOS check.
+static func get_healable_ally_tiles(tile: Tile, grid: Dictionary, max_range: int) -> Array[Tile]:
+	if not tile.has_legion() or max_range <= 0:
+		return []
+	var team_id: String = tile.legion.team_id
+	var from_coords := tile.coords
+	var out: Array[Tile] = []
+	for coords in grid.keys():
+		var t: Tile = grid[coords]
+		if t == null or not t.has_legion():
+			continue
+		if t.legion == tile.legion:
+			continue
+		if t.legion.team_id != team_id:
+			continue
+		if not _legion_needs_heal(t.legion):
+			continue
+		var dist := HexPathfinder.hex_distance(from_coords, t.coords)
+		if dist >= 1 and dist <= max_range:
+			out.append(t)
+	return out
+
+static func _legion_needs_heal(legion: Legion) -> bool:
+	if legion == null:
+		return false
+	for unit in legion.units:
+		if unit != null and int(unit.current_health) < int(unit.max_health):
+			return true
+	return false
+
+## Walkable empty tiles within [1, max_range] hexes (no LOS yet).
+static func get_empty_tiles_in_range(tile: Tile, grid: Dictionary, max_range: int) -> Array[Tile]:
+	if tile == null or max_range <= 0:
+		return []
+	var from_coords := tile.coords
+	var out: Array[Tile] = []
+	for coords in grid.keys():
+		var t: Tile = grid[coords]
+		if t == null or not t.walkable or t.has_legion():
+			continue
+		var dist := HexPathfinder.hex_distance(from_coords, t.coords)
+		if dist >= 1 and dist <= max_range:
+			out.append(t)
+	return out
+
 static func get_swappable_tiles(tile: Tile, grid: Dictionary) -> Array[Tile]:
 	if not tile.has_legion():
 		return []

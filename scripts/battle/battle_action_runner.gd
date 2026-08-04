@@ -21,7 +21,7 @@ func play_result(
 	var payload: Dictionary = result.get("payload", {})
 	var to_coords: Vector2i = payload.get("to", from_coords)
 
-	if not ("legion_healed" in events or "combat_resolved" in events):
+	if not ("legion_healed" in events or "combat_resolved" in events or "legion_teleported" in events):
 		_call_hook(hooks, "clear_overlays")
 
 	if "legion_moved" in events:
@@ -31,6 +31,24 @@ func play_result(
 		if tween:
 			await tween.finished
 		_call_hook(hooks, "on_ap_changed", legion)
+	elif "legion_teleported" in events:
+		var legion: Legion = payload.get("legion")
+		await playback.play_teleport(from_coords, to_coords, payload, {
+			"deselect_after": true,
+			"deselect": hooks.get("deselect", Callable()),
+			"on_ap_changed": hooks.get("on_ap_changed", Callable()),
+			"rewire": func() -> void:
+				presenter.rewire_legion_tile(legion, from_coords, to_coords)
+				var lv: LegionVisu = presenter.get_legion_visu(legion)
+				if lv:
+					var to_visu: TileVisu = presenter.tile_visu_at(to_coords)
+					if to_visu:
+						lv.global_position = to_visu.global_position,
+		})
+		_call_hook(hooks, "deselect")
+		_call_hook(hooks, "clear_overlays")
+		_call_hook(hooks, "on_finished")
+		return true
 	elif "legions_swapped" in events:
 		var legion_a: Legion = session.grid.get(to_coords).legion
 		var legion_b: Legion = session.grid.get(from_coords).legion
@@ -45,10 +63,14 @@ func play_result(
 		var played := await _play_combat(
 			host, presenter, playback, from_coords, to_coords, payload.get("combat", {}), hooks
 		)
+		# Combat is terminal — always clear selection/overlays after it resolves.
+		_call_hook(hooks, "deselect")
+		_call_hook(hooks, "clear_overlays")
 		_call_hook(hooks, "on_finished")
 		return played
 	elif "legion_healed" in events:
-		await playback.play_heal(from_coords, payload, {
+		var heal_coords: Vector2i = payload.get("to", payload.get("coords", from_coords))
+		await playback.play_heal(heal_coords, payload, {
 			"deselect_after": hooks.get("deselect_after_heal", false),
 			"deselect": hooks.get("deselect", Callable()),
 			"on_ap_changed": hooks.get("on_ap_changed", Callable()),
@@ -76,14 +98,23 @@ func _play_combat(
 ) -> bool:
 	var from_visu: TileVisu = presenter.tile_visu_at(from_coords)
 	var to_visu: TileVisu = presenter.tile_visu_at(to_coords)
-	if not from_visu or not to_visu or not from_visu.legion_visu or not to_visu.legion_visu:
-		return false
+	var can_animate := (
+		from_visu != null
+		and to_visu != null
+		and from_visu.legion_visu != null
+		and to_visu.legion_visu != null
+	)
 
-	await playback.play_combat(from_coords, to_coords, combat, {
-		"deselect_before": hooks.get("deselect_before_combat", false),
-		"deselect": hooks.get("deselect", Callable()),
-		"on_ap_changed": hooks.get("on_ap_changed", Callable()),
-	})
+	if can_animate:
+		await playback.play_combat(from_coords, to_coords, combat, {
+			"deselect_before": hooks.get("deselect_before_combat", false),
+			"deselect": hooks.get("deselect", Callable()),
+			"on_ap_changed": hooks.get("on_ap_changed", Callable()),
+		})
+	else:
+		# Model already resolved; skip visuals rather than reporting failure.
+		if hooks.get("deselect_before_combat", false):
+			_call_hook(hooks, "deselect")
 
 	if hooks.get("deselect_after_combat", false):
 		_call_hook(hooks, "deselect")
@@ -93,6 +124,7 @@ func _play_combat(
 		presenter.cleanup_dead_legion_at(from_coords, session)
 		presenter.cleanup_dead_legion_at(to_coords, session)
 		presenter.remove_dead_legions(session)
+	_call_hook(hooks, "clear_overlays")
 	return true
 
 func _call_hook(hooks: Dictionary, key: String, arg = null) -> void:

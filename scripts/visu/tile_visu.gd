@@ -14,6 +14,7 @@ var qr_label: Label
 @export var color_deployable: Color = Color(0.45, 0.82, 0.55)
 @export var color_deployed: Color = Color(0.55, 0.75, 0.95)
 @export var color_healable: Color = Color(0.25, 1.0, 0.35)
+@export var color_teleportable: Color = Color(0.55, 0.35, 1.0)
 
 var tile: Tile
 var legion_visu: LegionVisu = null
@@ -106,5 +107,7 @@ func _apply_state() -> void:
 		base_sprite.self_modulate = color_deployed
 	elif _gameplay_state == "healable":
 		base_sprite.self_modulate = color_healable
+	elif _gameplay_state == "teleportable":
+		base_sprite.self_modulate = color_teleportable
 	else:
 		base_sprite.self_modulate = Color.WHITE

@@ -171,6 +171,16 @@ func update_direction(direction: Vector2) -> void:
 	for unit in units.get_children():
 		unit.update_direction(direction)
 
+## Average facing of living units (for restoring after self-heal tosses).
+func get_facing_direction() -> Vector2:
+	for uv in _unit_to_visu.values():
+		if uv == null:
+			continue
+		var x := 1.0 if uv.direction_right else -1.0
+		var y := 1.0 if uv.direction_front else -1.0
+		return Vector2(x, y)
+	return Vector2.RIGHT
+
 func start_idle_animation() -> void:
 	for unit in units.get_children():
 		unit.start_idle_animation()

@@ -30,7 +30,8 @@ func _test_move_and_turns() -> bool:
 		return false
 
 	var move: Dictionary = session.apply({
-		"type": "move",
+		"type": "use_action",
+		"action_id": "move",
 		"from": from_coords,
 		"to": movable[0],
 	})
@@ -115,7 +116,8 @@ func _test_victory_by_elimination() -> bool:
 	var target: Vector2i = goblin_coords
 
 	var attack: Dictionary = session.apply({
-		"type": "attack",
+		"type": "use_action",
+		"action_id": "melee_attack",
 		"from": demon_coords,
 		"to": target,
 		"rng_seed": 42,

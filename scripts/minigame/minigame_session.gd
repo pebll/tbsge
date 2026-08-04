@@ -116,25 +116,6 @@ func _apply_battle(cmd_type: String, cmd: Dictionary) -> Dictionary:
 	match cmd_type:
 		"use_action":
 			return _battle_use_action(cmd)
-		"move":
-			return _battle_use_action({
-				"action_id": "move",
-				"from": cmd.get("from", Vector2i.ZERO),
-				"to": cmd.get("to", Vector2i.ZERO),
-			})
-		"swap":
-			return _battle_use_action({
-				"action_id": "move",
-				"from": cmd.get("from", Vector2i.ZERO),
-				"to": cmd.get("to", Vector2i.ZERO),
-			})
-		"attack":
-			return _battle_use_action({
-				"action_id": "melee_attack",
-				"from": cmd.get("from", Vector2i.ZERO),
-				"to": cmd.get("to", Vector2i.ZERO),
-				"rng_seed": cmd.get("rng_seed", _rng.randi()),
-			})
 		"end_turn":
 			return _battle_end_turn()
 		"pass_legion":
@@ -215,6 +196,8 @@ func _draft_ready(cmd: Dictionary) -> Dictionary:
 
 func _begin_battle() -> void:
 	phase = Phase.BATTLE
+	if action_log:
+		action_log.clear()
 	legions.clear()
 	for team_id in config.team_ids:
 		var draft = drafts.get(team_id)

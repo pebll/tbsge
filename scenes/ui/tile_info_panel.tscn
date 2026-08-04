@@ -53,13 +53,13 @@ alignment = 1
 theme_override_constants/separation = 12
 
 [node name="UnitIconFrame" type="CenterContainer" parent="VBox/LegionBlock/LegionHeader" unique_id=3847193200]
-custom_minimum_size = Vector2(120, 168)
+custom_minimum_size = Vector2(100, 140)
 layout_mode = 2
 size_flags_vertical = 0
 
 [node name="UnitIcon" type="TextureRect" parent="VBox/LegionBlock/LegionHeader/UnitIconFrame" unique_id=106450623]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(110, 150)
+custom_minimum_size = Vector2(96, 132)
 layout_mode = 2
 size_flags_horizontal = 4
 size_flags_vertical = 4

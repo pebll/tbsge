@@ -8,6 +8,8 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_multi_legion_planning():
 		return false
+	if not _test_archer_vs_goblin_battle():
+		return false
 	print("Success: Balance runner tests")
 	return true
 
@@ -53,5 +55,18 @@ func _test_multi_legion_planning() -> bool:
 		return false
 	if golem_sizes[0] != 4 or golem_sizes[1] != 2:
 		push_error("GOLEM legions should be 4+2, got %s" % str(golem_sizes))
+		return false
+	return true
+
+func _test_archer_vs_goblin_battle() -> bool:
+	## Exercises ranged_attack path in BalanceBattleRunner with seeded RNG.
+	var result: Dictionary = BalanceBattleRunner.run("ARCHER", "GOBLIN", 7, 99)
+	if not result.get("ok", false):
+		push_error("ARCHER vs GOBLIN balance battle failed: %s" % result.get("error", "?"))
+		return false
+	var winner_unit_type: String = String(result.get("winner_unit_type", ""))
+	var timed_out: bool = result.get("timed_out", false)
+	if winner_unit_type.is_empty() and not timed_out:
+		push_error("Expected ARCHER/GOBLIN winner or timeout")
 		return false
 	return true

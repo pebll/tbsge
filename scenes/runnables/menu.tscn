@@ -3,6 +3,8 @@
 [ext_resource type="Script" uid="uid://cf33u7p6gtxa0" path="res://scripts/visu/menu_background.gd" id="1_bg"]
 [ext_resource type="Script" uid="uid://wrgrgpcmorv2" path="res://scripts/ui/main_menu.gd" id="2_menu"]
 [ext_resource type="PackedScene" path="res://scenes/ui/game_button.tscn" id="3_gb"]
+[ext_resource type="PackedScene" path="res://scenes/ui/sounds_settings_panel.tscn" id="4_sounds"]
+[ext_resource type="PackedScene" path="res://scenes/ui/options_settings_panel.tscn" id="5_options"]
 
 [node name="Menu" type="Node2D" unique_id=706520335]
 
@@ -54,70 +56,22 @@ theme_override_constants/separation = 12
 [node name="DevTestButton" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox/MainButtons" unique_id=220938300 instance=ExtResource("3_gb")]
 unique_name_in_owner = true
 text = "Dev Test"
-preferred_width = 240
+preferred_width = 360
 
 [node name="SoundsButton" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox/MainButtons" unique_id=220938301 instance=ExtResource("3_gb")]
 unique_name_in_owner = true
 text = "Sounds"
-preferred_width = 240
+preferred_width = 360
 
-[node name="SoundsPanel" type="VBoxContainer" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox" unique_id=1100000002]
+[node name="OptionsButton" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox/MainButtons" unique_id=220938303 instance=ExtResource("3_gb")]
 unique_name_in_owner = true
-visible = false
-layout_mode = 2
-theme_override_constants/separation = 14
+text = "Options"
+preferred_width = 360
 
-[node name="MenuSoundRow" type="VBoxContainer" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox/SoundsPanel" unique_id=1100000003]
-layout_mode = 2
-theme_override_constants/separation = 4
-
-[node name="MenuSoundLabel" type="Label" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox/SoundsPanel/MenuSoundRow" unique_id=1100000004]
-layout_mode = 2
-text = "Menu sounds"
-horizontal_alignment = 1
-
-[node name="MenuSoundSlider" type="HSlider" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox/SoundsPanel/MenuSoundRow" unique_id=1100000005]
+[node name="SoundsPanel" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox" unique_id=1100000002 instance=ExtResource("4_sounds")]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(240, 0)
 layout_mode = 2
-max_value = 1.0
-step = 0.01
-value = 1.0
 
-[node name="GameSoundRow" type="VBoxContainer" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox/SoundsPanel" unique_id=1100000006]
-layout_mode = 2
-theme_override_constants/separation = 4
-
-[node name="GameSoundLabel" type="Label" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox/SoundsPanel/GameSoundRow" unique_id=1100000007]
-layout_mode = 2
-text = "In-game sounds"
-horizontal_alignment = 1
-
-[node name="GameSoundSlider" type="HSlider" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox/SoundsPanel/GameSoundRow" unique_id=1100000008]
+[node name="OptionsPanel" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox" unique_id=1100000012 instance=ExtResource("5_options")]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(240, 0)
 layout_mode = 2
-max_value = 1.0
-step = 0.01
-
-[node name="MusicSoundRow" type="VBoxContainer" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox/SoundsPanel" unique_id=1100000009]
-layout_mode = 2
-theme_override_constants/separation = 4
-
-[node name="MusicSoundLabel" type="Label" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox/SoundsPanel/MusicSoundRow" unique_id=1100000010]
-layout_mode = 2
-text = "Music"
-horizontal_alignment = 1
-
-[node name="MusicSoundSlider" type="HSlider" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox/SoundsPanel/MusicSoundRow" unique_id=1100000011]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(240, 0)
-layout_mode = 2
-max_value = 1.0
-step = 0.01
-value = 1.0
-
-[node name="BackButton" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox/SoundsPanel" unique_id=220938302 instance=ExtResource("3_gb")]
-unique_name_in_owner = true
-text = "Back"
-preferred_width = 240

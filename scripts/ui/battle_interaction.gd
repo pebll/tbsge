@@ -4,6 +4,7 @@ extends RefCounted
 const ActionDefinitionScript = preload("res://scripts/actions/action_definition.gd")
 const ActionTargetingScript = preload("res://scripts/actions/action_targeting.gd")
 const BattleStateScript = preload("res://scripts/actions/battle_state.gd")
+const UiTheme = preload("res://scripts/ui/ui_theme.gd")
 
 const LIFT_NONE := 0.0
 const LIFT_OPTION := 2.0
@@ -45,6 +46,24 @@ var legions_fn: Callable
 var _events_bound: bool = false
 var _attack_choice_popup: Control = null
 
+func bind_from_context(context) -> void:
+	## Single wiring entry so hosts don't re-declare the same Callables.
+	battle_state_fn = func(): return context.battle_state()
+	tile_visu_fn = func(coords: Vector2i) -> TileVisu: return context.tile_visu_at(coords)
+	is_locked_fn = func() -> bool: return context.is_input_locked()
+	can_act_fn = func(legion: Legion) -> bool: return context.can_act_legion(legion)
+	apply_action_fn = func(action_id: String, from_coords: Vector2i, to_coords: Vector2i) -> void:
+		context.apply_action(action_id, from_coords, to_coords)
+	battle_phase_fn = func() -> bool: return context.in_battle_phase()
+	allows_spawn_fn = func(coords: Vector2i) -> bool: return context.allows_spawn(coords)
+	spawn_fn = func(coords: Vector2i) -> void: context.spawn_at(coords)
+	turn_manager_fn = func() -> TurnManager: return context.turn_manager()
+	legions_fn = func() -> Array: return context.legions()
+	_inspect_fn = func(coords: Vector2i) -> void: context.inspect_tile(coords)
+	_clear_inspect_fn = func() -> void: context.clear_inspect()
+	if context.overlay_ui_fn.is_valid():
+		overlay_ui_fn = context.overlay_ui_fn
+
 func bind_events() -> void:
 	if _events_bound:
 		return
@@ -80,6 +99,8 @@ func deselect() -> void:
 	selected_action = null
 	target_coords.clear()
 	default_target_actions.clear()
+	_info_visible_for_tile = false
+	_clear_inspect_fn.call()
 	if action_bar:
 		action_bar.clear_bar()
 
@@ -99,8 +120,13 @@ func select_tile(coords: Vector2i) -> void:
 	default_target_actions.clear()
 	_paint_tile(coords, "selected", LIFT_SELECTED)
 	_paint_default_targets(state, legion)
+	_info_tile_coords = coords
+	_info_visible_for_tile = true
+	_inspect_fn.call(coords)
 	if action_bar:
-		action_bar.set_actions(ActionTargetingScript.available_actions(state, legion))
+		if action_bar.has_method("set_tooltip_context_legion"):
+			action_bar.set_tooltip_context_legion(legion)
+		_refresh_action_bar(state, legion, null)
 
 func select_action(action: ActionDefinitionScript) -> void:
 	if not has_selected:
@@ -133,6 +159,21 @@ func select_action(action: ActionDefinitionScript) -> void:
 	else:
 		_paint_tile(selected_coords, "selected", LIFT_SELECTED)
 		_paint_action_targets(action)
+
+func _refresh_action_bar(
+	state: BattleStateScript,
+	legion: Legion,
+	selected: ActionDefinitionScript
+) -> void:
+	if action_bar == null:
+		return
+	var listed := ActionTargetingScript.listed_actions(legion)
+	var reasons: Dictionary = {}
+	for action in listed:
+		var reason := ActionTargetingScript.disable_reason(state, legion, action)
+		if not reason.is_empty():
+			reasons[action.id] = reason
+	action_bar.set_actions(listed, selected, reasons)
 
 func refresh_after_action(legion_coords: Vector2i) -> void:
 	var state: BattleStateScript = battle_state_fn.call()
@@ -232,9 +273,6 @@ func _on_tile_hover_entered(coords: Vector2i) -> void:
 			selected_visu.legion_visu.update_direction(dir)
 
 func _on_tile_hover_exited(coords: Vector2i) -> void:
-	if _info_visible_for_tile and coords == _info_tile_coords:
-		_info_visible_for_tile = false
-		_clear_inspect_fn.call()
 	if coords in _overlay_coords:
 		var tile_visu: TileVisu = tile_visu_fn.call(coords)
 		if tile_visu:
@@ -260,10 +298,7 @@ func _dispatch_click(coords: Vector2i) -> void:
 		return
 	if has_selected and default_target_actions.has(coords):
 		var actions: Array = default_target_actions[coords]
-		var attack_ids: Array[String] = []
-		for action_id in actions:
-			if String(action_id) == "melee_attack" or String(action_id) == "ranged_attack":
-				attack_ids.append(String(action_id))
+		var attack_ids: Array[String] = attack_ids_from_actions(actions)
 		if attack_ids.size() >= 2:
 			_show_attack_choice_popup(coords, attack_ids)
 			return
@@ -309,6 +344,10 @@ func _paint_default_targets(state: BattleStateScript, legion: Legion) -> void:
 		_paint_tile(c, _overlay_for_default_actions(default_target_actions[c]), LIFT_OPTION)
 
 func _overlay_for_default_actions(action_ids: Array) -> String:
+	return overlay_state_for_default_actions(action_ids)
+
+## Pure helper — which overlay to paint for default multi-action highlights.
+static func overlay_state_for_default_actions(action_ids: Array) -> String:
 	var has_melee := "melee_attack" in action_ids
 	var has_ranged := "ranged_attack" in action_ids
 	if has_melee and has_ranged:
@@ -317,10 +356,18 @@ func _overlay_for_default_actions(action_ids: Array) -> String:
 		return "ranged_attackable"
 	if has_melee:
 		return "attackable"
-	# move / other
 	var first := String(action_ids[0]) if not action_ids.is_empty() else "movable"
 	var def: ActionDefinitionScript = ActionDefs.get_def(first)
 	return def.overlay_state if def else "movable"
+
+## Pure helper — attack action ids among default target actions for a tile.
+static func attack_ids_from_actions(actions: Array) -> Array[String]:
+	var attack_ids: Array[String] = []
+	for action_id in actions:
+		var id := String(action_id)
+		if id == "melee_attack" or id == "ranged_attack":
+			attack_ids.append(id)
+	return attack_ids
 
 func _paint_action_targets(action: ActionDefinitionScript) -> void:
 	for c in target_coords:
@@ -422,30 +469,7 @@ func _make_attack_icon_button(icon: Texture2D) -> Button:
 	btn.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	if icon:
 		btn.icon = icon
-
-	var normal := StyleBoxFlat.new()
-	normal.bg_color = COLOR_ICON_BTN_BG
-	normal.border_color = COLOR_POPUP_BORDER
-	normal.border_width_left = 3
-	normal.border_width_right = 3
-	normal.border_width_top = 3
-	normal.border_width_bottom = 3
-	normal.corner_radius_top_left = 12
-	normal.corner_radius_top_right = 12
-	normal.corner_radius_bottom_left = 12
-	normal.corner_radius_bottom_right = 12
-	normal.content_margin_left = 14
-	normal.content_margin_right = 14
-	normal.content_margin_top = 14
-	normal.content_margin_bottom = 14
-	var hover := normal.duplicate()
-	hover.bg_color = Color(0.96, 0.92, 0.85)
-	var pressed := normal.duplicate()
-	pressed.bg_color = Color(0.86, 0.80, 0.70)
-	btn.add_theme_stylebox_override("normal", normal)
-	btn.add_theme_stylebox_override("hover", hover)
-	btn.add_theme_stylebox_override("pressed", pressed)
-	btn.add_theme_stylebox_override("focus", normal)
+	UiTheme.apply_button_chrome(btn, 12, 3, 14, 14)
 	return btn
 
 func _hide_attack_choice_popup() -> void:

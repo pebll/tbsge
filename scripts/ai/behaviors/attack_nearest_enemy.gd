@@ -5,7 +5,7 @@ const HexPathfinder = preload("res://scripts/ai/hex_pathfinder.gd")
 const Utils = preload("res://scripts/core/utils.gd")
 const MatchSessionScript = preload("res://scripts/match/match_session.gd")
 
-static var debug_enabled: bool = true
+static var debug_enabled: bool = false
 
 static func decide(session: MatchSessionScript, legion: Legion) -> Dictionary:
 	var cmd := _decide_internal(session, legion)
@@ -17,24 +17,63 @@ static func sort_actionable_by_enemy_distance(
 	session: MatchSessionScript,
 	actionable: Array[Vector2i]
 ) -> Array[Vector2i]:
+	## Activation order tree (simple, deterministic):
+	## 1) Closest to any enemy first (hex distance)
+	## 2) Same distance: units that can attack now before pure movers
+	## 3) Stable coord tie-break
+	## Re-queried each activation so after a front unit moves/waits, the new
+	## closest acts — rear units stop blocking each other less often.
 	if actionable.is_empty():
 		return actionable
 	var enemies := _enemy_legions(session, session.turn_manager.active_team_id)
 	if enemies.is_empty():
 		return actionable.duplicate()
-	var sorted := actionable.duplicate()
-	sorted.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
-		var da := _min_enemy_distance(a, enemies)
-		var db := _min_enemy_distance(b, enemies)
-		if da == db:
-			if a.x == b.x:
-				return a.y < b.y
-			return a.x < b.x
-		return da < db
+
+	var scored: Array[Dictionary] = []
+	for coords in actionable:
+		scored.append({
+			"coords": coords,
+			"dist": _min_enemy_distance(coords, enemies),
+			"can_fight": _can_fight_now(session, coords),
+		})
+	scored.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var da: int = int(a["dist"])
+		var db: int = int(b["dist"])
+		if da != db:
+			return da < db
+		var fa: bool = bool(a["can_fight"])
+		var fb: bool = bool(b["can_fight"])
+		if fa != fb:
+			return fa and not fb
+		var ca: Vector2i = a["coords"]
+		var cb: Vector2i = b["coords"]
+		if ca.x != cb.x:
+			return ca.x < cb.x
+		return ca.y < cb.y
 	)
+
+	var sorted: Array[Vector2i] = []
+	for row in scored:
+		sorted.append(row["coords"])
 	if debug_enabled:
-		print("[AI] Legion order (nearest enemy first): %s" % str(sorted))
+		var parts: PackedStringArray = []
+		for row in scored:
+			parts.append(
+				"%s(d=%d%s)"
+				% [row["coords"], row["dist"], ",fight" if bool(row["can_fight"]) else ""]
+			)
+		print("[AI] Legion order (closest first): %s" % ", ".join(parts))
 	return sorted
+
+static func _can_fight_now(session: MatchSessionScript, coords: Vector2i) -> bool:
+	var legion: Legion = session.get_legion_at(coords)
+	if legion == null or not session.can_act_legion(legion):
+		return false
+	if not session.get_action_targets(legion, "melee_attack").is_empty():
+		return true
+	if not session.get_action_targets(legion, "ranged_attack").is_empty():
+		return true
+	return false
 
 static func _decide_internal(session: MatchSessionScript, legion: Legion) -> Dictionary:
 	if legion == null:
@@ -79,16 +118,20 @@ static func _decide_internal(session: MatchSessionScript, legion: Legion) -> Dic
 			"to": nearest_coords,
 			"reason": "adjacent to nearest enemy @ %s" % nearest_coords,
 		}
+	# Prefer any adjacent enemy over passing / walking away from a farther nearest.
+	if not attackable.is_empty():
+		var melee_target := _pick_closest_coords(attackable, from_coords)
+		return {
+			"type": "use_action",
+			"action_id": "melee_attack",
+			"from": from_coords,
+			"to": melee_target,
+			"reason": "adjacent enemy @ %s (nearest was %s)" % [melee_target, nearest_coords],
+		}
 
 	# If nearest is not in melee but another enemy is in ranged range, take the shot.
 	if not ranged_targets.is_empty():
-		var best_ranged: Vector2i = ranged_targets[0]
-		var best_d := HexPathfinder.hex_distance(from_coords, best_ranged)
-		for c in ranged_targets:
-			var d := HexPathfinder.hex_distance(from_coords, c)
-			if d < best_d:
-				best_d = d
-				best_ranged = c
+		var best_ranged: Vector2i = _pick_closest_coords(ranged_targets, from_coords)
 		return {
 			"type": "use_action",
 			"action_id": "ranged_attack",
@@ -105,6 +148,16 @@ static func _decide_internal(session: MatchSessionScript, legion: Legion) -> Dic
 		return _cmd_pass(legion, "no empty adjacent tiles")
 
 	var best_step: Variant = _best_step_toward(session, from_coords, nearest_coords, movable, legion.team_id)
+	var step_enemy_coords := nearest_coords
+	if best_step == null:
+		# Nearest may be walled off by allies/terrain — try any other enemy.
+		for enemy in enemies:
+			if enemy.tile_coords == nearest_coords:
+				continue
+			best_step = _best_step_toward(session, from_coords, enemy.tile_coords, movable, legion.team_id)
+			if best_step != null:
+				step_enemy_coords = enemy.tile_coords
+				break
 	if best_step == null:
 		return _cmd_pass(legion, "no step toward enemy @ %s" % nearest_coords)
 
@@ -113,7 +166,7 @@ static func _decide_internal(session: MatchSessionScript, legion: Legion) -> Dic
 		"action_id": "move",
 		"from": from_coords,
 		"to": best_step,
-		"reason": "step toward enemy @ %s" % nearest_coords,
+		"reason": "step toward enemy @ %s" % step_enemy_coords,
 	}
 
 static func _cmd_pass(legion: Legion, reason: String) -> Dictionary:
@@ -157,6 +210,17 @@ static func _find_nearest_enemy(from_coords: Vector2i, enemies: Array[Legion]) -
 			best_dist = dist
 	return best
 
+static func _pick_closest_coords(candidates: Array[Vector2i], from_coords: Vector2i) -> Vector2i:
+	var best: Vector2i = candidates[0]
+	var best_dist := HexPathfinder.hex_distance(from_coords, best)
+	for i in range(1, candidates.size()):
+		var c: Vector2i = candidates[i]
+		var dist := HexPathfinder.hex_distance(from_coords, c)
+		if dist < best_dist:
+			best = c
+			best_dist = dist
+	return best
+
 static func _min_enemy_distance(from_coords: Vector2i, enemies: Array[Legion]) -> int:
 	var best := 2147483647
 	for enemy in enemies:
@@ -188,7 +252,8 @@ static func _best_step_toward(
 		var goal_tile: Tile = session.grid.get(goal)
 		if goal_tile == null or not goal_tile.walkable:
 			continue
-		if goal_tile.has_legion() and goal_tile.legion.team_id != team_id:
+		# Cannot step onto an occupied surround hex (ally or otherwise).
+		if goal_tile.has_legion():
 			continue
 		var path := HexPathfinder.find_path(session.grid, from_coords, goal, blocked)
 		if path.size() < 2:
@@ -224,18 +289,24 @@ static func _choose_step_toward(
 	if best_closer_dist < current_dist:
 		return best_closer
 
+	# Same-distance flank steps: prefer positive alignment, but accept any.
 	var best_lateral: Vector2i = Vector2i(2147483646, 2147483646)
 	var best_lateral_align := -INF
+	var any_lateral: Variant = null
 	for coords in movable:
 		var dist := HexPathfinder.hex_distance(coords, enemy_coords)
 		if dist != current_dist:
 			continue
+		if any_lateral == null:
+			any_lateral = coords
 		var align := _alignment_toward(from_coords, coords, enemy_coords)
 		if align > best_lateral_align:
 			best_lateral_align = align
 			best_lateral = coords
 	if best_lateral_align > 0.0:
 		return best_lateral
+	if any_lateral != null:
+		return any_lateral
 
 	var best_fallback: Vector2i = Vector2i(2147483646, 2147483646)
 	var best_fallback_align := -INF
@@ -246,6 +317,11 @@ static func _choose_step_toward(
 			best_fallback = coords
 	if best_fallback_align > 0.0:
 		return best_fallback
+
+	# Last resort: any legal step that does not increase distance.
+	for coords in movable:
+		if HexPathfinder.hex_distance(coords, enemy_coords) <= current_dist:
+			return coords
 
 	return null
 

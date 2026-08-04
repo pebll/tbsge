@@ -26,43 +26,29 @@ static func resolve(state: BattleStateScript, cmd: Dictionary) -> Dictionary:
 	if to_coords not in targets:
 		return _fail("Invalid target for %s" % action_id)
 
+	var result: Dictionary = {}
 	match action.targeting:
 		ActionDefinitionScript.TargetingKind.SELF:
-			return _execute_self_heal(state, legion, action, from_coords)
+			result = _execute_self_heal(state, legion, action, from_coords)
 		ActionDefinitionScript.TargetingKind.ADJACENT_MOVE:
 			if ActionTargeting.is_swap_target(state, from_coords, to_coords):
-				return _execute_swap(state, from_coords, to_coords, action)
-			return _execute_move(state, from_coords, to_coords, action)
+				result = _execute_swap(state, from_coords, to_coords, action)
+			else:
+				result = _execute_move(state, from_coords, to_coords, action)
 		ActionDefinitionScript.TargetingKind.ADJACENT_ENEMY:
-			return _execute_melee_attack(state, from_coords, to_coords, action, cmd)
+			result = _execute_melee_attack(state, from_coords, to_coords, action, cmd)
 		ActionDefinitionScript.TargetingKind.ENEMY_IN_RANGE:
-			return _execute_ranged_attack(state, from_coords, to_coords, action, cmd)
+			result = _execute_ranged_attack(state, from_coords, to_coords, action, cmd)
+		ActionDefinitionScript.TargetingKind.ALLY_IN_RANGE:
+			result = _execute_ally_heal(state, legion, action, from_coords, to_coords)
+		ActionDefinitionScript.TargetingKind.EMPTY_IN_RANGE:
+			result = _execute_teleport(state, legion, action, from_coords, to_coords)
+		_:
+			return _fail("Unhandled action targeting")
 
-	return _fail("Unhandled action targeting")
-
-static func resolve_legacy_move(state: BattleStateScript, cmd: Dictionary) -> Dictionary:
-	return resolve(state, {
-		"action_id": "move",
-		"from": cmd.get("from", Vector2i.ZERO),
-		"to": cmd.get("to", Vector2i.ZERO),
-	})
-
-static func resolve_legacy_attack(state: BattleStateScript, cmd: Dictionary) -> Dictionary:
-	return resolve(state, {
-		"action_id": "melee_attack",
-		"from": cmd.get("from", Vector2i.ZERO),
-		"to": cmd.get("to", Vector2i.ZERO),
-		"rng_seed": cmd.get("rng_seed", 0),
-	})
-
-static func resolve_legacy_swap(state: BattleStateScript, cmd: Dictionary) -> Dictionary:
-	var from_coords: Vector2i = cmd.get("from", Vector2i.ZERO)
-	var to_coords: Vector2i = cmd.get("to", Vector2i.ZERO)
-	return resolve(state, {
-		"action_id": "move",
-		"from": from_coords,
-		"to": to_coords,
-	})
+	if result.get("ok", false):
+		_start_action_cooldown(legion, action)
+	return result
 
 static func _execute_move(
 	state: BattleStateScript,
@@ -81,6 +67,8 @@ static func _execute_move(
 	legion.tile_coords = to_coords
 	legion.spend_ap(action.ap_cost)
 	_apply_terminal(state, legion, action, from_coords)
+	# Moving onto a tile must not inherit a wait left by a destroyed previous occupant.
+	state.turn_manager.clear_wait(to_coords)
 	return _ok(["legion_moved"], {
 		"action_id": action.id,
 		"from": from_coords,
@@ -106,6 +94,9 @@ static func _execute_swap(
 	legion_a.spend_ap(action.ap_cost)
 	legion_b.spend_ap(action.ap_cost)
 	_apply_terminal(state, legion_a, action, from_coords)
+	# Wait stains are per-tile; swapping must not strand either legion under a stale wait.
+	state.turn_manager.clear_wait(from_coords)
+	state.turn_manager.clear_wait(to_coords)
 	return _ok(["legions_swapped"], {
 		"action_id": action.id,
 		"from": from_coords,
@@ -179,32 +170,123 @@ static func _execute_self_heal(
 	action: ActionDefinitionScript,
 	coords: Vector2i
 ) -> Dictionary:
-	var healed := 0
-	var unit_heals: Array = []
-	for unit in legion.units:
-		if unit == null:
-			continue
-		var before := int(unit.current_health)
-		unit.current_health = mini(before + action.heal_amount, int(unit.max_health))
-		var after := int(unit.current_health)
-		if after > before:
-			var gained := after - before
-			healed += gained
-			unit_heals.append({
-				"unit": unit,
-				"hp_before": before,
-				"hp_after": after,
-				"hp_gained": gained,
-			})
+	var heal_amount := ActionParams.resolve_int(legion, action, "heal_amount", action.heal_amount)
+	var heal_result := _apply_focused_heal(legion, legion, heal_amount)
 	legion.spend_ap(action.ap_cost)
 	_apply_terminal(state, legion, action, coords)
 	return _ok(["legion_healed"], {
 		"action_id": action.id,
 		"coords": coords,
-		"healed_total": healed,
-		"unit_heals": unit_heals,
+		"from": coords,
+		"to": coords,
+		"healed_total": heal_result["healed_total"],
+		"unit_heals": heal_result["unit_heals"],
 		"legion": legion,
+		"caster_legion": legion,
+		"target_legion": legion,
 	})
+
+static func _execute_ally_heal(
+	state: BattleStateScript,
+	caster: Legion,
+	action: ActionDefinitionScript,
+	from_coords: Vector2i,
+	to_coords: Vector2i
+) -> Dictionary:
+	var to_tile: Tile = state.tile_at(to_coords)
+	if to_tile == null or not to_tile.has_legion():
+		return _fail("No ally at target")
+	var target: Legion = to_tile.legion
+	if target.team_id != caster.team_id or target == caster:
+		return _fail("Invalid ally target")
+	var heal_amount := ActionParams.resolve_int(caster, action, "heal_amount", action.heal_amount)
+	var heal_result := _apply_focused_heal(caster, target, heal_amount)
+	caster.spend_ap(action.ap_cost)
+	_apply_terminal(state, caster, action, from_coords)
+	return _ok(["legion_healed"], {
+		"action_id": action.id,
+		"coords": to_coords,
+		"from": from_coords,
+		"to": to_coords,
+		"healed_total": heal_result["healed_total"],
+		"unit_heals": heal_result["unit_heals"],
+		"legion": target,
+		"caster_legion": caster,
+		"target_legion": target,
+	})
+
+static func _execute_teleport(
+	state: BattleStateScript,
+	legion: Legion,
+	action: ActionDefinitionScript,
+	from_coords: Vector2i,
+	to_coords: Vector2i
+) -> Dictionary:
+	var from_tile: Tile = state.tile_at(from_coords)
+	var to_tile: Tile = state.tile_at(to_coords)
+	if to_tile == null or not to_tile.walkable or to_tile.has_legion():
+		return _fail("Invalid teleport destination")
+	from_tile.legion = null
+	to_tile.legion = legion
+	legion.tile_coords = to_coords
+	legion.spend_ap(action.ap_cost)
+	_apply_terminal(state, legion, action, from_coords)
+	state.turn_manager.clear_wait(to_coords)
+	return _ok(["legion_teleported"], {
+		"action_id": action.id,
+		"from": from_coords,
+		"to": to_coords,
+		"legion": legion,
+		"caster_legion": legion,
+	})
+
+## Each caster unit applies heal_amount once to the current lowest-HP wounded unit.
+static func _apply_focused_heal(caster: Legion, target: Legion, heal_amount: int) -> Dictionary:
+	var healed := 0
+	var unit_heals: Array = []
+	if caster == null or target == null or heal_amount <= 0:
+		return {"healed_total": 0, "unit_heals": unit_heals}
+	for caster_unit in caster.units:
+		if caster_unit == null:
+			continue
+		var focus := _pick_lowest_hp_wounded(target)
+		if focus == null:
+			break
+		var before := int(focus.current_health)
+		focus.current_health = mini(before + heal_amount, int(focus.max_health))
+		var after := int(focus.current_health)
+		if after <= before:
+			continue
+		var gained := after - before
+		healed += gained
+		unit_heals.append({
+			"caster": caster_unit,
+			"unit": focus,
+			"hp_before": before,
+			"hp_after": after,
+			"hp_gained": gained,
+		})
+	return {"healed_total": healed, "unit_heals": unit_heals}
+
+static func _pick_lowest_hp_wounded(legion: Legion) -> Unit:
+	var best: Unit = null
+	var best_hp := 2147483647
+	for unit in legion.units:
+		if unit == null:
+			continue
+		var hp := int(unit.current_health)
+		if hp >= int(unit.max_health):
+			continue
+		if hp < best_hp:
+			best_hp = hp
+			best = unit
+	return best
+
+static func _start_action_cooldown(legion: Legion, action: ActionDefinitionScript) -> void:
+	if legion == null or action == null:
+		return
+	var cd := ActionParams.resolve_int(legion, action, "cooldown", action.cooldown)
+	legion.start_cooldown(action.id, cd)
 
 static func _apply_terminal(
 	state: BattleStateScript,
@@ -223,6 +305,8 @@ static func _cleanup_empty_legion(state: BattleStateScript, coords: Vector2i) ->
 		return
 	if tile.legion and tile.legion.units.is_empty():
 		tile.legion = null
+		# Don't leave a wait stain on a vacated tile — another ally may move in.
+		state.turn_manager.clear_wait(coords)
 
 static func _ok(events: Array, payload: Dictionary = {}) -> Dictionary:
 	return {"ok": true, "events": events, "payload": payload}

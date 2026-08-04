@@ -19,10 +19,6 @@ run/main_scene="res://scenes/runnables/minigame.tscn"
 config/features=PackedStringArray("4.6", "Mobile")
 config/icon="res://icon.svg"
 
-[audio]
-
-buses/default_bus_layout="res://default_bus_layout.tres"
-
 [autoload]
 
 EventBus="*uid://wps2obuyjcpy"
@@ -30,10 +26,12 @@ AudioManager="*uid://cxvbv8c8txafc"
 UnitDefs="*res://scripts/core/unit_defs.gd"
 TeamDefs="*res://scripts/core/team_defs.gd"
 ActionDefs="*res://scripts/actions/action_defs.gd"
+KeywordDefs="*res://scripts/core/keyword_defs.gd"
+GameSettings="*res://scripts/core/game_settings.gd"
 
 [editor]
 
-movie_writer/movie_file="/home/lo/repos/fable_quest/videos/recording.avi"
+movie_writer/movie_file="res://videos/recording.avi"
 
 [global]
 

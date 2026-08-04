@@ -13,3 +13,5 @@ terminal = true
 targeting = 0
 overlay_state = "healable"
 heal_amount = 2
+tooltip_body = "Each unit restores {heal} health to the lowest-health ally in this legion. Ends this legion's turn."
+keywords = Array[String](["terminal", "ap"])

@@ -157,6 +157,7 @@ func _play_ranged_hit(
 		tex = ProjectilePresenterScript.load_projectile_texture("arrow")
 	var dist := from_pos.distance_to(to_pos)
 	var arc := clampf(22.0 + dist * 0.14, 28.0, 70.0)
+	var spin_sign := 1.0 if to_pos.x >= from_pos.x else -1.0
 	await _projectiles.play_parabola(
 		_host,
 		from_pos,
@@ -164,7 +165,9 @@ func _play_ranged_hit(
 		tex,
 		atk_unit.projectile_motion,
 		RANGED_FLIGHT_TIME,
-		arc
+		arc,
+		1.75,
+		spin_sign
 	)
 
 	AudioManager.play_unit_hit(atk_unit.unit_type)
@@ -208,33 +211,109 @@ func _apply_defender_reaction(
 	return died_on_hit
 
 func play_heal(coords: Vector2i, payload: Dictionary, options: Dictionary = {}) -> void:
-	var tile_visu: TileVisu = _tile_visu_at.call(coords)
-	if not tile_visu or not tile_visu.legion_visu:
+	var from_coords: Vector2i = payload.get("from", coords)
+	var to_coords: Vector2i = payload.get("to", payload.get("coords", coords))
+	var caster_legion: Legion = payload.get("caster_legion", payload.get("legion"))
+
+	var from_tile: TileVisu = _tile_visu_at.call(from_coords)
+	var to_tile: TileVisu = _tile_visu_at.call(to_coords)
+	if to_tile == null or to_tile.legion_visu == null:
+		to_tile = _tile_visu_at.call(coords)
+	if to_tile == null or to_tile.legion_visu == null:
 		return
 
-	var legion_visu: LegionVisu = tile_visu.legion_visu
-	var legion: Legion = payload.get("legion")
-	var world_pos: Vector2 = legion_visu.global_position
+	var target_visu: LegionVisu = to_tile.legion_visu
+	var caster_visu: LegionVisu = from_tile.legion_visu if from_tile else null
+	var world_pos: Vector2 = target_visu.global_position
+	var unit_heals: Array = payload.get("unit_heals", [])
+	var is_self_heal := caster_visu != null and caster_visu == target_visu
+	var facing_before := caster_visu.get_facing_direction() if is_self_heal else Vector2.RIGHT
 
-	for entry in payload.get("unit_heals", []):
+	# One pulse per caster unit (unit_heals is already focused onto lowest-HP targets).
+	for entry in unit_heals:
 		var unit: Unit = entry.get("unit")
 		if unit == null:
 			continue
-		legion_visu.animate_unit_healed(
+		var shooter: Unit = entry.get("caster")
+
+		if caster_visu != null and shooter != null:
+			await _play_heal_shot(caster_visu, target_visu, shooter, unit)
+
+		var heal_tween: Tween = target_visu.animate_unit_healed(
 			unit,
 			float(entry.get("hp_before", 0)),
 			float(entry.get("hp_after", 0)),
 			float(unit.max_health)
 		)
 		AudioManager.play_heal_sfx()
-		await _beat(COMBAT_HIT_BEAT)
+		if heal_tween:
+			await heal_tween.finished
+		else:
+			await _beat(COMBAT_HIT_BEAT)
 
-	legion_visu.update_local_positions()
-	legion_visu.tween_units_to_local_positions()
+	if is_self_heal and caster_visu:
+		caster_visu.update_direction(facing_before)
+
+	target_visu.update_local_positions()
+	target_visu.tween_units_to_local_positions()
 	await _beat(COMBAT_REPOSITION_BEAT)
-	legion_visu.start_idle_animation()
-	legion_visu.sync_all_unit_hp_bars()
+	target_visu.start_idle_animation()
+	target_visu.sync_all_unit_hp_bars()
 
+	if options.has("on_ap_changed"):
+		var on_ap_changed: Callable = options["on_ap_changed"]
+		if on_ap_changed.is_valid() and caster_legion:
+			on_ap_changed.call(caster_legion)
+
+	if options.get("deselect_after", false) and options.has("deselect"):
+		var deselect: Callable = options["deselect"]
+		if deselect.is_valid():
+			deselect.call()
+
+	_fx_tail.release(
+		func() -> void:
+			_combat_fx.spawn_heal_popup(world_pos, int(payload.get("healed_total", 0))),
+		[target_visu]
+	)
+
+func play_teleport(
+	from_coords: Vector2i,
+	to_coords: Vector2i,
+	payload: Dictionary,
+	options: Dictionary = {}
+) -> void:
+	var from_tile: TileVisu = _tile_visu_at.call(from_coords)
+	var legion_visu: LegionVisu = from_tile.legion_visu if from_tile else null
+	if legion_visu == null and options.has("rewire"):
+		# Model already moved; try destination after rewire.
+		pass
+
+	const FADE := 0.18
+	if legion_visu:
+		var fade_out := _host.create_tween()
+		fade_out.tween_property(legion_visu, "modulate:a", 0.0, FADE)
+		await fade_out.finished
+
+	if options.has("rewire"):
+		var rewire: Callable = options["rewire"]
+		if rewire.is_valid():
+			rewire.call()
+
+	var to_tile: TileVisu = _tile_visu_at.call(to_coords)
+	legion_visu = to_tile.legion_visu if to_tile else legion_visu
+	if legion_visu == null:
+		var legion: Legion = payload.get("legion")
+		if legion and _legion_visu_at.is_valid():
+			legion_visu = _legion_visu_at.call(legion)
+
+	if legion_visu:
+		legion_visu.modulate.a = 0.0
+		var fade_in := _host.create_tween()
+		fade_in.tween_property(legion_visu, "modulate:a", 1.0, FADE)
+		await fade_in.finished
+		legion_visu.modulate.a = 1.0
+
+	var legion: Legion = payload.get("legion")
 	if options.has("on_ap_changed"):
 		var on_ap_changed: Callable = options["on_ap_changed"]
 		if on_ap_changed.is_valid() and legion:
@@ -245,10 +324,53 @@ func play_heal(coords: Vector2i, payload: Dictionary, options: Dictionary = {}) 
 		if deselect.is_valid():
 			deselect.call()
 
-	_fx_tail.release(
-		func() -> void:
-			_combat_fx.spawn_heal_popup(world_pos, int(payload.get("healed_total", 0))),
-		[legion_visu]
+func _play_heal_shot(
+	caster_visu: LegionVisu,
+	target_visu: LegionVisu,
+	shooter: Unit,
+	target_unit: Unit
+) -> void:
+	var from_pos := caster_visu.get_unit_sprite_global_position(shooter)
+	var to_pos := target_visu.get_unit_sprite_global_position(target_unit)
+	# Self-heal onto yourself: loft the bandage straight up and back down.
+	var self_toss := shooter == target_unit
+	if self_toss:
+		to_pos = from_pos
+
+	# Spin handedness from facing (self) or throw direction (ally / teammate).
+	var spin_sign := 1.0
+	if self_toss:
+		var shooter_visu: UnitVisu = caster_visu.get_unit_visu(shooter)
+		if shooter_visu != null and not shooter_visu.direction_right:
+			spin_sign = -1.0
+	elif to_pos.x < from_pos.x:
+		spin_sign = -1.0
+
+	var direction := Vector2.UP if self_toss else (to_pos - from_pos).normalized()
+	if direction == Vector2.ZERO:
+		direction = Vector2.UP
+	caster_visu.animate_unit_ranged_attack(shooter, direction)
+	await _beat(UnitVisu.RANGED_WINDUP_SEC)
+
+	var tex := ProjectilePresenterScript.load_projectile_texture("bandage")
+	if tex == null:
+		tex = ProjectilePresenterScript.load_projectile_texture("magicball")
+	if tex == null or _projectiles == null:
+		return
+	var dist := from_pos.distance_to(to_pos)
+	var arc := 110.0 if self_toss else clampf(22.0 + dist * 0.14, 28.0, 70.0)
+	var flight := 0.38 if self_toss else RANGED_FLIGHT_TIME
+	var spins := 1.0 if self_toss else 1.75
+	await _projectiles.play_parabola(
+		_host,
+		from_pos,
+		to_pos,
+		tex,
+		UnitDefinition.ProjectileMotion.THROWN,
+		flight,
+		arc,
+		spins,
+		spin_sign
 	)
 
 func _build_legion_visu_map(attacker: Legion, defender: Legion, hits: Array) -> Dictionary:

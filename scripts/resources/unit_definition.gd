@@ -38,6 +38,8 @@ enum ProjectileMotion {
 @export var sfx_death: AudioStream
 ## Empty = legion uses default move / melee_attack / ranged_attack / self_heal.
 @export var action_ids: Array[String] = []
+## Per-action param overrides: { "heal_ally": { "heal_amount": 4, "target_range": 2 } }.
+@export var action_params: Dictionary = {}
 
 func has_ranged() -> bool:
 	return attack_range > 0 and ranged_attack > 0

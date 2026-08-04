@@ -9,6 +9,7 @@ const ActionPlaybackScript = preload("res://scripts/battle/action_playback.gd")
 const BattleContextScript = preload("res://scripts/battle/battle_context.gd")
 const BattleUIAdapterScript = preload("res://scripts/ui/battle_ui_adapter.gd")
 const BattleActionRunnerScript = preload("res://scripts/battle/battle_action_runner.gd")
+const BattleHostWiringScript = preload("res://scripts/battle/battle_host_wiring.gd")
 const MinigameSessionScript = preload("res://scripts/minigame/minigame_session.gd")
 const MinigamePresenterScript = preload("res://scripts/minigame/minigame_presenter.gd")
 const MinigamePhaseDepsScript = preload("res://scripts/minigame/minigame_phase_deps.gd")
@@ -39,6 +40,9 @@ var _pass_continue_btn: GameButton
 var _status_label: Label
 var _game_over_panel: GameOverPanel
 var _action_bar: Control
+var _tooltip_controller: TooltipController
+var _action_log_panel: BattleActionLogPanel
+var _pause_menu: PauseMenu
 
 @onready var _camera: Camera2D = $Camera2D
 
@@ -70,21 +74,39 @@ func _exit_tree() -> void:
 		battle_ui.unbind()
 
 func _input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_ESCAPE or event.physical_keycode == KEY_ESCAPE:
+			_toggle_pause_menu()
+			get_viewport().set_input_as_handled()
+			return
+	if _pause_menu and _pause_menu.is_open():
+		return
 	if battle.is_input_locked() or _unit_picker.visible:
 		return
 	if session.phase != MinigameSessionScript.Phase.BATTLE:
 		return
-	if not event is InputEventKey:
-		return
-	var key_event := event as InputEventKey
-	if not key_event.pressed or key_event.echo:
-		return
-	if key_event.keycode == KEY_TAB or key_event.physical_keycode == KEY_TAB:
-		battle_ui.cycle_legion_tab()
+	if BattleHostWiringScript.handle_hotkeys(event, battle_ui):
 		get_viewport().set_input_as_handled()
-	elif key_event.keycode == KEY_SPACE or key_event.physical_keycode == KEY_SPACE:
-		battle_ui.pass_current_legion()
-		get_viewport().set_input_as_handled()
+
+func _toggle_pause_menu() -> void:
+	if _game_over_panel and _game_over_panel.visible:
+		return
+	if _pause_menu == null:
+		return
+	if _pause_menu.is_open():
+		_pause_menu.close_menu()
+	else:
+		if battle_ui:
+			battle_ui.deselect()
+			battle_ui.clear_overlays()
+		_pause_menu.open_menu()
+
+func _on_pause_resume() -> void:
+	if _pause_menu:
+		_pause_menu.close_menu()
+
+func _on_pause_abandon() -> void:
+	get_tree().change_scene_to_file(MENU_SCENE)
 
 func inspect_tile(coords: Vector2i) -> void:
 	if session.phase == MinigameSessionScript.Phase.DRAFT:
@@ -114,6 +136,8 @@ func _setup_phase_controllers() -> void:
 	deps.status_label = _status_label
 	deps.game_over_panel = _game_over_panel
 	deps.action_bar = _action_bar
+	deps.action_log_panel = _action_log_panel
+	deps.pause_menu = _pause_menu
 
 	draft = DraftPhaseControllerScript.new(deps)
 	battle = BattlePhaseControllerScript.new(deps)
@@ -121,15 +145,18 @@ func _setup_phase_controllers() -> void:
 
 func _setup_battle_context() -> void:
 	battle_context = BattleContextScript.new()
-	battle_context.session = session
-	battle_context.presenter = presenter
-	battle_context.is_locked_fn = func() -> bool: return battle.is_input_locked()
-	battle_context.apply_action_fn = func(action_id: String, from_coords: Vector2i, to_coords: Vector2i) -> void:
-		request_use_action(action_id, from_coords, to_coords)
+	BattleHostWiringScript.wire_core_context(
+		battle_context,
+		session,
+		presenter,
+		func() -> bool: return battle.is_input_locked(),
+		func(action_id: String, from_coords: Vector2i, to_coords: Vector2i) -> void:
+			request_use_action(action_id, from_coords, to_coords),
+		func(coords: Vector2i) -> void: inspect_tile(coords),
+		func() -> void: clear_inspect(),
+		func() -> Node: return _overlay_layer
+	)
 	battle_context.battle_phase_fn = func() -> bool: return session.phase == MinigameSessionScript.Phase.BATTLE
-	battle_context.inspect_fn = func(coords: Vector2i) -> void: inspect_tile(coords)
-	battle_context.clear_inspect_fn = func() -> void: clear_inspect()
-	battle_context.overlay_ui_fn = func() -> Node: return _overlay_layer
 
 func _connect_phase_signals() -> void:
 	_setup_panel.ready_pressed.connect(func() -> void: draft.handle_ready())
@@ -172,6 +199,18 @@ func _setup_ui() -> void:
 	_action_bar = preload("res://scenes/ui/battle_action_bar.tscn").instantiate()
 	_ui_layer.add_child(_action_bar)
 
+	_tooltip_controller = TooltipController.new()
+	_ui_layer.add_child(_tooltip_controller)
+	if _tile_info_panel.has_method("set_tooltip_controller"):
+		_tile_info_panel.set_tooltip_controller(_tooltip_controller)
+	if _action_bar.has_method("set_tooltip_controller"):
+		_action_bar.set_tooltip_controller(_tooltip_controller)
+
+	_action_log_panel = BattleActionLogPanel.new()
+	_ui_layer.add_child(_action_log_panel)
+	_action_log_panel.set_tooltip_controller(_tooltip_controller)
+	EventBus.battle_log_entry_added.connect(_on_battle_log_entry_added)
+
 	_combat_fx_layer = CanvasLayer.new()
 	_combat_fx_layer.name = "CombatFX"
 	_combat_fx_layer.layer = 2
@@ -206,6 +245,11 @@ func _setup_ui() -> void:
 	_game_over_panel.new_game_pressed.connect(_on_game_over_new_game)
 	_game_over_panel.main_menu_pressed.connect(_on_game_over_main_menu)
 
+	_pause_menu = PauseMenu.new()
+	_overlay_layer.add_child(_pause_menu)
+	_pause_menu.resume_pressed.connect(_on_pause_resume)
+	_pause_menu.abandon_pressed.connect(_on_pause_abandon)
+
 func _on_tile_clicked(coords: Vector2i) -> void:
 	if session.phase == MinigameSessionScript.Phase.DRAFT:
 		if draft.is_blocking_input():
@@ -223,6 +267,10 @@ func _on_battle_started() -> void:
 	EventBus.tile_right_clicked.disconnect(_on_tile_right_clicked)
 	draft.exit()
 	battle.enter()
+
+func _on_battle_log_entry_added(entry: Dictionary) -> void:
+	if _action_log_panel and session and session.phase == MinigameSessionScript.Phase.BATTLE:
+		_action_log_panel.receive_entry(entry)
 
 func _on_legion_ap_changed(legion: Legion) -> void:
 	if not _tile_info_panel or not _tile_info_panel.visible:

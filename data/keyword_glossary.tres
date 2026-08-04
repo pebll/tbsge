@@ -1,0 +1,36 @@
+[gd_resource type="Resource" script_class="KeywordGlossary" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/keyword_glossary.gd" id="1_glossary"]
+
+[resource]
+script = ExtResource("1_glossary")
+entries = {
+"terminal": {
+"label": "Terminal",
+"definition": "Ends this legion's turn after use. Remaining AP is spent."
+},
+"cooldown": {
+"label": "Cooldown",
+"definition": "Must wait a number of turns before this action can be used again."
+},
+"los": {
+"label": "LOS",
+"definition": "Line of sight. Mountains and some obstacles block ranged targeting."
+},
+"forest_cover": {
+"label": "Forest cover",
+"definition": "Forests can reduce incoming ranged effectiveness for units standing in them."
+},
+"ap": {
+"label": "AP",
+"definition": "Action points. Spent to move and use actions each turn."
+},
+"range": {
+"label": "Range",
+"definition": "How many hexes away a valid target can be."
+},
+"ally": {
+"label": "Ally",
+"definition": "A legion on your own team."
+}
+}
