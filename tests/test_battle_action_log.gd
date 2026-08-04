@@ -145,12 +145,18 @@ func _test_filter_defaults() -> bool:
 	if not log.is_entry_visible({"action_id": "pass"}):
 		push_error("Wait/pass entries should stay visible")
 		return false
-	if not log.is_entry_visible({"action_id": "teleport"}):
-		push_error("Teleport entries should stay visible")
+	if log.is_entry_visible({"action_id": "teleport"}):
+		push_error("Teleport entries should follow the moves toggle (hidden when off)")
+		return false
+	if log.is_entry_visible({"action_id": "move", "show_coords": true}):
+		push_error("Coord cards should be hidden when moves are off")
 		return false
 	GameSettings.set_show_battle_log_moves(true, false)
 	if not log.is_entry_visible({"action_id": "move"}):
 		push_error("Moves should appear when option enabled")
+		return false
+	if not log.is_entry_visible({"action_id": "teleport"}):
+		push_error("Teleport should appear when moves are enabled")
 		return false
 	GameSettings.set_show_battle_log_end_turns(true, false)
 	if not log.is_entry_visible({"action_id": "end_turn"}):

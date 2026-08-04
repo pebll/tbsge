@@ -244,7 +244,10 @@ func _is_visible(entry: Dictionary) -> bool:
 	if _bound_log:
 		return _bound_log.is_entry_visible(entry)
 	var action_id := String(entry.get("action_id", ""))
-	if action_id in ["move", "swap"]:
+	if (
+		action_id in ["move", "swap", "teleport"]
+		or bool(entry.get("show_coords", false))
+	):
 		return GameSettings.show_battle_log_moves
 	if action_id == "end_turn":
 		return GameSettings.show_battle_log_end_turns

@@ -9,15 +9,15 @@ radius = 48.010418
 [node name="Legion" type="Node2D" unique_id=823189178]
 script = ExtResource("1_swhq2")
 
-[node name="Units" type="Node2D" parent="." unique_id=1934969450]
-z_index = 1000
-
 [node name="Banner" type="Sprite2D" parent="." unique_id=-1447774245]
-z_index = 500
+z_index = 0
 position = Vector2(0, -14.999996)
 scale = Vector2(0.09, 0.09)
 texture = ExtResource("3_banner")
 offset = Vector2(-11.111113, -411.11115)
+
+[node name="Units" type="Node2D" parent="." unique_id=1934969450]
+z_index = 10
 
 [node name="Area2D" type="Area2D" parent="." unique_id=1341307370]
 

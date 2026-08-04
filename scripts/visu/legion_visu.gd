@@ -68,25 +68,19 @@ func _sync_depth_sort() -> void:
 	z_index = base
 	_sync_banner_depth()
 
-## Own units always above this legion's banner. Banner gets a south-biased absolute
-## z so it can sit above a neighboring legion's body, still far below map UI (8k+).
+## Own units/corpses draw above this legion's banner. Cross-legion stacking comes
+## from the parent LegionVisu depth z_index (southern/higher Y draws in front).
 func _sync_banner_depth() -> void:
 	if banner == null:
 		return
-	const HexLayoutScript = preload("res://scripts/core/hex_layout.gd")
-	var own := HexLayoutScript.depth_sort_z(position.y)
-	var biased := HexLayoutScript.depth_sort_z(
-		position.y + HexLayoutScript.DEFAULT_TILE_SIZE * 1.15
-	)
-	banner.z_as_relative = false
-	banner.z_index = biased * 10 + 4
-	var body_z := maxi(own * 10 + 20, banner.z_index + 6)
+	banner.z_as_relative = true
+	banner.z_index = 0
 	if units:
-		units.z_as_relative = false
-		units.z_index = body_z
+		units.z_as_relative = true
+		units.z_index = 10
 	if corpses:
-		corpses.z_as_relative = false
-		corpses.z_index = body_z
+		corpses.z_as_relative = true
+		corpses.z_index = 10
 
 func _get_formation_scale() -> float:
 	if legion == null:

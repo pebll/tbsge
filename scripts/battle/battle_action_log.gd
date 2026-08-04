@@ -21,7 +21,11 @@ func append(entry: Dictionary) -> void:
 ## Visibility always follows GameSettings so UI never desyncs from Options.
 func is_entry_visible(entry: Dictionary) -> bool:
 	var action_id := String(entry.get("action_id", ""))
-	if action_id in ["move", "swap"]:
+	# Anything that reads as a relocation (coords card) follows the moves toggle.
+	if (
+		action_id in ["move", "swap", "teleport"]
+		or bool(entry.get("show_coords", false))
+	):
 		return GameSettings.show_battle_log_moves
 	if action_id == "end_turn":
 		return GameSettings.show_battle_log_end_turns
