@@ -68,6 +68,7 @@ func _ready() -> void:
 	EventBus.tile_clicked.connect(_on_tile_clicked)
 	EventBus.tile_right_clicked.connect(_on_tile_right_clicked)
 	EventBus.legion_ap_changed.connect(_on_legion_ap_changed)
+	EventBus.legion_shields_refilled.connect(_on_legion_shields_refilled)
 
 func _exit_tree() -> void:
 	if battle_ui:
@@ -289,6 +290,13 @@ func _on_legion_ap_changed(legion: Legion) -> void:
 		return
 	var tile: Tile = session.grid.get(legion.tile_coords)
 	if tile and tile.has_legion():
+		_tile_info_panel.show_tile(tile)
+
+func _on_legion_shields_refilled(legion: Legion) -> void:
+	if not _tile_info_panel or not _tile_info_panel.visible or legion == null:
+		return
+	var tile: Tile = session.grid.get(legion.tile_coords)
+	if tile and tile.has_legion() and tile.legion == legion:
 		_tile_info_panel.show_tile(tile)
 
 func _on_game_over_new_game() -> void:

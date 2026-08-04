@@ -56,6 +56,7 @@ const COLOR_TEXT := Color(0.12, 0.10, 0.08)
 const COLOR_BAR_BG := Color(0.82, 0.77, 0.68)
 const COLOR_BAR_FILL := Color(0.60, 0.16, 0.12)
 const COLOR_BLOCK_BG := Color(0.93, 0.89, 0.82)
+const COLOR_SHIELD_TEXT := Color(0.52, 0.54, 0.58)
 
 const BORDER_THICK := 4
 const RADIUS := 16
@@ -129,6 +130,9 @@ func _apply_style() -> void:
 	clip_contents = true
 
 	legion_name.add_theme_color_override("font_color", COLOR_TEXT)
+	legion_name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	legion_name.max_lines_visible = 2
+	legion_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	attack_value.add_theme_color_override("font_color", COLOR_TEXT)
 	health_value.add_theme_color_override("font_color", COLOR_TEXT)
 	unit_count_value.add_theme_color_override("font_color", COLOR_TEXT)
@@ -260,7 +264,7 @@ func _can_add_draft_unit() -> bool:
 func _render_legion(legion: Legion) -> void:
 	_apply_team_accent(legion.team_id)
 	legion_block.show()
-	legion_name.text = "%s LEGION" % legion.unit_type
+	legion_name.text = _format_legion_title(legion.unit_type)
 
 	var unit0: Unit = legion.units[0] if legion.units.size() > 0 else null
 	if unit0:
@@ -379,17 +383,46 @@ func _build_unit_row(unit_type: String, u: Unit) -> Control:
 	spacer_bottom.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	bar_vbox.add_child(spacer_bottom)
 
+	var vitals := HBoxContainer.new()
+	vitals.add_theme_constant_override("separation", 4)
+	vitals.alignment = BoxContainer.ALIGNMENT_END
+	vitals.size_flags_horizontal = Control.SIZE_SHRINK_END
+	vitals.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(vitals)
+
 	var hp := Label.new()
 	hp.text = "%d/%d" % [int(u.current_health), int(u.max_health)]
 	hp.add_theme_color_override("font_color", COLOR_TEXT)
 	hp.add_theme_font_size_override("font_size", 18)
 	hp.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	hp.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	hp.custom_minimum_size = Vector2(64, 0)
-	hp.size_flags_horizontal = Control.SIZE_SHRINK_END
-	row.add_child(hp)
+	vitals.add_child(hp)
+
+	if u.shield_max > 0:
+		var shield_lbl := Label.new()
+		shield_lbl.text = "%d" % int(u.shield_remaining)
+		shield_lbl.add_theme_color_override("font_color", COLOR_SHIELD_TEXT)
+		shield_lbl.add_theme_font_size_override("font_size", 18)
+		shield_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		shield_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		vitals.add_child(shield_lbl)
 
 	return wrapper
+
+func _format_legion_title(unit_type: String) -> String:
+	var title := _unit_display_name(unit_type).strip_edges().to_upper()
+	if title.is_empty():
+		title = unit_type.replace("_", " ").to_upper()
+	# Multi-word names wrap onto two lines so the header does not overflow.
+	if " " in title:
+		return "%s\nLEGION" % title
+	return "%s LEGION" % title
+
+func _unit_display_name(unit_type: String) -> String:
+	var def := UnitDefs.get_def(unit_type)
+	if def != null and not String(def.display_name).strip_edges().is_empty():
+		return String(def.display_name)
+	return unit_type.replace("_", " ").capitalize()
 
 func _team_accent_stylebox(color: Color) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()

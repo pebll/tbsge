@@ -542,6 +542,35 @@ func _spawn_shield_hit_icon() -> void:
 	tween.parallel().tween_property(icon, "modulate:a", 0.0, 0.2)
 	tween.tween_callback(icon.queue_free)
 
+## Turn-start shield restore: soft flash + shield glyph rising.
+func juice_shield_restore() -> void:
+	if unit == null or unit.shield_max <= 0:
+		return
+	_play_color_flash(COLOR_SHIELD_FLASH, 0.4)
+	_spawn_shield_restore_icon()
+
+func _spawn_shield_restore_icon() -> void:
+	var icon := TextureRect.new()
+	icon.texture = ICON_SHIELD
+	icon.custom_minimum_size = Vector2(40, 40)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.modulate = Color(0.55, 0.88, 1.0, 0.0)
+	icon.z_index = 3600
+	add_child(icon)
+	var start_pos := _hp_bar_anchor_position() + Vector2(10, 4)
+	var rise_pos := start_pos + Vector2(0, -42)
+	icon.position = start_pos
+	icon.scale = Vector2(0.55, 0.55)
+	icon.pivot_offset = icon.custom_minimum_size * 0.5
+
+	var tween := icon.create_tween()
+	tween.tween_property(icon, "modulate:a", 1.0, 0.1)
+	tween.parallel().tween_property(icon, "scale", Vector2(1.15, 1.15), 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(icon, "position", rise_pos, 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(icon, "modulate:a", 0.0, 0.35).set_delay(0.12)
+	tween.tween_callback(icon.queue_free)
+
 func juice_die(direction: Vector2) -> Tween:
 	if idle_tween and idle_tween.is_running():
 		idle_tween.kill()

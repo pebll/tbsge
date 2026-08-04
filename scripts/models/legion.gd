@@ -51,8 +51,12 @@ func spend_all_ap() -> void:
 func refresh_ap() -> void:
 	current_ap = max_ap
 	tick_cooldowns()
+	var any_shield_restored := false
 	for unit in units:
-		unit.reset_turn_state()
+		if unit and unit.reset_turn_state():
+			any_shield_restored = true
+	if any_shield_restored:
+		EventBus.legion_shields_refilled.emit(self)
 
 func get_cooldown_remaining(action_id: String) -> int:
 	return int(action_cooldowns.get(action_id, 0))
