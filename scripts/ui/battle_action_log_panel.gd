@@ -87,8 +87,11 @@ func bind_log(action_log: BattleActionLog) -> void:
 func clear_entries() -> void:
 	if _list == null:
 		return
-	for child in _list.get_children():
-		child.queue_free()
+	# Free immediately so rebuilds cannot briefly keep stale (e.g. move) cards.
+	while _list.get_child_count() > 0:
+		var child: Node = _list.get_child(0)
+		_list.remove_child(child)
+		child.free()
 
 ## Hosts call this for live EventBus entries. Combat lines may queue.
 func receive_entry(entry: Dictionary) -> void:
@@ -244,9 +247,10 @@ func _is_visible(entry: Dictionary) -> bool:
 	if _bound_log:
 		return _bound_log.is_entry_visible(entry)
 	var action_id := String(entry.get("action_id", ""))
+	var result_summary := String(entry.get("result_summary", ""))
 	if (
-		action_id in ["move", "swap", "teleport"]
-		or bool(entry.get("show_coords", false))
+		action_id in ["move", "swap"]
+		or result_summary in ["moved", "swapped"]
 	):
 		return GameSettings.show_battle_log_moves
 	if action_id == "end_turn":

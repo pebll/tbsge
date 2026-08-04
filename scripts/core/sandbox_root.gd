@@ -133,26 +133,32 @@ func spawn_unit(coords: Vector2i) -> void:
 		presenter.spawn_legion_visu(legion)
 		EventBus.legion_ap_changed.emit(legion)
 
-func use_battle_action(action_id: String, from_coords: Vector2i, to_coords: Vector2i) -> void:
+func use_battle_action(
+	action_id: String,
+	from_coords: Vector2i,
+	to_coords: Vector2i,
+	skip_action_log: bool = false
+) -> Dictionary:
 	if input.is_locked():
-		return
+		return {"ok": false, "error": "Input locked", "events": [], "payload": {}}
 	var cmd := {
 		"type": "use_action",
 		"action_id": action_id,
 		"from": from_coords,
 		"to": to_coords,
+		"skip_action_log": skip_action_log,
 	}
 	cmd.merge(BattleHostWiringScript.rng_seed_for_action(action_id))
-	await _perform_use_action(cmd, from_coords)
+	return await _perform_use_action(cmd, from_coords)
 
-func _perform_use_action(cmd: Dictionary, from_coords: Vector2i) -> void:
+func _perform_use_action(cmd: Dictionary, from_coords: Vector2i) -> Dictionary:
 	var from_tile: Tile = session.grid.get(from_coords)
 	if from_tile == null or not from_tile.has_legion():
-		return
+		return {"ok": false, "error": "No legion", "events": [], "payload": {}}
 
 	var result := session.apply(cmd)
 	if not result.get("ok", false):
-		return
+		return result
 
 	input.begin_action()
 	await action_runner.play_result(
@@ -172,6 +178,7 @@ func _perform_use_action(cmd: Dictionary, from_coords: Vector2i) -> void:
 	if _action_log_panel:
 		_action_log_panel.reveal_pending()
 	input.end_action()
+	return result
 
 func _setup_battle_context() -> void:
 	battle_context = BattleContextScript.new()
@@ -189,8 +196,24 @@ func _setup_battle_context() -> void:
 	battle_context.allows_spawn_fn = func(_coords: Vector2i) -> bool: return session.config.allow_spawn
 	battle_context.spawn_fn = func(coords: Vector2i) -> void: spawn_unit(coords)
 	battle_context.apply_move_path_fn = func(path: Array) -> void:
-		for i in range(1, path.size()):
-			use_battle_action("move", path[i - 1], path[i])
+		_apply_move_path(path)
+
+func _apply_move_path(path: Array) -> void:
+	if path.size() < 2:
+		return
+	var start: Vector2i = path[0]
+	var last_ok_to: Vector2i = start
+	var steps_ok := 0
+	var last_was_swap := false
+	for i in range(1, path.size()):
+		var step: Dictionary = await use_battle_action("move", path[i - 1], path[i], true)
+		if not step.get("ok", false):
+			break
+		steps_ok += 1
+		last_ok_to = path[i]
+		last_was_swap = "legions_swapped" in step.get("events", [])
+	if steps_ok > 0:
+		session.log_move_relocation(start, last_ok_to, steps_ok == 1 and last_was_swap)
 
 func _on_legion_ap_changed(legion: Legion) -> void:
 	if presenter and session:

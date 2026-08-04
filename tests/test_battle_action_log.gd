@@ -9,6 +9,8 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_filter_defaults():
 		return false
+	if not _test_path_coalesce_logs_once():
+		return false
 	if not _test_combat_wipe_and_teams():
 		return false
 	if not _test_log_cap():
@@ -136,6 +138,12 @@ func _test_filter_defaults() -> bool:
 	if log.is_entry_visible({"action_id": "move"}):
 		push_error("Move entries should be hidden by default")
 		return false
+	if log.is_entry_visible({"action_id": "swap"}):
+		push_error("Swap entries should be hidden by default")
+		return false
+	if log.is_entry_visible({"action_id": "move", "result_summary": "moved"}):
+		push_error("Moved result_summary should follow moves filter")
+		return false
 	if log.is_entry_visible({"action_id": "end_turn"}):
 		push_error("End turn entries should be hidden by default")
 		return false
@@ -145,18 +153,18 @@ func _test_filter_defaults() -> bool:
 	if not log.is_entry_visible({"action_id": "pass"}):
 		push_error("Wait/pass entries should stay visible")
 		return false
-	if log.is_entry_visible({"action_id": "teleport"}):
-		push_error("Teleport entries should follow the moves toggle (hidden when off)")
+	if not log.is_entry_visible({"action_id": "teleport"}):
+		push_error("Teleport entries should stay visible")
 		return false
-	if log.is_entry_visible({"action_id": "move", "show_coords": true}):
-		push_error("Coord cards should be hidden when moves are off")
+	if not log.is_entry_visible({"action_id": "teleport", "show_coords": true}):
+		push_error("Teleport coord cards should stay visible when moves are off")
 		return false
 	GameSettings.set_show_battle_log_moves(true, false)
 	if not log.is_entry_visible({"action_id": "move"}):
 		push_error("Moves should appear when option enabled")
 		return false
 	if not log.is_entry_visible({"action_id": "teleport"}):
-		push_error("Teleport should appear when moves are enabled")
+		push_error("Teleport should still appear when moves are enabled")
 		return false
 	GameSettings.set_show_battle_log_end_turns(true, false)
 	if not log.is_entry_visible({"action_id": "end_turn"}):
@@ -164,6 +172,73 @@ func _test_filter_defaults() -> bool:
 		return false
 	GameSettings.set_show_battle_log_moves(false, false)
 	GameSettings.set_show_battle_log_end_turns(false, false)
+	return true
+
+func _test_path_coalesce_logs_once() -> bool:
+	## Multi-hex move with skip_action_log + log_move_relocation → one card.
+	var session := MinigameTestHelpersScript.prepare_session()
+	var legions: Dictionary = MinigameTestHelpersScript.start_two_legion_battle(session)
+	var green: Legion = legions["a"]
+	green.current_ap = max(green.current_ap, 3)
+	session.turn_manager.clear_wait(green.tile_coords)
+
+	var start: Vector2i = green.tile_coords
+	var move_targets := session.get_action_targets(green, "move")
+	if move_targets.is_empty():
+		push_error("Expected move targets for path coalesce test")
+		return false
+	var mid: Vector2i = move_targets[0]
+
+	session.action_log.clear()
+	var step1 := session.apply({
+		"type": "use_action",
+		"action_id": "move",
+		"from": start,
+		"to": mid,
+		"skip_action_log": true,
+	})
+	if not step1["ok"]:
+		push_error("Path step 1 failed: %s" % step1.get("error"))
+		return false
+	if session.action_log.size() != 0:
+		push_error("skip_action_log should not append after step 1")
+		return false
+
+	# Prefer a second hop when AP + geometry allow; else coalesce the single hop.
+	var end: Vector2i = mid
+	var second_targets := session.get_action_targets(green, "move")
+	for t in second_targets:
+		if t == start:
+			continue
+		var step2 := session.apply({
+			"type": "use_action",
+			"action_id": "move",
+			"from": mid,
+			"to": t,
+			"skip_action_log": true,
+		})
+		if step2.get("ok", false):
+			end = t
+			break
+
+	if session.action_log.size() != 0:
+		push_error("Silent path steps should not log, got %d" % session.action_log.size())
+		return false
+	session.log_move_relocation(start, end, false)
+	if session.action_log.size() != 1:
+		push_error("Expected exactly one coalesced path log, got %d" % session.action_log.size())
+		return false
+	var entry: Dictionary = session.action_log.latest()
+	if String(entry.get("action_id", "")) != "move":
+		push_error("Coalesced entry should be move")
+		return false
+	if entry.get("from") != start or entry.get("to") != end:
+		push_error("Coalesced entry should span full path %s -> %s, got %s -> %s"
+			% [start, end, entry.get("from"), entry.get("to")])
+		return false
+	if String(entry.get("coord_text", "")) != "%d,%d" % [end.x, end.y]:
+		push_error("Coalesced coord_text should be final tile")
+		return false
 	return true
 
 func _test_combat_wipe_and_teams() -> bool:
