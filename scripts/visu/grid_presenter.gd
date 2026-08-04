@@ -14,7 +14,8 @@ var legion_to_visu: Dictionary = {}
 var tiles_container: Node
 
 func _ready() -> void:
-	tiles_container = Node.new()
+	# Node2D so tile CanvasItems share a clear parent with legion siblings.
+	tiles_container = Node2D.new()
 	tiles_container.name = "Tiles"
 	add_child(tiles_container)
 
@@ -27,7 +28,9 @@ func build_map_from_grid(grid: Dictionary) -> void:
 			coords, tile_size, tile_size_xy_ratio
 		)
 		hex_tile.position = world_pos
-		hex_tile.z_index = HexLayoutScript.depth_sort_z(world_pos.y)
+		hex_tile.z_index = HexLayoutScript.depth_sort_z(
+			world_pos.y, HexLayoutScript.DEPTH_LAYER_TILE
+		)
 		tiles_container.add_child(hex_tile)
 		hex_tile.init(tile)
 		grid_visu[coords] = hex_tile

@@ -26,7 +26,9 @@ func generate_hex_map(radius: int, parent: Node, grid_visu: Dictionary, grid_mod
 			var hex_tile: TileVisu = preload("res://scenes/hextile.tscn").instantiate()
 			var world_pos: Vector2 = HexLayoutScript.axial_to_world(q, r, tile_size, tile_size_xy_ratio)
 			hex_tile.position = world_pos
-			hex_tile.z_index = HexLayoutScript.depth_sort_z(world_pos.y)
+			hex_tile.z_index = HexLayoutScript.depth_sort_z(
+				world_pos.y, HexLayoutScript.DEPTH_LAYER_TILE
+			)
 			parent.add_child(hex_tile)
 			hex_tile.init(tile)
 			grid_visu[Vector2i(q, r)] = hex_tile

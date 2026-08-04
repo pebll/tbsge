@@ -10,8 +10,11 @@ const BANNER_TEXTURES := [
 var legion: Legion
 var _unit_to_visu: Dictionary = {}
 
+const HexLayoutScript = preload("res://scripts/core/hex_layout.gd")
+
 @onready var units: Node2D = $Units
 @onready var banner: Sprite2D = $Banner
+@onready var shadow: Sprite2D = get_node_or_null("Shadow") as Sprite2D
 var corpses: Node2D
 @onready var idle_tween: Tween
 @onready var active_tween: Tween
@@ -31,8 +34,8 @@ func init(p_legion: Legion, formation_seed: int = -1) -> void:
 	if corpses == null:
 		corpses = Node2D.new()
 		corpses.name = "Corpses"
-		corpses.z_index = units.z_index
 		add_child(corpses)
+		_sync_internal_layers()
 	for unit in legion.units:
 		var unit_visu: UnitVisu = preload("res://scenes/unit.tscn").instantiate()
 		unit_visu.init(unit)
@@ -60,27 +63,28 @@ func _apply_team_banner() -> void:
 	banner.texture = BANNER_TEXTURES[idx]
 	banner.self_modulate = team.color
 	banner.visible = true
-	_sync_banner_depth()
+	_sync_internal_layers()
 
 func _sync_depth_sort() -> void:
-	const HexLayoutScript = preload("res://scripts/core/hex_layout.gd")
-	var base := HexLayoutScript.depth_sort_z(position.y)
-	z_index = base
-	_sync_banner_depth()
+	# Row base only — child layers (shadow/banner/units) stack within the stride.
+	z_index = HexLayoutScript.depth_sort_z(position.y, HexLayoutScript.DEPTH_LAYER_TILE)
+	_sync_internal_layers()
 
-## Own units/corpses draw above this legion's banner. Cross-legion stacking comes
-## from the parent LegionVisu depth z_index (southern/higher Y draws in front).
-func _sync_banner_depth() -> void:
-	if banner == null:
-		return
-	banner.z_as_relative = true
-	banner.z_index = 0
+## Within one hex: tile (sibling) < shadow < banner < units.
+## Cross-hex order comes from the row base on this LegionVisu.
+func _sync_internal_layers() -> void:
+	if shadow:
+		shadow.z_as_relative = true
+		shadow.z_index = HexLayoutScript.DEPTH_LAYER_SHADOW
+	if banner:
+		banner.z_as_relative = true
+		banner.z_index = HexLayoutScript.DEPTH_LAYER_BANNER
 	if units:
 		units.z_as_relative = true
-		units.z_index = 10
+		units.z_index = HexLayoutScript.DEPTH_LAYER_UNITS
 	if corpses:
 		corpses.z_as_relative = true
-		corpses.z_index = 10
+		corpses.z_index = HexLayoutScript.DEPTH_LAYER_UNITS
 
 func _get_formation_scale() -> float:
 	if legion == null:

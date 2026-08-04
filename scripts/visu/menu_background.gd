@@ -2,6 +2,7 @@ class_name MenuBackground
 extends Node2D
 
 const MenuStreamUtils = preload("res://scripts/core/menu_stream_utils.gd")
+const HexLayoutScript = preload("res://scripts/core/hex_layout.gd")
 
 const TEAM_IDS: Array[String] = ["GREEN", "BLUE"]
 
@@ -79,7 +80,9 @@ func _spawn_tile(coords: Vector2i) -> void:
 		coords.x, coords.y, tile_size, tile_size_xy_ratio
 	)
 	tile_visu.position = world_pos
-	tile_visu.z_index = int(world_pos.y / 10.0)
+	tile_visu.z_index = HexLayoutScript.depth_sort_z(
+		world_pos.y, HexLayoutScript.DEPTH_LAYER_TILE
+	)
 	_tiles_container.add_child(tile_visu)
 	tile_visu.init(tile)
 	_configure_decorative_tile(tile_visu)
@@ -110,6 +113,7 @@ func _spawn_decorative_legion(tile: Tile, tile_visu: TileVisu) -> void:
 	_tiles_container.add_child(legion_visu)
 	legion_visu.init(legion)
 	legion_visu.position = tile_visu.position
+	legion_visu._sync_depth_sort()
 	tile.legion = legion
 	tile_visu.legion_visu = legion_visu
 

@@ -8,6 +8,7 @@ const MinigameSessionScript = preload("res://scripts/minigame/minigame_session.g
 const AiDrafter = preload("res://scripts/ai/ai_drafter.gd")
 const TileScript = preload("res://scripts/models/tile.gd")
 const LegionScript = preload("res://scripts/models/legion.gd")
+const HexLayoutScript = preload("res://scripts/core/hex_layout.gd")
 
 func run(_tree: SceneTree) -> bool:
 	if not _test_soft_pathfinding():
@@ -17,6 +18,8 @@ func run(_tree: SceneTree) -> bool:
 	if not _test_greedy_heal_beats_trades():
 		return false
 	if not _test_move_reachability_basic():
+		return false
+	if not _test_depth_layer_order():
 		return false
 	print("Success: Playtest polish (P5–P9 helpers) tests")
 	return true
@@ -131,5 +134,30 @@ func _test_move_reachability_basic() -> bool:
 	var reachable: Array = data["reachable"]
 	if reachable.is_empty():
 		push_error("Expected some reachable tiles with 3 AP")
+		return false
+	return true
+
+func _test_depth_layer_order() -> bool:
+	var y_north := 100.0
+	var y_south := 120.0
+	var north_tile := HexLayoutScript.depth_sort_z(y_north, HexLayoutScript.DEPTH_LAYER_TILE)
+	var north_banner := HexLayoutScript.depth_sort_z(y_north, HexLayoutScript.DEPTH_LAYER_BANNER)
+	var north_units := HexLayoutScript.depth_sort_z(y_north, HexLayoutScript.DEPTH_LAYER_UNITS)
+	var south_tile := HexLayoutScript.depth_sort_z(y_south, HexLayoutScript.DEPTH_LAYER_TILE)
+
+	if not (north_tile < north_banner and north_banner < north_units):
+		push_error("Expected tile < banner < units within a row")
+		return false
+	if north_units >= south_tile:
+		push_error("Southern tile must draw above northern units (iso occlusion)")
+		return false
+	# Relative children: parent at TILE layer + child layer == absolute layer z.
+	var legion_root := HexLayoutScript.depth_sort_z(y_north, HexLayoutScript.DEPTH_LAYER_TILE)
+	var banner_effective := legion_root + HexLayoutScript.DEPTH_LAYER_BANNER
+	if banner_effective != north_banner:
+		push_error("Banner relative stack should match absolute layer z")
+		return false
+	if banner_effective <= north_tile:
+		push_error("Banner must sit above its own tile")
 		return false
 	return true
