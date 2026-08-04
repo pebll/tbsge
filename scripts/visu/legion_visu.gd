@@ -22,6 +22,9 @@ var corpses: Node2D
 
 var current_offset: Vector2 = Vector2(0, 0)
 var _formation_seed: int = 0
+## While tweening a move, depth uses the southernmost Y of the path so the
+## legion stays above destination tiles (old +10 unit bias did this by accident).
+var _move_depth_y: float = INF
 
 const FORMATION_BASE_SPACING := 30.0
 const FORMATION_MAX_RADIUS := 58.0
@@ -66,8 +69,11 @@ func _apply_team_banner() -> void:
 	_sync_internal_layers()
 
 func _sync_depth_sort() -> void:
+	var y := position.y
+	if _move_depth_y < INF:
+		y = maxf(y, _move_depth_y)
 	# Row base only — child layers (shadow/banner/units) stack within the stride.
-	z_index = HexLayoutScript.depth_sort_z(position.y, HexLayoutScript.DEPTH_LAYER_TILE)
+	z_index = HexLayoutScript.depth_sort_z(y, HexLayoutScript.DEPTH_LAYER_TILE)
 	_sync_internal_layers()
 
 ## Within one hex: tile (sibling) < shadow < banner < units.
@@ -215,19 +221,25 @@ func juice_move(target_pos: Vector2) -> Tween:
 	update_local_positions()
 	if move_tween and move_tween.is_valid():
 		move_tween.kill()
+	# Hold the southernmost path depth for the whole slide (see _move_depth_y).
+	_move_depth_y = maxf(position.y, target_pos.y)
+	_sync_depth_sort()
 	move_tween = create_tween()
 	active_tween = move_tween
 	move_tween.set_parallel(true)
 	move_tween.tween_property(self, "position", target_pos, move_time).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
-	# Keep iso depth in sync while Y changes so we don't slide under southern tiles.
 	move_tween.tween_method(_on_move_depth_tick, 0.0, 1.0, move_time)
 	move_tween.set_parallel(false)
-	move_tween.tween_callback(_sync_depth_sort)
+	move_tween.tween_callback(_finish_move_depth)
 	for unit in units.get_children():
 		unit.juice_move(target_pos)
 	return move_tween
 
 func _on_move_depth_tick(_t: float) -> void:
+	_sync_depth_sort()
+
+func _finish_move_depth() -> void:
+	_move_depth_y = INF
 	_sync_depth_sort()
 
 func juice_attack(direction: Vector2) -> void:

@@ -63,7 +63,7 @@ Goal: a friend can launch from **main menu → Play → draft → fight → win/
 - [ ] **End-to-end loop** — game over → rematch or main menu; no dead ends.
 - [ ] **Manual smoke green** — all items in “How manual smoke works” + pause/tooltips/log/heal/teleport checklist (from recent UX work).
 - [ ] **AI completes a full battle** — no soft-lock; human can win and lose.
-- [x] **Draft is understandable** — budget, unit cap, deploy slots, pass/continue; **8 role-distinct units** in the pool (chaff, shield tank, HP wall, long range, short thrower, healer, assassin, AP3 bruiser).
+- [x] **Draft is understandable** — budget, unit cap, deploy slots, pass/continue; **8 role-distinct units** in the pool (chaff, shield tank, HP wall, long range, short spit, healer, assassin, AP3 bruiser).
 - [ ] **Fix doc drift** — `README.md` / `AGENT_NOTES.md` panel + action list match current behavior (select-sticky info, full action set).
 
 ### Should-have (polish)

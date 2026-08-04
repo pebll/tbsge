@@ -160,4 +160,14 @@ func _test_depth_layer_order() -> bool:
 	if banner_effective <= north_tile:
 		push_error("Banner must sit above its own tile")
 		return false
+	# Idle northern units sit under the next southern tile (correct iso).
+	if north_units >= south_tile:
+		push_error("Idle northern units should sit under southern tiles")
+		return false
+	# Southbound move: depth uses max(from,to) Y so the legion clears the dest tile.
+	var move_depth_y := maxf(y_north, y_south)
+	var moving_units := HexLayoutScript.depth_sort_z(move_depth_y, HexLayoutScript.DEPTH_LAYER_UNITS)
+	if moving_units <= south_tile:
+		push_error("Southbound move depth must stay above the destination tile")
+		return false
 	return true

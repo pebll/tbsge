@@ -5,11 +5,11 @@
 [ext_resource type="Resource" path="res://data/units/gargoyle.tres" id="3_gargoyle"]
 [ext_resource type="Resource" path="res://data/units/golem.tres" id="4_golem"]
 [ext_resource type="Resource" path="res://data/units/archer.tres" id="5_archer"]
-[ext_resource type="Resource" path="res://data/units/flame.tres" id="6_flame"]
+[ext_resource type="Resource" path="res://data/units/spider.tres" id="6_spider"]
 [ext_resource type="Resource" path="res://data/units/mage.tres" id="7_mage"]
 [ext_resource type="Resource" path="res://data/units/assassin.tres" id="8_assassin"]
 [ext_resource type="Resource" path="res://data/units/scorpion_rider.tres" id="9_scorpion_rider"]
 
 [resource]
 script = ExtResource("1_db")
-defs = Array[Resource]([ExtResource("2_goblin"), ExtResource("3_gargoyle"), ExtResource("4_golem"), ExtResource("5_archer"), ExtResource("6_flame"), ExtResource("7_mage"), ExtResource("8_assassin"), ExtResource("9_scorpion_rider")])
+defs = Array[Resource]([ExtResource("2_goblin"), ExtResource("3_gargoyle"), ExtResource("4_golem"), ExtResource("5_archer"), ExtResource("6_spider"), ExtResource("7_mage"), ExtResource("8_assassin"), ExtResource("9_scorpion_rider")])
