@@ -46,6 +46,8 @@ const MinigameRulesScript = preload("res://scripts/minigame/minigame_rules.gd")
 @onready var clear_button: GameButton = %ClearButton
 
 var _draft_mode: bool = false
+## Previewing a unit type from the picker (not yet placed) — hide counts / draft +/-.
+var _draft_preview_only: bool = false
 var _draft_unit_type: String = ""
 var _draft_unit_count: int = 0
 var _remaining_budget: int = 0
@@ -206,21 +208,21 @@ func show_legion(legion: Legion) -> void:
 		_set_empty_state()
 		hide()
 		return
+	_draft_preview_only = false
 	set_draft_mode(false)
 	_render_legion(legion)
 	show()
 
 func set_draft_mode(enabled: bool) -> void:
 	_draft_mode = enabled
-	draft_controls.visible = enabled
+	# Preview-only inspect hides placement controls; placed stacks keep them.
+	draft_controls.visible = enabled and not _draft_preview_only
 	if _row_mobility:
 		_row_mobility.visible = not enabled
 	else:
 		ap_stat.visible = not enabled
-	if _actions_block:
-		_actions_block.visible = not enabled
 	if _move_button:
-		_move_button.visible = enabled
+		_move_button.visible = enabled and not _draft_preview_only
 
 func show_draft_legion(
 	legion: Legion,
@@ -232,12 +234,33 @@ func show_draft_legion(
 		_set_empty_state()
 		hide()
 		return
+	_draft_preview_only = false
 	_draft_unit_type = legion.unit_type
 	_draft_unit_count = placement_count if placement_count >= 0 else legion.unit_count
 	_remaining_budget = remaining_budget
 	set_draft_mode(true)
 	_render_legion(legion)
 	_refresh_draft_controls()
+	show()
+
+## Inspect a unit type from the draft picker (right-click). No placement count yet.
+func show_draft_unit_preview(unit_type: String, team_id: String, remaining_budget: int = 0) -> void:
+	if unit_type.is_empty():
+		hide()
+		return
+	var legion := Legion.new(unit_type, 1, Vector2i.ZERO, team_id)
+	_draft_preview_only = true
+	_draft_unit_type = unit_type
+	_draft_unit_count = 1
+	_remaining_budget = remaining_budget
+	set_draft_mode(true)
+	_render_legion(legion)
+	# Hide per-unit roster — nothing placed yet.
+	if _units_header:
+		_units_header.hide()
+	for c in units_list.get_children():
+		c.queue_free()
+	cost_value.text = "Not placed yet — left-click a card to deploy"
 	show()
 
 func show_draft_message(text: String) -> void:
@@ -250,7 +273,7 @@ func _refresh_draft_controls() -> void:
 	var cost := MinigameRulesScript.legion_cost(_draft_unit_type, _draft_unit_count)
 	var fill := MinigameRulesScript.legion_fill(_draft_unit_type, _draft_unit_count)
 	count_value.text = "%d / %d" % [_draft_unit_count, legion_cap]
-	cost_value.text = "Legion cost: %d gold  •  Size %.1f / 12" % [cost, fill]
+	cost_value.text = "Legion cost: %d gold\nSize %.1f / 12 (max %d)" % [cost, fill, legion_cap]
 	min_button.button_disabled = _draft_unit_count <= 1
 	minus_button.button_disabled = _draft_unit_count <= 1
 	plus_button.button_disabled = _draft_unit_count >= affordable_max
@@ -585,7 +608,10 @@ func _render_unit_type_stats(unit0: Unit, unit_type: String) -> void:
 		_update_ranged_stat_rows(null)
 		return
 
-	size_value.text = "%.1f" % def.size
+	size_value.text = "%.1f (max %d)" % [
+		def.size,
+		MinigameRulesScript.max_units_in_legion(def.id),
+	]
 	price_value.text = "%d" % def.price
 	if def.shield > 0:
 		shield_stat.show()
@@ -631,6 +657,7 @@ func _ensure_stat_rows_layout() -> void:
 	_row_vitals = _make_stat_line()
 	_row_damage = _make_stat_line()
 	_row_economy = _make_stat_line()
+	var row_price := _make_stat_line()
 	_row_mobility = _make_stat_line()
 
 	# Row 1: Health, Shield
@@ -638,10 +665,11 @@ func _ensure_stat_rows_layout() -> void:
 	_row_vitals.add_child(shield_stat)
 	# Row 2: Melee, Ranged (ranged added later)
 	_row_damage.add_child(attack_stat)
-	# Row 3: Size, Cost
+	# Row 3: Size
 	_row_economy.add_child(size_stat)
-	_row_economy.add_child(price_stat)
-	# Row 4: AP, Range (range added later)
+	# Row 4: Cost (own line)
+	row_price.add_child(price_stat)
+	# Row 5: AP, Range (range added later)
 	_row_mobility.add_child(ap_stat)
 
 	# Hide the old unit-count chip from the header — count lives above the unit list.
@@ -658,8 +686,10 @@ func _ensure_stat_rows_layout() -> void:
 	header_text.move_child(_row_damage, insert_at + 2)
 	header_text.add_child(_row_economy)
 	header_text.move_child(_row_economy, insert_at + 3)
+	header_text.add_child(row_price)
+	header_text.move_child(row_price, insert_at + 4)
 	header_text.add_child(_row_mobility)
-	header_text.move_child(_row_mobility, insert_at + 4)
+	header_text.move_child(_row_mobility, insert_at + 5)
 
 func _make_stat_line() -> HBoxContainer:
 	var row := HBoxContainer.new()
@@ -734,6 +764,9 @@ func _render_units_header(legion: Legion) -> void:
 	_ensure_units_header()
 	if _units_header == null:
 		return
+	if _draft_preview_only:
+		_units_header.hide()
+		return
 	_units_header.show()
 	_units_header_count.text = str(legion.units.size())
 	var tex: Texture2D = null
@@ -764,10 +797,6 @@ func _ensure_move_button() -> void:
 func _render_actions(legion: Legion) -> void:
 	_ensure_actions_block()
 	if _inspect_action_bar == null:
-		return
-	if _draft_mode:
-		if _actions_block:
-			_actions_block.hide()
 		return
 	_actions_block.show()
 	_inspect_action_bar.set_tooltip_context_legion(legion)

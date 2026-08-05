@@ -4,6 +4,7 @@ extends Control
 const MinigameRulesScript = preload("res://scripts/minigame/minigame_rules.gd")
 
 signal unit_selected(unit_type: String)
+signal unit_inspected(unit_type: String)
 signal cancelled
 
 const COLOR_BG := Color(0.91, 0.86, 0.78)
@@ -12,6 +13,7 @@ const COLOR_TEXT := Color(0.12, 0.10, 0.08)
 const COLOR_BLOCK_BG := Color(0.93, 0.89, 0.82)
 const BORDER_THICK := 4
 const RADIUS := 16
+const ICON_GOLD := preload("res://assets/icons/base_icons_sprites/coin.png")
 
 @onready var grid: GridContainer = %UnitGrid
 @onready var title_label: Label = %TitleLabel
@@ -49,9 +51,16 @@ func _build_cards() -> void:
 	var db: UnitDatabase = load("res://data/unit_db.tres")
 	if db == null:
 		return
+	var defs: Array = []
 	for def in db.defs:
-		if def == null:
-			continue
+		if def != null:
+			defs.append(def)
+	defs.sort_custom(func(a: UnitDefinition, b: UnitDefinition) -> bool:
+		if a.price != b.price:
+			return a.price < b.price
+		return a.display_name < b.display_name
+	)
+	for def in defs:
 		grid.add_child(_build_card(def))
 
 func _build_card(def: UnitDefinition) -> Control:
@@ -67,50 +76,62 @@ func _build_card(def: UnitDefinition) -> Control:
 	sb.corner_radius_top_right = RADIUS
 	sb.corner_radius_bottom_left = RADIUS
 	sb.corner_radius_bottom_right = RADIUS
-	sb.content_margin_left = 14
-	sb.content_margin_right = 14
-	sb.content_margin_top = 14
-	sb.content_margin_bottom = 14
+	sb.content_margin_left = 12
+	sb.content_margin_right = 12
+	sb.content_margin_top = 12
+	sb.content_margin_bottom = 12
 	card.add_theme_stylebox_override("panel", sb)
-	card.custom_minimum_size = Vector2(180, 220)
+	card.custom_minimum_size = Vector2(148, 168)
+	card.tooltip_text = "%s — left-click to place, right-click to inspect" % def.display_name
 
 	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 8)
+	vbox.add_theme_constant_override("separation", 6)
 	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	card.add_child(vbox)
 
 	var icon := TextureRect.new()
-	icon.custom_minimum_size = Vector2(120, 120)
+	icon.custom_minimum_size = Vector2(108, 108)
 	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	icon.texture = def.icon
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	vbox.add_child(icon)
 
-	var name_label := Label.new()
-	name_label.text = def.display_name
-	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	name_label.add_theme_font_size_override("font_size", 22)
-	name_label.add_theme_color_override("font_color", COLOR_TEXT)
-	vbox.add_child(name_label)
+	var cost_row := HBoxContainer.new()
+	cost_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	cost_row.add_theme_constant_override("separation", 4)
+	cost_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var cost := Label.new()
+	cost.text = str(def.price)
+	cost.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	cost.add_theme_font_size_override("font_size", 22)
+	cost.add_theme_color_override("font_color", COLOR_TEXT)
+	cost.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cost_row.add_child(cost)
+	var gold_icon := TextureRect.new()
+	gold_icon.texture = ICON_GOLD
+	gold_icon.custom_minimum_size = Vector2(22, 22)
+	gold_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	gold_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	gold_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cost_row.add_child(gold_icon)
+	vbox.add_child(cost_row)
 
-	var info := Label.new()
-	info.text = "%dg  •  %.1f size  •  max %d" % [
-		def.price,
-		def.size,
-		MinigameRulesScript.max_units_in_legion(def.id),
-	]
-	info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	info.add_theme_font_size_override("font_size", 16)
-	info.add_theme_color_override("font_color", COLOR_TEXT)
-	vbox.add_child(info)
-
-	var btn := Button.new()
-	btn.flat = true
-	btn.set_anchors_preset(Control.PRESET_FULL_RECT)
-	btn.mouse_filter = Control.MOUSE_FILTER_STOP
-	btn.pressed.connect(func(): _on_card_pressed(def.id))
-	card.add_child(btn)
-	btn.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	# Flat overlay catches left/right clicks without blocking layout.
+	var hit := Control.new()
+	hit.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	hit.mouse_filter = Control.MOUSE_FILTER_STOP
+	hit.gui_input.connect(func(event: InputEvent) -> void:
+		if not (event is InputEventMouseButton and event.pressed):
+			return
+		if event.button_index == MOUSE_BUTTON_LEFT:
+			_on_card_pressed(def.id)
+			hit.accept_event()
+		elif event.button_index == MOUSE_BUTTON_RIGHT:
+			unit_inspected.emit(def.id)
+			hit.accept_event()
+	)
+	card.add_child(hit)
 
 	return card
 

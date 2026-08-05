@@ -146,6 +146,13 @@ func handle_unit_picked(unit_type: String) -> void:
 		count = int(existing.get("unit_count", 1))
 	_apply_placement(unit_type, count)
 
+func handle_unit_inspected(unit_type: String) -> void:
+	if unit_type.is_empty():
+		return
+	var draft: Dictionary = deps.session.get_view_state(viewing_team).get("draft", {})
+	var remaining := int(draft.get("remaining_budget", 0))
+	deps.tile_info_panel.show_draft_unit_preview(unit_type, viewing_team, remaining)
+
 func handle_picker_cancelled() -> void:
 	if picker_for_change_type:
 		refresh_view()

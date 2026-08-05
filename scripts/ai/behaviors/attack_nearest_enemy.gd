@@ -9,6 +9,13 @@ const ActionParams = preload("res://scripts/actions/action_params.gd")
 
 static var debug_enabled: bool = false
 
+## Heal only when the stack (or a unit) is this hurt — or when safely far from fights.
+const HEAL_CRITICAL_RATIO := 0.45
+const HEAL_CRITICAL_UNIT_RATIO := 0.35
+const HEAL_SAFE_ENEMY_DISTANCE := 3
+const HEAL_MIN_SCORE_CRITICAL := 1.0
+const HEAL_MIN_SCORE_SAFE := 4.0
+
 static func decide(session: MatchSessionScript, legion: Legion) -> Dictionary:
 	var cmd := _decide_internal(session, legion)
 	if debug_enabled:
@@ -19,7 +26,7 @@ static func sort_actionable_by_enemy_distance(
 	session: MatchSessionScript,
 	actionable: Array[Vector2i]
 ) -> Array[Vector2i]:
-	## Closest to any enemy first; fighters before pure movers; coord tie-break.
+	## Closest engage path first (soft pathfinding), then fighters, then coord tie-break.
 	if actionable.is_empty():
 		return actionable
 	var enemies := _enemy_legions(session, session.turn_manager.active_team_id)
@@ -30,13 +37,13 @@ static func sort_actionable_by_enemy_distance(
 	for coords in actionable:
 		scored.append({
 			"coords": coords,
-			"dist": _min_enemy_distance(coords, enemies),
+			"dist": _min_path_engage_cost(session, coords, enemies),
 			"can_fight": _can_fight_now(session, coords),
 		})
 	scored.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
-		var da: int = int(a["dist"])
-		var db: int = int(b["dist"])
-		if da != db:
+		var da: float = float(a["dist"])
+		var db: float = float(b["dist"])
+		if not is_equal_approx(da, db):
 			return da < db
 		var fa: bool = bool(a["can_fight"])
 		var fb: bool = bool(b["can_fight"])
@@ -56,10 +63,10 @@ static func sort_actionable_by_enemy_distance(
 		var parts: PackedStringArray = []
 		for row in scored:
 			parts.append(
-				"%s(d=%d%s)"
-				% [row["coords"], row["dist"], ",fight" if bool(row["can_fight"]) else ""]
+				"%s(d=%.1f%s)"
+				% [row["coords"], float(row["dist"]), ",fight" if bool(row["can_fight"]) else ""]
 			)
-		print("[AI] Legion order (closest first): %s" % ", ".join(parts))
+		print("[AI] Legion order (path closest first): %s" % ", ".join(parts))
 	return sorted
 
 static func _can_fight_now(session: MatchSessionScript, coords: Vector2i) -> bool:
@@ -71,6 +78,189 @@ static func _can_fight_now(session: MatchSessionScript, coords: Vector2i) -> boo
 	if not session.get_action_targets(legion, "ranged_attack").is_empty():
 		return true
 	return false
+
+## Soft path cost to the nearest stand/engage hex vs any enemy. 0 if already fighting.
+static func _min_path_engage_cost(
+	session: MatchSessionScript,
+	coords: Vector2i,
+	enemies: Array[Legion]
+) -> float:
+	if _can_fight_now(session, coords):
+		return 0.0
+	var legion: Legion = session.get_legion_at(coords)
+	if legion == null:
+		return INF
+	var best := INF
+	for enemy in enemies:
+		if enemy == null or enemy.units.is_empty():
+			continue
+		var goals := _stand_goals(session, legion, enemy)
+		for goal in goals:
+			if goal == coords:
+				return 0.0
+			var path := HexPathfinder.find_path(session.grid, coords, goal, {}, true)
+			if path.size() < 2:
+				continue
+			best = minf(best, _path_soft_cost(session.grid, path))
+	return best
+
+## While threatening: take a 1-step flank that still attacks the same enemy, to unblock allies.
+static func _best_attack_preserving_reposition(
+	session: MatchSessionScript,
+	legion: Legion,
+	enemies: Array[Legion]
+) -> Dictionary:
+	if legion == null or legion.current_ap < 2:
+		return {}
+	if not legion.can_afford(1):
+		return {}
+	if not _team_has_other_ally(session, legion):
+		return {}
+	var threatened := _threatened_enemy_coords(session, legion)
+	if threatened.is_empty():
+		return {}
+
+	var from := legion.tile_coords
+	var movable := session.get_movable_coords(from)
+	var best_to := Vector2i.ZERO
+	var best_score := -INF
+	var found := false
+	for to_coords in movable:
+		# Keep 1 AP for the follow-up attack.
+		if HexPathfinder.hex_distance(from, to_coords) != 1:
+			continue
+		var tile: Tile = session.grid.get(to_coords)
+		if tile == null or not tile.walkable or tile.has_legion():
+			continue
+		if not _still_threatens_from(session, legion, to_coords, threatened):
+			continue
+		var score := float(_empty_neighbor_count(session, to_coords))
+		score += _ally_clearance_bonus(session, legion, to_coords)
+		if _reposition_helps_allies(session, legion, enemies, from, to_coords):
+			score += 4.0
+		if score > best_score:
+			best_score = score
+			best_to = to_coords
+			found = true
+	if not found:
+		return {}
+	return {
+		"type": "use_action",
+		"action_id": "move",
+		"from": from,
+		"to": best_to,
+		"path": [from, best_to],
+		"reason": "flank-reposition to free path @ %s" % best_to,
+	}
+
+static func _team_has_other_ally(session: MatchSessionScript, legion: Legion) -> bool:
+	for other in session.legions:
+		if other != null and other != legion and other.team_id == legion.team_id and not other.units.is_empty():
+			return true
+	return false
+
+static func _threatened_enemy_coords(session: MatchSessionScript, legion: Legion) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for action_id in ["melee_attack", "ranged_attack"]:
+		for to_coords in session.get_action_targets(legion, action_id):
+			if to_coords not in out:
+				out.append(to_coords)
+	return out
+
+static func _still_threatens_from(
+	session: MatchSessionScript,
+	legion: Legion,
+	from_coords: Vector2i,
+	threatened: Array[Vector2i]
+) -> bool:
+	var old := legion.tile_coords
+	var tile_old: Tile = session.grid.get(old)
+	var tile_new: Tile = session.grid.get(from_coords)
+	if tile_new == null or tile_new.has_legion():
+		return false
+	var prev_new = tile_new.legion
+	legion.tile_coords = from_coords
+	if tile_old and tile_old.legion == legion:
+		tile_old.legion = null
+	tile_new.legion = legion
+	var still := false
+	for action_id in ["melee_attack", "ranged_attack"]:
+		for to_coords in session.get_action_targets(legion, action_id):
+			if to_coords in threatened:
+				still = true
+				break
+		if still:
+			break
+	legion.tile_coords = old
+	if tile_old:
+		tile_old.legion = legion
+	tile_new.legion = prev_new
+	return still
+
+## True when at least one ally is farther from the fight (by path) and our hex sits on a soft path.
+static func _reposition_helps_allies(
+	session: MatchSessionScript,
+	legion: Legion,
+	enemies: Array[Legion],
+	from_coords: Vector2i,
+	_to_coords: Vector2i
+) -> bool:
+	if enemies.is_empty():
+		return false
+	var focus: Legion = _pick_focus_enemy(from_coords, enemies)
+	for other in session.legions:
+		if other == null or other == legion or other.team_id != legion.team_id:
+			continue
+		if other.units.is_empty():
+			continue
+		if not session.can_act_legion(other) and other.current_ap <= 0:
+			# Still count waiting rear allies that need the lane next turn.
+			pass
+		var goals := _stand_goals(session, other, focus)
+		for goal in goals:
+			var path := HexPathfinder.find_path(
+				session.grid, other.tile_coords, goal, {}, true
+			)
+			if path.size() < 2:
+				continue
+			if from_coords in path:
+				return true
+	# Also rotate when an ally is bird-adjacent behind us toward the enemy.
+	for adj in Utils.get_surrounding_coords(from_coords):
+		var tile: Tile = session.grid.get(adj)
+		if tile == null or not tile.has_legion():
+			continue
+		var ally: Legion = tile.legion
+		if ally.team_id != legion.team_id or ally == legion:
+			continue
+		var ally_d := HexPathfinder.hex_distance(ally.tile_coords, focus.tile_coords)
+		var my_d := HexPathfinder.hex_distance(from_coords, focus.tile_coords)
+		if ally_d > my_d:
+			return true
+	return false
+
+static func _empty_neighbor_count(session: MatchSessionScript, coords: Vector2i) -> int:
+	var n := 0
+	for adj in Utils.get_surrounding_coords(coords):
+		var tile: Tile = session.grid.get(adj)
+		if tile != null and tile.walkable and not tile.has_legion():
+			n += 1
+	return n
+
+static func _ally_clearance_bonus(
+	session: MatchSessionScript,
+	legion: Legion,
+	coords: Vector2i
+) -> float:
+	var bonus := 0.0
+	for adj in Utils.get_surrounding_coords(coords):
+		var tile: Tile = session.grid.get(adj)
+		if tile == null or not tile.has_legion():
+			continue
+		var other: Legion = tile.legion
+		if other.team_id == legion.team_id and other != legion:
+			bonus -= 1.5
+	return bonus
 
 static func _decide_internal(session: MatchSessionScript, legion: Legion) -> Dictionary:
 	if legion == null:
@@ -84,56 +274,203 @@ static func _decide_internal(session: MatchSessionScript, legion: Legion) -> Dic
 	if enemies.is_empty():
 		return _cmd_pass(legion, "no enemies")
 
-	# Greedy: score combat / heal / teleport; pick best.
+	# 1) If already fighting: sidestep around the enemy when possible so allies can flow in,
+	#    then strike next activation (needs move + attack AP).
+	var reposition := _best_attack_preserving_reposition(session, legion, enemies)
+	if not reposition.is_empty():
+		return reposition
+
+	# 2) Fight now if possible — never blink/heal away from a free attack.
+	var combat := _best_action_of(session, legion, enemies, ["melee_attack", "ranged_attack"])
+	if not combat.is_empty():
+		return combat
+
+	# 3) Critical heal only (low stack / dying unit) — before walking away from a crisis.
+	var critical_heal := _best_justified_heal(session, legion, enemies, true)
+	if not critical_heal.is_empty():
+		return critical_heal
+
+	# 4) Teleport only as an engage: needs leftover AP to strike after blink.
+	if legion.current_ap >= 2:
+		var blink := _best_engage_teleport(session, legion, enemies)
+		if not blink.is_empty():
+			return blink
+
+	# 5) Walk toward focus — prefer closing over bandaging chip damage.
+	if legion.can_afford(1):
+		var focus: Legion = _pick_focus_enemy(legion.tile_coords, enemies)
+		var walk := _plan_walk_toward(session, legion, focus)
+		if walk.is_empty() and enemies.size() > 1:
+			for enemy in _enemies_by_focus(legion.tile_coords, enemies):
+				if enemy == focus:
+					continue
+				walk = _plan_walk_toward(session, legion, enemy)
+				if not walk.is_empty():
+					focus = enemy
+					break
+		if walk.size() >= 2:
+			return {
+				"type": "use_action",
+				"action_id": "move",
+				"from": walk[0],
+				"to": walk[1],
+				"path": walk,
+				"reason": "path toward focus @ %s (%d steps)" % [focus.tile_coords, walk.size() - 1],
+			}
+
+	# 6) Far-from-combat heal (chip OK only when not near the fight).
+	var safe_heal := _best_justified_heal(session, legion, enemies, false)
+	if not safe_heal.is_empty():
+		return safe_heal
+
+	if not legion.can_afford(1):
+		return _cmd_pass(legion, "cannot afford move")
+	return _cmd_pass(legion, "no step toward enemy")
+
+static func _best_action_of(
+	session: MatchSessionScript,
+	legion: Legion,
+	enemies: Array[Legion],
+	action_ids: Array
+) -> Dictionary:
 	var best_score := -INF
 	var best_cmd: Dictionary = {}
-	for action_id in ActionDefs.legion_action_ids(legion):
-		if action_id == "move":
+	for action_id in action_ids:
+		if action_id not in ActionDefs.legion_action_ids(legion):
 			continue
-		var targets := session.get_action_targets(legion, action_id)
+		var targets := session.get_action_targets(legion, String(action_id))
 		for to_coords in targets:
-			var score := AiActionScorer.score_action(session, legion, action_id, to_coords)
-			if action_id in ["melee_attack", "ranged_attack", "teleport"]:
+			var score := AiActionScorer.score_action(session, legion, String(action_id), to_coords)
+			if String(action_id) in ["melee_attack", "ranged_attack"]:
 				score += _focus_bonus_at(session, to_coords, enemies)
 			if score > best_score:
 				best_score = score
 				best_cmd = {
 					"type": "use_action",
-					"action_id": action_id,
+					"action_id": String(action_id),
 					"from": legion.tile_coords,
 					"to": to_coords,
+					"score": score,
 					"reason": "greedy score %.1f (%s -> %s)" % [score, action_id, to_coords],
 				}
+	return best_cmd
 
-	if not best_cmd.is_empty():
-		if String(best_cmd.get("action_id", "")) != "teleport" or best_score >= 0.5:
-			return best_cmd
+## Heal only when critical (require_critical) or safely far from enemies.
+static func _best_justified_heal(
+	session: MatchSessionScript,
+	legion: Legion,
+	enemies: Array[Legion],
+	require_critical: bool
+) -> Dictionary:
+	var heal := _best_action_of(session, legion, enemies, ["self_heal", "heal_ally"])
+	if heal.is_empty():
+		return {}
+	var action_id := String(heal.get("action_id", ""))
+	var to_coords: Vector2i = heal.get("to", legion.tile_coords)
+	var target := _heal_target_legion(session, legion, action_id, to_coords)
+	if target == null:
+		return {}
 
-	if not legion.can_afford(1):
-		return _cmd_pass(legion, "cannot afford move")
+	var critical := _legion_needs_critical_heal(target)
+	var far := _min_enemy_distance(legion.tile_coords, enemies) >= HEAL_SAFE_ENEMY_DISTANCE
+	if require_critical:
+		if not critical:
+			return {}
+	else:
+		# Safe bandage: far from fights, not a crisis already handled above.
+		if not far or critical:
+			return {}
 
-	var focus: Legion = _pick_focus_enemy(legion.tile_coords, enemies)
-	var walk := _plan_walk_toward(session, legion, focus)
-	if walk.is_empty() and enemies.size() > 1:
-		for enemy in _enemies_by_focus(legion.tile_coords, enemies):
-			if enemy == focus:
-				continue
-			walk = _plan_walk_toward(session, legion, enemy)
-			if not walk.is_empty():
-				focus = enemy
-				break
+	var min_score := HEAL_MIN_SCORE_CRITICAL if require_critical else HEAL_MIN_SCORE_SAFE
+	if float(heal.get("score", 0.0)) < min_score:
+		return {}
+	heal["reason"] = (
+		"critical heal %.1f" % float(heal.get("score", 0.0))
+		if require_critical
+		else "safe heal %.1f (enemy dist >= %d)" % [float(heal.get("score", 0.0)), HEAL_SAFE_ENEMY_DISTANCE]
+	)
+	return heal
 
-	if walk.size() < 2:
-		return _cmd_pass(legion, "no step toward enemy @ %s" % focus.tile_coords)
+static func _heal_target_legion(
+	session: MatchSessionScript,
+	caster: Legion,
+	action_id: String,
+	to_coords: Vector2i
+) -> Legion:
+	if action_id == "heal_ally":
+		return session.get_legion_at(to_coords)
+	return caster
 
+static func _legion_needs_critical_heal(legion: Legion) -> bool:
+	if legion == null or legion.units.is_empty():
+		return false
+	var cur := 0.0
+	var mx := 0.0
+	for u in legion.units:
+		if u == null:
+			continue
+		var u_max := float(u.max_health)
+		var u_cur := float(u.current_health)
+		cur += u_cur
+		mx += u_max
+		if u_max > 0.0 and (u_cur / u_max) <= HEAL_CRITICAL_UNIT_RATIO:
+			return true
+	if mx <= 0.0:
+		return false
+	return (cur / mx) <= HEAL_CRITICAL_RATIO
+
+static func _best_engage_teleport(
+	session: MatchSessionScript,
+	legion: Legion,
+	enemies: Array[Legion]
+) -> Dictionary:
+	if "teleport" not in ActionDefs.legion_action_ids(legion):
+		return {}
+	var targets := session.get_action_targets(legion, "teleport")
+	var best_score := -INF
+	var best_to := Vector2i.ZERO
+	var found := false
+	for to_coords in targets:
+		if not _teleport_enables_melee(session, legion, to_coords):
+			continue
+		var score := AiActionScorer.score_action(session, legion, "teleport", to_coords)
+		score += _focus_bonus_at(session, to_coords, enemies)
+		# Mild preference for closing on soft targets already baked into scorer.
+		if score > best_score:
+			best_score = score
+			best_to = to_coords
+			found = true
+	if not found:
+		return {}
 	return {
 		"type": "use_action",
-		"action_id": "move",
-		"from": walk[0],
-		"to": walk[1],
-		"path": walk,
-		"reason": "path toward focus @ %s (%d steps)" % [focus.tile_coords, walk.size() - 1],
+		"action_id": "teleport",
+		"from": legion.tile_coords,
+		"to": best_to,
+		"reason": "engage teleport %.1f -> %s" % [best_score, best_to],
 	}
+
+static func _teleport_enables_melee(
+	session: MatchSessionScript,
+	legion: Legion,
+	to_coords: Vector2i
+) -> bool:
+	var old := legion.tile_coords
+	var tile_old: Tile = session.grid.get(old)
+	var tile_new: Tile = session.grid.get(to_coords)
+	if tile_new == null or tile_new.has_legion():
+		return false
+	var prev_new = tile_new.legion
+	legion.tile_coords = to_coords
+	if tile_old and tile_old.legion == legion:
+		tile_old.legion = null
+	tile_new.legion = legion
+	var melee_targets: Array = session.get_action_targets(legion, "melee_attack")
+	legion.tile_coords = old
+	if tile_old:
+		tile_old.legion = legion
+	tile_new.legion = prev_new
+	return not melee_targets.is_empty()
 
 static func _cmd_pass(legion: Legion, reason: String) -> Dictionary:
 	return {

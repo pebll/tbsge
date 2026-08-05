@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://df82lj2k7w23x"
+
+[deps]
+
+files=["res://data/ai_duel/run_2026-08-05T15-05-13/legions.legion.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/legions.team.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/legions.unit.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/legions.start.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/legions.start.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/legions.start.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/legions.end.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/legions.damage.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/legions.damage.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/legions.team.translation"]
+
+source_file="res://data/ai_duel/run_2026-08-05T15-05-13/legions.csv"
+dest_files=["res://data/ai_duel/run_2026-08-05T15-05-13/legions.legion.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/legions.team.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/legions.unit.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/legions.start.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/legions.start.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/legions.start.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/legions.end.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/legions.damage.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/legions.damage.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/legions.team.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true

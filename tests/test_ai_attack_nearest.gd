@@ -5,6 +5,7 @@ const MinigameConfigScript = preload("res://scripts/minigame/minigame_config.gd"
 const MinigameTestHelpersScript = preload("res://tests/minigame_test_helpers.gd")
 const AttackNearestEnemyBehavior = preload("res://scripts/ai/behaviors/attack_nearest_enemy.gd")
 const HexPathfinder = preload("res://scripts/ai/hex_pathfinder.gd")
+const Utils = preload("res://scripts/core/utils.gd")
 
 func run(_tree: SceneTree) -> bool:
 	if not _test_attacks_adjacent_enemy():
@@ -38,6 +39,14 @@ func run(_tree: SceneTree) -> bool:
 	if not _test_side_step_when_front_ally_blocks_closer():
 		return false
 	if not _test_pass_when_only_useless_lateral_moves():
+		return false
+	if not _test_chip_damage_near_enemy_prefers_move_over_heal():
+		return false
+	if not _test_critical_heal_when_very_low():
+		return false
+	if not _test_activation_order_uses_path_not_bird():
+		return false
+	if not _test_fighter_flank_repositions_for_allies():
 		return false
 	print("Success: AI attack-nearest tests")
 	return true
@@ -725,3 +734,146 @@ func _test_pass_when_only_useless_lateral_moves() -> bool:
 		return true
 	push_error("Expected PASS or non-worsening move, got %s" % cmd)
 	return false
+
+## Light wounds near an enemy must walk/engage, not self-heal.
+func _test_chip_damage_near_enemy_prefers_move_over_heal() -> bool:
+	var session := MinigameTestHelpersScript.prepare_session()
+	var legions: Dictionary = _start_battle_with_legions(session, Vector2i.ZERO, Vector2i.ZERO)
+	var green: Legion = legions["a"]
+	var blue: Legion = legions["b"]
+	_teleport_legion(session, green, Vector2i(0, -2))
+	_teleport_legion(session, blue, Vector2i(2, -2))
+	# ~75% HP — not critical, but enough missing that the old AI would heal.
+	for u in green.units:
+		u.current_health = maxi(1, int(ceil(float(u.max_health) * 0.75)))
+	green.refresh_ap()
+	var cmd: Dictionary = AttackNearestEnemyBehavior.decide(session, green)
+	if String(cmd.get("action_id", "")) == "self_heal":
+		push_error("Chip damage near enemy should not self-heal, got %s" % cmd)
+		return false
+	if cmd.get("type") != "use_action" or cmd.get("action_id") != "move":
+		push_error("Expected move toward enemy instead of heal, got %s" % cmd)
+		return false
+	return true
+
+## Very low HP may self-heal even with enemies nearby (no attack in range).
+func _test_critical_heal_when_very_low() -> bool:
+	var session := MinigameTestHelpersScript.prepare_session()
+	var legions: Dictionary = _start_battle_with_legions(session, Vector2i.ZERO, Vector2i.ZERO)
+	var green: Legion = legions["a"]
+	var blue: Legion = legions["b"]
+	_teleport_legion(session, green, Vector2i(0, -2))
+	_teleport_legion(session, blue, Vector2i(2, -2))
+	for u in green.units:
+		u.current_health = maxi(1, int(ceil(float(u.max_health) * 0.25)))
+	green.refresh_ap()
+	var cmd: Dictionary = AttackNearestEnemyBehavior.decide(session, green)
+	if cmd.get("type") != "use_action" or cmd.get("action_id") != "self_heal":
+		push_error("Critical HP should self-heal, got %s" % cmd)
+		return false
+	return true
+
+## Bird-close but soft-blocked should activate after a unit with a clear engage path.
+func _test_activation_order_uses_path_not_bird() -> bool:
+	var session := MinigameTestHelpersScript.prepare_session()
+	var started: Dictionary = MinigameTestHelpersScript.start_two_legion_battle(session)
+	var blocked: Legion = started["a"]
+	var enemy: Legion = started["b"]
+	var team_a: String = started["team_a"]
+
+	var enemy_coords := Vector2i(2, 0)
+	var blocked_coords := Vector2i(0, 0)
+	var clear_coords := Vector2i(0, 2)
+	var wall_a := Vector2i(1, 0)
+	var wall_b := Vector2i(1, -1)
+	var wall_c := Vector2i(1, 1)
+	for c in [enemy_coords, blocked_coords, clear_coords, wall_a, wall_b, wall_c]:
+		if session.grid.get(c) == null:
+			return true
+
+	for c in [blocked.tile_coords, enemy.tile_coords]:
+		if session.grid.get(c):
+			session.grid[c].legion = null
+	_teleport_legion(session, enemy, enemy_coords)
+	_teleport_legion(session, blocked, blocked_coords)
+
+	# Ally wall plugs the short corridor so bird-close unit has a long soft path.
+	for wc in [wall_a, wall_b, wall_c]:
+		var wall := Legion.new("GOBLIN", 1, wc, team_a)
+		session.grid[wc].legion = wall
+		session.legions.append(wall)
+
+	var clear := Legion.new("GOBLIN", 1, clear_coords, team_a)
+	session.grid[clear_coords].legion = clear
+	session.legions.append(clear)
+	blocked.refresh_ap()
+	clear.refresh_ap()
+	session.turn_manager.waited_coords.clear()
+
+	var d_bird_blocked := HexPathfinder.hex_distance(blocked_coords, enemy_coords)
+	var d_bird_clear := HexPathfinder.hex_distance(clear_coords, enemy_coords)
+	if d_bird_blocked >= d_bird_clear:
+		# Geometry didn't give the intended bird vs path contrast.
+		return true
+
+	var ordered := AttackNearestEnemyBehavior.sort_actionable_by_enemy_distance(
+		session, [blocked_coords, clear_coords]
+	)
+	if ordered.is_empty() or ordered[0] != clear_coords:
+		push_error(
+			"Path-closer unit should activate first (bird blocked=%d clear=%d), got %s"
+			% [d_bird_blocked, d_bird_clear, ordered]
+		)
+		return false
+	return true
+
+## Adjacent fighter with AP left should flank-step so a rear ally can advance.
+func _test_fighter_flank_repositions_for_allies() -> bool:
+	var session := MinigameTestHelpersScript.prepare_session()
+	var started: Dictionary = MinigameTestHelpersScript.start_two_legion_battle(session)
+	var fighter: Legion = started["a"]
+	var enemy: Legion = started["b"]
+	var team_a: String = started["team_a"]
+
+	var enemy_coords := Vector2i(1, 0)
+	var fight_coords := Vector2i(0, 0)
+	var rear_coords := Vector2i(-1, 0)
+	for c in [enemy_coords, fight_coords, rear_coords]:
+		if session.grid.get(c) == null:
+			return true
+
+	for c in [fighter.tile_coords, enemy.tile_coords]:
+		if session.grid.get(c):
+			session.grid[c].legion = null
+	_teleport_legion(session, enemy, enemy_coords)
+	_teleport_legion(session, fighter, fight_coords)
+	var rear := Legion.new("GOBLIN", 1, rear_coords, team_a)
+	session.grid[rear_coords].legion = rear
+	session.legions.append(rear)
+	fighter.max_ap = 2
+	fighter.current_ap = 2
+	rear.refresh_ap()
+	session.turn_manager.waited_coords.clear()
+
+	var cmd: Dictionary = AttackNearestEnemyBehavior.decide(session, fighter)
+	if cmd.get("type") != "use_action" or cmd.get("action_id") != "move":
+		# If map has no free flank hex that still attacks, accept melee as fallback.
+		if cmd.get("action_id") == "melee_attack":
+			var flank_exists := false
+			for adj in Utils.get_surrounding_coords(enemy_coords):
+				if adj == fight_coords:
+					continue
+				var tile: Tile = session.grid.get(adj)
+				if tile != null and tile.walkable and not tile.has_legion():
+					if HexPathfinder.hex_distance(fight_coords, adj) == 1:
+						flank_exists = true
+						break
+			if not flank_exists:
+				return true
+		push_error("Expected flank reposition move before attack, got %s" % cmd)
+		return false
+	var to_coords: Vector2i = cmd.get("to")
+	if HexPathfinder.hex_distance(to_coords, enemy_coords) != 1:
+		push_error("Flank step must stay adjacent to enemy, got %s" % to_coords)
+		return false
+	return true

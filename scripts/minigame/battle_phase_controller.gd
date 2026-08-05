@@ -6,6 +6,7 @@ const AttackNearestEnemyBehavior = preload("res://scripts/ai/behaviors/attack_ne
 const BattleInputLockScript = preload("res://scripts/battle/battle_input_lock.gd")
 const BattleHostWiringScript = preload("res://scripts/battle/battle_host_wiring.gd")
 const BattleActionLogFormatterScript = preload("res://scripts/battle/battle_action_log_formatter.gd")
+const MatchBattleStats = preload("res://scripts/battle/match_battle_stats.gd")
 
 const AI_LEGION_DELAY := 0.5
 
@@ -14,6 +15,7 @@ signal ai_turn_finished
 var deps: MinigamePhaseDeps
 var ai_running: bool = false
 var _lock: BattleInputLockScript = BattleInputLockScript.new()
+var battle_stats: MatchBattleStats = MatchBattleStats.new()
 
 func _init(phase_deps: MinigamePhaseDeps) -> void:
 	deps = phase_deps
@@ -26,6 +28,8 @@ func enter() -> void:
 	deps.turn_hud.show_active_team(deps.session.turn_manager.active_team_id)
 	if deps.action_log_panel:
 		deps.action_log_panel.enter_battle(deps.session.action_log)
+	battle_stats = MatchBattleStats.new()
+	battle_stats.begin(deps.session)
 	_log_battle_opening_turn()
 	maybe_start_ai_turn()
 
@@ -178,6 +182,8 @@ func _perform_use_action_unlocked(
 			)
 		return result
 
+	battle_stats.record_apply(result)
+
 	await deps.action_runner.play_result(
 		deps.host,
 		deps.session,
@@ -216,7 +222,10 @@ func check_match_end() -> void:
 		deps.action_bar.hide()
 	if deps.action_log_panel:
 		deps.action_log_panel.exit_battle()
-	deps.game_over_panel.show_for_winner(deps.session.winner)
+	var report: Dictionary = {}
+	if battle_stats != null:
+		report = battle_stats.build_report(deps.session.winner)
+	deps.game_over_panel.show_for_winner(deps.session.winner, report)
 
 func inspect_tile(coords: Vector2i) -> void:
 	if not deps.tile_info_panel:
@@ -246,6 +255,7 @@ func _maybe_show_hotseat_pass() -> bool:
 func _run_ai_turn_async() -> void:
 	ai_running = true
 	deps.battle_ui.deselect()
+	var prefer_coords := Vector2i(2147483646, 2147483646)
 	while (
 		deps.session.phase == MinigameSessionScript.Phase.BATTLE
 		and deps.is_ai_team(deps.session.turn_manager.active_team_id)
@@ -266,13 +276,17 @@ func _run_ai_turn_async() -> void:
 				deps.presenter.sync_spent_visuals(deps.session)
 			break
 
+		# After teleport/move, finish that legion's remaining AP before switching.
 		var coords: Vector2i = actionable[0]
+		if prefer_coords in actionable:
+			coords = prefer_coords
 		var legion: Legion = deps.session.get_legion_at(coords)
 		if legion == null:
 			if AttackNearestEnemyBehavior.debug_enabled:
 				print("[AI] stale legion slot @ %s, skipping" % coords)
 			deps.session.pass_legion_or_force_wait(coords)
 			deps.presenter.sync_spent_visuals(deps.session)
+			prefer_coords = Vector2i(2147483646, 2147483646)
 			await deps.host.get_tree().create_timer(AI_LEGION_DELAY).timeout
 			continue
 
@@ -297,9 +311,14 @@ func _run_ai_turn_async() -> void:
 						print("[AI] action failed for %s @ %s, passing legion" % [legion.team_id, coords])
 					deps.session.pass_legion_or_force_wait(legion.tile_coords)
 					deps.presenter.sync_spent_visuals(deps.session)
+					prefer_coords = Vector2i(2147483646, 2147483646)
+				else:
+					# Stick to this legion so teleport can be followed by melee.
+					prefer_coords = legion.tile_coords
 			_:
 				deps.session.pass_legion_or_force_wait(coords)
 				deps.presenter.sync_spent_visuals(deps.session)
+				prefer_coords = Vector2i(2147483646, 2147483646)
 
 		await deps.host.get_tree().create_timer(AI_LEGION_DELAY).timeout
 		if deps.session.phase == MinigameSessionScript.Phase.ENDED:

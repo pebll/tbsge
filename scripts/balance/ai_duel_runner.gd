@@ -8,6 +8,7 @@ const AiDuelReport = preload("res://scripts/balance/ai_duel_report.gd")
 const AttackNearestEnemyBehavior = preload("res://scripts/ai/behaviors/attack_nearest_enemy.gd")
 const CombatResolver = preload("res://scripts/core/combat_resolver.gd")
 const MapBuilderScript = preload("res://scripts/minigame/map_builder.gd")
+const MatchBattleStats = preload("res://scripts/battle/match_battle_stats.gd")
 const MinigameConfigScript = preload("res://scripts/minigame/minigame_config.gd")
 const MinigameSessionScript = preload("res://scripts/minigame/minigame_session.gd")
 const MinigameRulesScript = preload("res://scripts/minigame/minigame_rules.gd")
@@ -128,7 +129,8 @@ static func run_one(game_index: int, map_size: int, budget: int) -> Dictionary:
 	if session.phase != MinigameSessionScript.Phase.BATTLE:
 		return empty
 
-	var tracker := _begin_legion_tracker(session)
+	var tracker := MatchBattleStats.new()
+	tracker.begin(session)
 	var combat_rng := RandomNumberGenerator.new()
 	combat_rng.seed = combat_seed
 
@@ -167,7 +169,7 @@ static func run_one(game_index: int, map_size: int, budget: int) -> Dictionary:
 				if apply_cmd["action_id"] in ["melee_attack", "ranged_attack"]:
 					apply_cmd["rng_seed"] = combat_rng.randi()
 				var step: Dictionary = session.apply(apply_cmd)
-				_record_combat_from_result(tracker, step)
+				tracker.record_apply(step)
 				if not step.get("ok", false):
 					session.pass_legion_or_force_wait(coords)
 			_:
@@ -179,7 +181,7 @@ static func run_one(game_index: int, map_size: int, budget: int) -> Dictionary:
 	var winner := session.winner if not timed_out else ""
 	var survivors_green := MinigameRulesScript.count_living_units(session.legions, "GREEN")
 	var survivors_blue := MinigameRulesScript.count_living_units(session.legions, "BLUE")
-	var legion_rows := _finalize_legion_rows(tracker, game_index, winner)
+	var legion_rows := tracker.legion_rows_for_csv(game_index, winner)
 
 	return {
 		"winner": winner,
@@ -233,67 +235,6 @@ static func _empty_result(game_index: int, map_size: int, budget: int) -> Dictio
 			"blue_draft": "",
 		},
 	}
-
-static func _begin_legion_tracker(session: MinigameSessionScript) -> Dictionary:
-	var tracks: Array = []
-	var by_legion: Dictionary = {}
-	var seq := 0
-	for legion in session.legions:
-		seq += 1
-		var track := {
-			"legion": legion,
-			"legion_id": "%s_%d" % [legion.team_id, seq],
-			"team": legion.team_id,
-			"unit_type": legion.unit_type,
-			"start_coords": legion.tile_coords,
-			"start_units": legion.units.size(),
-			"damage_dealt": 0.0,
-			"damage_received": 0.0,
-		}
-		tracks.append(track)
-		by_legion[legion] = track
-	return {"tracks": tracks, "by_legion": by_legion}
-
-static func _record_combat_from_result(tracker: Dictionary, result: Dictionary) -> void:
-	if not result.get("ok", false):
-		return
-	var events: Array = result.get("events", [])
-	if not ("combat_resolved" in events):
-		return
-	var combat: Dictionary = result.get("payload", {}).get("combat", {})
-	var by_legion: Dictionary = tracker.get("by_legion", {})
-	for hit in combat.get("hits", []):
-		if not (hit is Dictionary):
-			continue
-		var hp_lost := float(hit.get("hp_lost", 0.0))
-		var attacker: Legion = hit.get("attacker_legion", null)
-		var defender: Legion = hit.get("defender_legion", null)
-		if attacker != null and by_legion.has(attacker):
-			by_legion[attacker]["damage_dealt"] = float(by_legion[attacker]["damage_dealt"]) + hp_lost
-		if defender != null and by_legion.has(defender):
-			by_legion[defender]["damage_received"] = float(by_legion[defender]["damage_received"]) + hp_lost
-
-static func _finalize_legion_rows(tracker: Dictionary, game_index: int, winner: String) -> Array:
-	var out: Array = []
-	for track in tracker.get("tracks", []):
-		var legion: Legion = track.get("legion", null)
-		var end_units := 0
-		if legion != null and legion.units.size() > 0:
-			end_units = legion.units.size()
-		var team: String = String(track.get("team", ""))
-		out.append({
-			"game_id": game_index + 1,
-			"legion_id": track.get("legion_id", ""),
-			"team": team,
-			"unit_type": track.get("unit_type", ""),
-			"start_coords": track.get("start_coords", Vector2i.ZERO),
-			"start_units": int(track.get("start_units", 0)),
-			"end_units": end_units,
-			"damage_dealt": float(track.get("damage_dealt", 0.0)),
-			"damage_received": float(track.get("damage_received", 0.0)),
-			"team_won": not winner.is_empty() and team == winner,
-		})
-	return out
 
 static func _draft_summary(session: MinigameSessionScript, team_id: String) -> String:
 	var draft = session.drafts.get(team_id)

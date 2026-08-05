@@ -166,6 +166,7 @@ func _setup_battle_context() -> void:
 func _connect_phase_signals() -> void:
 	_setup_panel.ready_pressed.connect(func() -> void: draft.handle_ready())
 	_unit_picker.unit_selected.connect(func(unit_type: String) -> void: draft.handle_unit_picked(unit_type))
+	_unit_picker.unit_inspected.connect(func(unit_type: String) -> void: draft.handle_unit_inspected(unit_type))
 	_unit_picker.cancelled.connect(func() -> void: draft.handle_picker_cancelled())
 	_turn_hud.next_turn_pressed.connect(func() -> void: battle.handle_end_turn())
 	_tile_info_panel.draft_count_min_pressed.connect(func() -> void: draft.handle_count_min())
