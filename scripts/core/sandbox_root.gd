@@ -69,6 +69,8 @@ func _ready() -> void:
 	_setup_combat_fx_ui()
 	_setup_turn_hud()
 	EventBus.legion_ap_changed.connect(_on_legion_ap_changed)
+	if not EventBus.unit_vitals_fx.is_connected(_on_unit_vitals_fx):
+		EventBus.unit_vitals_fx.connect(_on_unit_vitals_fx)
 
 func _exit_tree() -> void:
 	if battle_ui:
@@ -223,6 +225,10 @@ func _on_legion_ap_changed(legion: Legion) -> void:
 	var tile: Tile = session.grid.get(legion.tile_coords)
 	if tile and tile.has_legion():
 		tile_info_panel.show_tile(tile)
+
+func _on_unit_vitals_fx(unit: Unit, hp: float, shield: float) -> void:
+	if tile_info_panel and tile_info_panel.visible:
+		tile_info_panel.apply_unit_vitals_fx(unit, hp, shield)
 
 func _setup_turn_hud() -> void:
 	if not tile_info_layer:

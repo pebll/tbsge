@@ -5,6 +5,7 @@ const MinigameSessionScript = preload("res://scripts/minigame/minigame_session.g
 const AttackNearestEnemyBehavior = preload("res://scripts/ai/behaviors/attack_nearest_enemy.gd")
 const BattleInputLockScript = preload("res://scripts/battle/battle_input_lock.gd")
 const BattleHostWiringScript = preload("res://scripts/battle/battle_host_wiring.gd")
+const BattleActionLogFormatterScript = preload("res://scripts/battle/battle_action_log_formatter.gd")
 
 const AI_LEGION_DELAY := 0.5
 
@@ -25,7 +26,22 @@ func enter() -> void:
 	deps.turn_hud.show_active_team(deps.session.turn_manager.active_team_id)
 	if deps.action_log_panel:
 		deps.action_log_panel.enter_battle(deps.session.action_log)
+	_log_battle_opening_turn()
 	maybe_start_ai_turn()
+
+func _log_battle_opening_turn() -> void:
+	if deps.session == null or deps.session.action_log == null:
+		return
+	# Avoid duplicate if rematch somehow already logged turn 1.
+	for entry in deps.session.action_log.entries:
+		if String(entry.get("action_id", "")) == "turn_start" and int(entry.get("turn", 0)) == 1:
+			return
+	var team := deps.session.turn_manager.active_team_id
+	var turn_no := deps.session.turn_manager.turn_index
+	deps.session.action_log.append(
+		BattleActionLogFormatterScript.from_turn_start(deps.session, team, turn_no)
+	)
+	EventBus.battle_log_entry_added.emit(deps.session.action_log.latest())
 
 func exit() -> void:
 	deps.turn_hud.hide()

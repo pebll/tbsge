@@ -71,26 +71,26 @@ static func from_pass_legion(session: MatchSession, coords: Vector2i) -> Diction
 	_fill_numeric_fields(entry, "pass", ["legion_passed"], {}, legion, null)
 	return entry
 
-static func from_end_turn(
-	session: MatchSession,
-	ending_team: String,
-	ending_turn: int,
-	next_team: String
+static func from_turn_start(
+	_session: MatchSession,
+	team_id: String,
+	global_turn_index: int
 ) -> Dictionary:
-	var turn_no := ending_turn + 1
-	var name := _team_label(next_team)
+	var team_turn := team_turn_number(global_turn_index)
+	var name := _team_label(team_id)
+	var summary := "Turn start: %s's Turn %d" % [name, team_turn]
 	return {
-		"turn": turn_no,
-		"team": next_team,
-		"action_id": "end_turn",
+		"turn": team_turn,
+		"team": team_id,
+		"action_id": "turn_start",
 		"from": Vector2i.ZERO,
 		"to": Vector2i.ZERO,
 		"caster_summary": name,
 		"target_summary": "",
-		"result_summary": "%s's Turn %d" % [name, turn_no],
+		"result_summary": summary,
 		"caster_unit_type": "",
 		"target_unit_type": "",
-		"caster_team_id": next_team,
+		"caster_team_id": team_id,
 		"target_team_id": "",
 		"caster_hp_lost": 0,
 		"caster_deaths": 0,
@@ -102,12 +102,24 @@ static func from_end_turn(
 		"show_coords": false,
 		"coord_text": "",
 		"payload": {
-			"active_team": next_team,
-			"ending_team": ending_team,
-			"ending_turn": ending_turn,
-			"turn": turn_no,
+			"active_team": team_id,
+			"turn": team_turn,
+			"global_turn": global_turn_index,
 		},
 	}
+
+## Per-side turn count: 1,1,2,2,... from the global turn index (1-based).
+static func team_turn_number(global_turn_index: int) -> int:
+	return maxi(1, int(ceili(float(global_turn_index) / 2.0)))
+
+## Kept for call sites that still pass ending-team context; logs the *next* turn start.
+static func from_end_turn(
+	session: MatchSession,
+	_ending_team: String,
+	ending_turn: int,
+	next_team: String
+) -> Dictionary:
+	return from_turn_start(session, next_team, ending_turn + 1)
 
 static func _fill_numeric_fields(
 	entry: Dictionary,
@@ -222,7 +234,7 @@ static func _target_summary_for_action(
 	payload: Dictionary,
 	events: Array
 ) -> String:
-	if action_id in ["self_heal", "pass", "end_turn"]:
+	if action_id in ["self_heal", "pass", "end_turn", "turn_start"]:
 		return ""
 	if "combat_resolved" in events:
 		var combat: Dictionary = payload.get("combat", {})
@@ -261,8 +273,8 @@ static func _result_summary_for_action(action_id: String, payload: Dictionary, e
 		return _combat_result_summary(payload.get("combat", {}))
 	if action_id == "pass":
 		return "waited"
-	if action_id == "end_turn":
-		return "turn ended"
+	if action_id == "end_turn" or action_id == "turn_start":
+		return "turn start"
 	return action_id
 
 static func _combat_defender_legion(combat: Dictionary, caster: Legion) -> Legion:

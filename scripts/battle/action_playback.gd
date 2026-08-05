@@ -208,6 +208,13 @@ func _apply_defender_reaction(
 			float(def_unit.max_health),
 			shield_absorbed
 		)
+		EventBus.unit_vitals_fx.emit(
+			def_unit,
+			def_hp_after,
+			float(def_unit.shield_remaining)
+		)
+	else:
+		EventBus.unit_vitals_fx.emit(def_unit, 0.0, 0.0)
 	return died_on_hit
 
 func play_heal(coords: Vector2i, payload: Dictionary, options: Dictionary = {}) -> void:
@@ -244,6 +251,11 @@ func play_heal(coords: Vector2i, payload: Dictionary, options: Dictionary = {}) 
 			float(entry.get("hp_before", 0)),
 			float(entry.get("hp_after", 0)),
 			float(unit.max_health)
+		)
+		EventBus.unit_vitals_fx.emit(
+			unit,
+			float(entry.get("hp_after", unit.current_health)),
+			float(unit.shield_remaining)
 		)
 		AudioManager.play_heal_sfx()
 		if heal_tween:

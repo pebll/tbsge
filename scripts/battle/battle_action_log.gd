@@ -31,7 +31,7 @@ func is_entry_visible(entry: Dictionary) -> bool:
 		or result_summary in ["moved", "swapped"]
 	):
 		return GameSettings.show_battle_log_moves
-	if action_id == "end_turn":
+	if action_id == "end_turn" or action_id == "turn_start":
 		return GameSettings.show_battle_log_end_turns
 	return true
 

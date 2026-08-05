@@ -26,7 +26,7 @@ func sync_from_settings() -> void:
 	if _moves_btn == null:
 		return
 	_moves_btn.text = _on_off_label("Show moves", GameSettings.show_battle_log_moves)
-	_end_turns_btn.text = _on_off_label("Show end turns", GameSettings.show_battle_log_end_turns)
+	_end_turns_btn.text = _on_off_label("Show turn starts", GameSettings.show_battle_log_end_turns)
 	_ai_debug_btn.text = _on_off_label("AI debug", GameSettings.is_ai_debug_enabled())
 
 func _build() -> void:
@@ -38,7 +38,7 @@ func _build() -> void:
 	add_child(title)
 
 	_moves_btn = _make_button("Show moves: OFF")
-	_end_turns_btn = _make_button("Show end turns: OFF")
+	_end_turns_btn = _make_button("Show turn starts: OFF")
 	_ai_debug_btn = _make_button("AI debug: OFF")
 	_back_btn = _make_button("Back")
 

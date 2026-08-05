@@ -161,8 +161,10 @@ func _build() -> void:
 
 	var title := Label.new()
 	title.text = "Battle log"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title.add_theme_color_override("font_color", COLOR_TEXT)
-	title.add_theme_font_size_override("font_size", 22)
+	title.add_theme_font_size_override("font_size", 28)
 	_header.add_child(title)
 
 	_scroll = ScrollContainer.new()
@@ -257,7 +259,7 @@ func _is_visible(entry: Dictionary) -> bool:
 		or result_summary in ["moved", "swapped"]
 	):
 		return GameSettings.show_battle_log_moves
-	if action_id == "end_turn":
+	if action_id == "end_turn" or action_id == "turn_start":
 		return GameSettings.show_battle_log_end_turns
 	return true
 
@@ -299,8 +301,8 @@ func _apply_toggle_chrome(expanded: bool) -> void:
 func _add_entry_row(entry: Dictionary, animate: bool = false) -> void:
 	if _list == null or entry.is_empty():
 		return
-	if String(entry.get("action_id", "")) == "end_turn":
-		_add_end_turn_banner(entry, animate)
+	if String(entry.get("action_id", "")) in ["end_turn", "turn_start"]:
+		_add_turn_start_banner(entry, animate)
 		return
 
 	var caster_team := String(entry.get("caster_team_id", entry.get("team", "")))
@@ -393,8 +395,8 @@ func _juice_card_in(card: Control) -> void:
 		return
 	UiTheme.juice_pop_in(card, 0.13)
 
-## Thin turn separator: "{Name}'s Turn {n}" in the active team's color.
-func _add_end_turn_banner(entry: Dictionary, animate: bool = false) -> void:
+## Thin turn separator: full team-color bar like the turn HUD header.
+func _add_turn_start_banner(entry: Dictionary, animate: bool = false) -> void:
 	var team_id := String(entry.get("caster_team_id", entry.get("team", "")))
 	var payload: Dictionary = entry.get("payload", {})
 	if team_id.is_empty():
@@ -403,29 +405,30 @@ func _add_end_turn_banner(entry: Dictionary, animate: bool = false) -> void:
 	if label_text.is_empty():
 		var name := GameSettings.display_name_for_team(team_id)
 		var turn_no := int(entry.get("turn", payload.get("turn", 0)))
-		label_text = "%s's Turn %d" % [name, turn_no]
+		label_text = "Turn start: %s's Turn %d" % [name, turn_no]
 
+	var accent := _team_color(team_id)
 	var card := PanelContainer.new()
-	card.custom_minimum_size = Vector2(0, TURN_BANNER_HEIGHT)
+	card.custom_minimum_size = Vector2(0, TURN_BANNER_HEIGHT + 4)
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
 	card.tooltip_text = "Right-click to inspect"
 
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(COLOR_CARD_BG.r, COLOR_CARD_BG.g, COLOR_CARD_BG.b, 0.72)
+	sb.bg_color = accent
 	sb.border_color = COLOR_BORDER
 	sb.border_width_left = 2
 	sb.border_width_right = 2
-	sb.border_width_top = 1
-	sb.border_width_bottom = 1
-	sb.corner_radius_top_left = 8
-	sb.corner_radius_top_right = 8
-	sb.corner_radius_bottom_left = 8
-	sb.corner_radius_bottom_right = 8
-	sb.content_margin_left = 10
-	sb.content_margin_right = 10
-	sb.content_margin_top = 4
-	sb.content_margin_bottom = 4
+	sb.border_width_top = 2
+	sb.border_width_bottom = 2
+	sb.corner_radius_top_left = 10
+	sb.corner_radius_top_right = 10
+	sb.corner_radius_bottom_left = 10
+	sb.corner_radius_bottom_right = 10
+	sb.content_margin_left = 12
+	sb.content_margin_right = 12
+	sb.content_margin_top = 6
+	sb.content_margin_bottom = 6
 	card.add_theme_stylebox_override("panel", sb)
 
 	var label := Label.new()
@@ -433,8 +436,8 @@ func _add_end_turn_banner(entry: Dictionary, animate: bool = false) -> void:
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	label.add_theme_font_size_override("font_size", 18)
-	label.add_theme_color_override("font_color", _team_color(team_id))
+	label.add_theme_font_size_override("font_size", 20)
+	label.add_theme_color_override("font_color", _contrasting_on_team(accent))
 	card.add_child(label)
 
 	var captured: Dictionary = entry.duplicate(true)
@@ -448,6 +451,9 @@ func _add_end_turn_banner(entry: Dictionary, animate: bool = false) -> void:
 		card.modulate.a = 0.0
 		card.scale = Vector2(0.96, 0.88)
 		call_deferred("_juice_card_in", card)
+
+func _contrasting_on_team(bg: Color) -> Color:
+	return Color.WHITE if bg.get_luminance() < 0.45 else COLOR_TEXT
 
 func _make_banner_cap(team_id: String, left_side: bool) -> PanelContainer:
 	var cap := PanelContainer.new()
@@ -604,8 +610,8 @@ func _action_label(action_id: String) -> String:
 		return ""
 	if action_id == "pass":
 		return "Wait"
-	if action_id == "end_turn":
-		return "End turn"
+	if action_id == "end_turn" or action_id == "turn_start":
+		return "Turn"
 	var def: ActionDefinition = ActionDefs.get_def(action_id)
 	if def:
 		return def.display_name
@@ -614,7 +620,7 @@ func _action_label(action_id: String) -> String:
 func _action_icon(action_id: String) -> Texture2D:
 	if action_id == "pass":
 		return ICON_WAIT
-	if action_id == "end_turn":
+	if action_id == "end_turn" or action_id == "turn_start":
 		return ICON_END_TURN
 	var def: ActionDefinition = ActionDefs.get_def(action_id)
 	if def and def.icon:
@@ -655,7 +661,7 @@ func _inspect_entry(entry: Dictionary, control: Control) -> void:
 		return
 	var action_id := String(entry.get("action_id", "Event"))
 	var content := TooltipContent.new()
-	if action_id == "end_turn":
+	if action_id == "end_turn" or action_id == "turn_start":
 		content.title = String(entry.get("result_summary", "Turn"))
 		content.icon = null
 		content.body = "Whose turn it is now."
