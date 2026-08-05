@@ -319,6 +319,10 @@ func _dispatch_click(coords: Vector2i) -> void:
 			)
 			_pending_move_active = false
 			_execute_move_path(path)
+		else:
+			# Clicked outside the first-step choices — cancel the pending move.
+			_pending_move_active = false
+			deselect()
 		return
 
 	if has_selected and selected_action:

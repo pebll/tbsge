@@ -146,7 +146,7 @@ static func _adjacent_move_targets(
 	state: BattleStateScript,
 	from_coords: Vector2i,
 	team_id: String,
-	mover_start: Vector2i
+	_mover_start: Vector2i
 ) -> Array[Vector2i]:
 	var out: Array[Vector2i] = []
 	var from_tile: Tile = state.tile_at(from_coords)
@@ -154,10 +154,9 @@ static func _adjacent_move_targets(
 		return out
 	for t in Utils.get_movable_tiles(from_tile, state.grid):
 		out.append(t.coords)
-	# Swaps only from the legion's real tile (can't chain-swap through virtual empties).
-	if from_coords == mover_start:
-		for t in Utils.get_swappable_tiles(from_tile, state.grid):
-			if t.legion and t.legion.team_id == team_id and t.legion.can_afford(1):
-				if t.coords not in out:
-					out.append(t.coords)
+	# Allow swaps with friendly legions from any reachable tile.
+	for t in Utils.get_swappable_tiles(from_tile, state.grid):
+		if t.legion and t.legion.team_id == team_id and t.legion.can_afford(1):
+			if t.coords not in out:
+				out.append(t.coords)
 	return out

@@ -34,7 +34,7 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_heal_ally_param_override_range():
 		return false
-	if not _test_teleport_basic_terminal_and_cooldown():
+	if not _test_teleport_basic_ap_and_cooldown():
 		return false
 	if not _test_teleport_rejects_occupied_and_oor():
 		return false
@@ -709,7 +709,7 @@ func _test_heal_ally_param_override_range() -> bool:
 		return false
 	return true
 
-func _test_teleport_basic_terminal_and_cooldown() -> bool:
+func _test_teleport_basic_ap_and_cooldown() -> bool:
 	var session := MinigameTestHelpersScript.prepare_session()
 	var started: Dictionary = MinigameTestHelpersScript.start_two_legion_battle(session)
 	var team_a: String = started["team_a"]
@@ -746,14 +746,18 @@ func _test_teleport_basic_terminal_and_cooldown() -> bool:
 	if session.grid[from_coords].has_legion():
 		push_error("Source tile should be empty after teleport")
 		return false
-	if assassin.current_ap != 0:
-		push_error("Teleport should be terminal")
+	if assassin.current_ap != assassin.max_ap - 1:
+		push_error("Teleport should cost 1 AP and leave remaining AP (got %d)" % assassin.current_ap)
 		return false
 	if assassin.get_cooldown_remaining("teleport") != 1:
 		push_error("Teleport should start cooldown 1")
 		return false
 	if ActionTargetingScript.can_use(session.battle_state(), assassin, ActionDefs.get_def("teleport")):
-		push_error("Teleport should be unavailable while cooling down (also no AP)")
+		push_error("Teleport should be unavailable while cooling down")
+		return false
+	# Still have AP for other actions after teleport.
+	if not assassin.can_afford(1):
+		push_error("Assassin should still afford 1 AP after teleport")
 		return false
 	# Restore AP but keep cooldown — still blocked.
 	assassin.current_ap = assassin.max_ap

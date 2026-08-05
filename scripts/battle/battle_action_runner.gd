@@ -43,7 +43,10 @@ func play_result(
 				if lv:
 					var to_visu: TileVisu = presenter.tile_visu_at(to_coords)
 					if to_visu:
-						lv.global_position = to_visu.global_position,
+						# Match spawn/move: local position under GridPresenter + refresh z-order.
+						# global_position + stale depth left the sprite under tiles (invisible).
+						lv.position = to_visu.position
+						lv._sync_depth_sort(),
 		})
 		_call_hook(hooks, "deselect")
 		_call_hook(hooks, "clear_overlays")

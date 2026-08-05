@@ -59,12 +59,17 @@ func show_for_winner(winner_team_id: String) -> void:
 	if team_res is TeamDefinition:
 		accent = (team_res as TeamDefinition).color
 
+	var ai_vs_ai := GameSettings.is_match_launch_active() and GameSettings.is_ai_vs_ai_mode()
 	var defeat := (
 		GameSettings.is_match_launch_active()
 		and not GameSettings.is_hotseat_mode()
+		and not ai_vs_ai
 		and winner_team_id == "BLUE"
 	)
-	title_label.text = "Defeat" if defeat else "Victory!"
+	if ai_vs_ai:
+		title_label.text = "%s wins!" % display_name
+	else:
+		title_label.text = "Defeat" if defeat else "Victory!"
 	subtitle_label.text = "Draft again, or return to the main menu."
 	winner_label.text = "%s wins" % display_name
 	winner_label.add_theme_color_override("font_color", _contrasting_text_color(accent))

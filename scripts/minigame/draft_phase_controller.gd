@@ -24,6 +24,10 @@ func enter(first_team_id: String) -> void:
 	deps.tile_info_panel.set_draft_mode(true)
 	if deps.action_log_panel:
 		deps.action_log_panel.exit_battle()
+	# AI vs AI: auto-draft all AI teams and jump straight to battle.
+	if deps.is_ai_team(first_team_id):
+		_auto_draft_all_ai_teams()
+		return
 	refresh_view()
 
 func exit() -> void:
@@ -265,6 +269,20 @@ func _show_pass_overlay() -> void:
 	deps.unit_picker.hide()
 	deps.presenter.clear_deploy_overlays()
 	deps.presenter.sync_draft_previews([], viewing_team)
+
+func _auto_draft_all_ai_teams() -> void:
+	# AiDrafter.build_draft_commands already ends with draft_ready, which advances
+	# active_draft_team (or starts battle). Do not apply draft_ready again here.
+	deps.setup_panel.hide()
+	while deps.session.phase == MinigameSessionScript.Phase.DRAFT:
+		var team: String = deps.session.active_draft_team
+		if not deps.is_ai_team(team):
+			# Unexpected non-AI team; fall back to normal draft UI.
+			refresh_view()
+			return
+		_apply_ai_draft(team)
+	if deps.session.phase == MinigameSessionScript.Phase.BATTLE:
+		battle_started.emit()
 
 func _apply_ai_draft(team_id: String) -> void:
 	var rng := RandomNumberGenerator.new()

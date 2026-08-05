@@ -102,7 +102,7 @@ static func _action_body(action: ActionDefinition, legion: Legion) -> String:
 			return "Each unit heals the lowest-health ally within %d hexes for %d health. Ends this legion's turn." % [rng, heal]
 		"teleport":
 			var rng := ActionParams.resolve_int(legion, action, "target_range", action.target_range)
-			return "Blink to an empty tile within %d hexes. Ends this legion's turn." % rng
+			return "Blink to an empty tile within %d hexes. Costs 1 AP (does not end the turn)." % rng
 		_:
 			return "Use this action."
 

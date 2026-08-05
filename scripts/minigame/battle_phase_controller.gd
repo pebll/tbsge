@@ -91,6 +91,8 @@ func request_move_path(path: Array) -> void:
 		return
 	if path.size() < 2:
 		return
+	# Hold the lock for the entire multi-step walk so input can't interleave.
+	_lock.begin()
 	deps.battle_ui.deselect()
 	deps.battle_ui.clear_overlays()
 	var start: Vector2i = path[0]
@@ -101,7 +103,8 @@ func request_move_path(path: Array) -> void:
 		var from_c: Vector2i = path[i - 1]
 		var to_c: Vector2i = path[i]
 		# Suppress per-step log; one coalesced card covers the whole path.
-		var step: Dictionary = await perform_use_action("move", from_c, to_c, 0, true)
+		# Call _perform_use_action_unlocked to avoid double-locking.
+		var step: Dictionary = await _perform_use_action_unlocked("move", from_c, to_c, 0, true)
 		if not step.get("ok", false):
 			break
 		steps_ok += 1
@@ -113,11 +116,13 @@ func request_move_path(path: Array) -> void:
 			last_ok_to,
 			steps_ok == 1 and last_was_swap
 		)
-	var end_coords: Vector2i = last_ok_to if steps_ok > 0 else path[path.size() - 1]
-	# Use last successfully intended end; if mid-fail, legion may be elsewhere.
+	# If no steps succeeded the legion is still at start, not the planned destination.
+	var end_coords: Vector2i = last_ok_to
 	var tile: Tile = deps.session.grid.get(end_coords)
 	if tile and tile.has_legion() and deps.session.can_act_legion(tile.legion):
 		deps.battle_ui.select_tile(end_coords)
+	_lock.end()
+	check_match_end()
 	maybe_start_ai_turn()
 
 func perform_use_action(
@@ -130,6 +135,22 @@ func perform_use_action(
 	if _lock.is_locked():
 		return {"ok": false, "error": "Input locked", "events": [], "payload": {}}
 	_lock.begin()
+	var result: Dictionary = await _perform_use_action_unlocked(
+		action_id, from_coords, to_coords, rng_seed, skip_action_log
+	)
+	_lock.end()
+	check_match_end()
+	return result
+
+## Core action execution without lock management — used by both
+## perform_use_action (single) and request_move_path (multi-step).
+func _perform_use_action_unlocked(
+	action_id: String,
+	from_coords: Vector2i,
+	to_coords: Vector2i,
+	rng_seed: int = 0,
+	skip_action_log: bool = false
+) -> Dictionary:
 	if ai_running:
 		deps.battle_ui.deselect()
 		deps.battle_ui.clear_overlays()
@@ -146,7 +167,6 @@ func perform_use_action(
 
 	var from_tile: Tile = deps.session.grid.get(from_coords)
 	if from_tile == null or not from_tile.has_legion():
-		_lock.end()
 		return {"ok": false, "error": "No legion", "events": [], "payload": {}}
 
 	var result: Dictionary = deps.session.apply(cmd)
@@ -156,7 +176,6 @@ func perform_use_action(
 				"[AI] action rejected: %s %s -> %s (%s)"
 				% [action_id, from_coords, to_coords, result.get("error", "?")]
 			)
-		_lock.end()
 		return result
 
 	await deps.action_runner.play_result(
@@ -170,8 +189,6 @@ func perform_use_action(
 	)
 	if deps.action_log_panel:
 		deps.action_log_panel.reveal_pending()
-	_lock.end()
-	check_match_end()
 	return result
 
 func maybe_start_ai_turn() -> void:

@@ -59,11 +59,6 @@ unique_name_in_owner = true
 text = "Play"
 preferred_width = 360
 
-[node name="DevTestButton" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox/MainButtons" instance=ExtResource("3_gb")]
-unique_name_in_owner = true
-text = "Dev Test"
-preferred_width = 360
-
 [node name="SoundsButton" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox/MainButtons" instance=ExtResource("3_gb")]
 unique_name_in_owner = true
 text = "Sounds"

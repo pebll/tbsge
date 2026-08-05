@@ -14,6 +14,8 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_ai_drafts_multiple_legions():
 		return false
+	if not _test_ai_draft_prefers_few_fat_stacks():
+		return false
 	print("Success: Minigame draft tests")
 	return true
 
@@ -156,5 +158,47 @@ func _test_ai_drafts_multiple_legions() -> bool:
 	var draft: DraftState = session.drafts[team_b_id] as DraftState
 	if draft.placements.size() < 2:
 		push_error("AI should draft at least two legions (got %d)" % draft.placements.size())
+		return false
+	return true
+
+## Sample many AI drafts: prefer few stacks and high average fill.
+func _test_ai_draft_prefers_few_fat_stacks() -> bool:
+	var AiDrafter = preload("res://scripts/ai/ai_drafter.gd")
+	var total_legions := 0
+	var total_units := 0
+	var samples := 24
+	for i in range(samples):
+		var session := MinigameTestHelpersScript.prepare_session()
+		var team_a_id: String = MinigameTestHelpersScript.team_a(session)
+		var team_b_id: String = MinigameTestHelpersScript.team_b(session)
+		var slots_a: Array = session.get_deploy_slots(team_a_id)
+		session.apply({
+			"type": "draft_set_legion",
+			"team": team_a_id,
+			"coords": slots_a[0],
+			"unit_type": "GOBLIN",
+			"unit_count": 1,
+		})
+		session.apply({"type": "draft_ready", "team": team_a_id})
+		var rng := RandomNumberGenerator.new()
+		rng.seed = 1000 + i * 17
+		for cmd in AiDrafter.build_draft_commands(session, team_b_id, rng):
+			var result: Dictionary = session.apply(cmd)
+			if not result["ok"]:
+				push_error("AI draft failed in fill-bias sample: %s" % result.get("error"))
+				return false
+		var draft: DraftState = session.drafts[team_b_id] as DraftState
+		total_legions += draft.placements.size()
+		for p in draft.placements:
+			total_units += int(p.unit_count)
+
+	var avg_legions := float(total_legions) / float(samples)
+	var avg_units_per_legion := float(total_units) / float(maxi(1, total_legions))
+	# Soft target is 2–4; allow a little headroom for rare wide drafts.
+	if avg_legions > 4.5:
+		push_error("Expected AI avg legion count <= 4.5, got %.2f" % avg_legions)
+		return false
+	if avg_units_per_legion < 2.5:
+		push_error("Expected AI avg units/legion >= 2.5, got %.2f" % avg_units_per_legion)
 		return false
 	return true

@@ -30,7 +30,8 @@ const DIFFICULTY_LABELS := {
 
 const MATCH_MODE_AI := "ai"
 const MATCH_MODE_HOTSEAT := "hotseat"
-const MATCH_MODE_IDS := [MATCH_MODE_AI, MATCH_MODE_HOTSEAT]
+const MATCH_MODE_AI_VS_AI := "ai_vs_ai"
+const MATCH_MODE_IDS := [MATCH_MODE_AI, MATCH_MODE_HOTSEAT, MATCH_MODE_AI_VS_AI]
 
 const DEFAULT_PLAYER_NAME := "Commander"
 const DEFAULT_PLAYER2_NAME := "Challenger"
@@ -56,6 +57,8 @@ var player2_name: String = DEFAULT_PLAYER2_NAME
 
 ## Match-scoped opponent label (AI roll or hotseat P2); cleared with launch.
 var match_opponent_name: String = ""
+## AI vs AI: name for the GREEN side (rolled at launch).
+var _ai_vs_ai_green_name: String = ""
 
 ## When true, MinigameRoot builds config from setup prefs (survives rematch).
 var _match_launch_active: bool = false
@@ -145,12 +148,15 @@ func commit_player_names(p1: String = "", p2: String = "") -> void:
 func is_hotseat_mode() -> bool:
 	return match_mode == MATCH_MODE_HOTSEAT
 
+func is_ai_vs_ai_mode() -> bool:
+	return match_mode == MATCH_MODE_AI_VS_AI
+
 func player_budget_for_map_size(map_size: int = -1) -> int:
 	var size := match_map_size if map_size < 0 else map_size
 	return int(MAP_SIZE_GOLD.get(size, 75))
 
 func ai_budget_mult_for_difficulty(difficulty: String = "") -> float:
-	if is_hotseat_mode():
+	if is_hotseat_mode() or is_ai_vs_ai_mode():
 		return 1.0
 	var id := match_difficulty if difficulty.is_empty() else difficulty
 	return float(DIFFICULTY_MULT.get(id, 1.0))
@@ -162,6 +168,7 @@ func begin_match_launch() -> void:
 func clear_match_launch() -> void:
 	_match_launch_active = false
 	match_opponent_name = ""
+	_ai_vs_ai_green_name = ""
 
 func is_match_launch_active() -> bool:
 	return _match_launch_active
@@ -176,7 +183,10 @@ func build_match_config() -> MinigameConfigScript:
 	config.deploy_slot_count = 7
 	config.team_ids = ["GREEN", "BLUE"]
 	config.max_legion_fill = 12.0
-	if is_hotseat_mode():
+	if is_ai_vs_ai_mode():
+		config.ai_team_ids = ["GREEN", "BLUE"]
+		config.ai_budget_mult = 1.0
+	elif is_hotseat_mode():
 		config.ai_team_ids = []
 		config.ai_budget_mult = 1.0
 	else:
@@ -194,13 +204,19 @@ func display_name_for_team(team_id: String) -> String:
 	if team_id.is_empty():
 		return "—"
 	if _match_launch_active or not match_opponent_name.is_empty():
-		if team_id == "GREEN":
-			return _sanitize_name(player_name, DEFAULT_PLAYER_NAME)
-		if team_id == "BLUE":
-			var opp := match_opponent_name.strip_edges()
-			if opp.is_empty():
-				opp = player2_name if is_hotseat_mode() else ""
-			return _sanitize_name(opp, "Opponent")
+		if is_ai_vs_ai_mode():
+			if team_id == "GREEN":
+				return _sanitize_name(_ai_vs_ai_green_name, "AI Green")
+			if team_id == "BLUE":
+				return _sanitize_name(match_opponent_name, "AI Blue")
+		else:
+			if team_id == "GREEN":
+				return _sanitize_name(player_name, DEFAULT_PLAYER_NAME)
+			if team_id == "BLUE":
+				var opp := match_opponent_name.strip_edges()
+				if opp.is_empty():
+					opp = player2_name if is_hotseat_mode() else ""
+				return _sanitize_name(opp, "Opponent")
 	var team_res: Resource = TeamDefs.get_def(team_id)
 	if team_res is TeamDefinition:
 		var name := (team_res as TeamDefinition).display_name.strip_edges()
@@ -218,6 +234,12 @@ func _ensure_match_opponent_name() -> void:
 		return
 	# Rematch keeps the rolled AI name until main menu clears launch.
 	if not match_opponent_name.strip_edges().is_empty():
+		return
+	if is_ai_vs_ai_mode():
+		var pool := AI_FUNNY_NAMES.duplicate()
+		pool.shuffle()
+		_ai_vs_ai_green_name = pool[0]
+		match_opponent_name = pool[1 % pool.size()]
 		return
 	match_opponent_name = AI_FUNNY_NAMES[randi() % AI_FUNNY_NAMES.size()]
 

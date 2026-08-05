@@ -110,6 +110,12 @@ func _mode_options() -> Array:
 			"tooltip": "Two humans on one device. Pass the controls between turns.",
 			"width": 120,
 		},
+		{
+			"id": GameSettings.MATCH_MODE_AI_VS_AI,
+			"text": "AI vs AI",
+			"tooltip": "Watch two AIs battle it out. Sit back and enjoy!",
+			"width": 120,
+		},
 	]
 
 func _map_options() -> Array:
@@ -254,8 +260,13 @@ func _on_p2_changed(new_text: String) -> void:
 
 func _refresh_mode_visibility() -> void:
 	var hotseat := GameSettings.is_hotseat_mode()
+	var ai_vs_ai := GameSettings.is_ai_vs_ai_mode()
 	if _diff_row:
-		_diff_row.visible = not hotseat
+		_diff_row.visible = not hotseat and not ai_vs_ai
+	if _name_label:
+		_name_label.visible = not ai_vs_ai
+	if _name_edit:
+		_name_edit.visible = not ai_vs_ai
 	if _p2_label:
 		_p2_label.visible = hotseat
 	if _p2_edit:
@@ -266,6 +277,9 @@ func _refresh_summary() -> void:
 		return
 	var gold := GameSettings.player_budget_for_map_size()
 	var p1 := GameSettings.player_name
+	if GameSettings.is_ai_vs_ai_mode():
+		_summary.text = "AI vs AI · %d gold each" % gold
+		return
 	if GameSettings.is_hotseat_mode():
 		var p2 := GameSettings.player2_name
 		_summary.text = "%s: %d gold · %s: %d gold (hotseat)" % [p1, gold, p2, gold]

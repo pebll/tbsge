@@ -301,7 +301,9 @@ func play_teleport(
 		pass
 
 	const FADE := 0.18
-	if legion_visu:
+	if legion_visu and is_instance_valid(legion_visu):
+		if legion_visu.active_tween and legion_visu.active_tween.is_running():
+			legion_visu.active_tween.kill()
 		var fade_out := _host.create_tween()
 		fade_out.tween_property(legion_visu, "modulate:a", 0.0, FADE)
 		await fade_out.finished
@@ -312,18 +314,21 @@ func play_teleport(
 			rewire.call()
 
 	var to_tile: TileVisu = _tile_visu_at.call(to_coords)
-	legion_visu = to_tile.legion_visu if to_tile else legion_visu
+	legion_visu = to_tile.legion_visu if to_tile else null
 	if legion_visu == null:
-		var legion: Legion = payload.get("legion")
-		if legion and _legion_visu_at.is_valid():
-			legion_visu = _legion_visu_at.call(legion)
+		var payload_legion: Legion = payload.get("legion")
+		if payload_legion and _legion_visu_at.is_valid():
+			legion_visu = _legion_visu_at.call(payload_legion)
 
-	if legion_visu:
+	if legion_visu and is_instance_valid(legion_visu):
 		legion_visu.modulate.a = 0.0
 		var fade_in := _host.create_tween()
 		fade_in.tween_property(legion_visu, "modulate:a", 1.0, FADE)
 		await fade_in.finished
+		# Force opaque in case a concurrent tween/spent tint raced the fade-in.
 		legion_visu.modulate.a = 1.0
+		if legion_visu.has_method("_sync_depth_sort"):
+			legion_visu._sync_depth_sort()
 
 	var legion: Legion = payload.get("legion")
 	if options.has("on_ap_changed"):

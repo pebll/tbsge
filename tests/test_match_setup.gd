@@ -17,6 +17,10 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_display_names_and_opponent_roll():
 		return false
+	if not _test_ai_vs_ai_match_config():
+		return false
+	if not _test_ai_vs_ai_display_names():
+		return false
 	print("Success: Match setup / settings tests")
 	return true
 
@@ -186,6 +190,60 @@ func _test_display_names_and_opponent_roll() -> bool:
 	GameSettings.match_mode = prev_mode
 	GameSettings.player_name = prev_p1
 	GameSettings.player2_name = prev_p2
+	GameSettings.match_opponent_name = prev_opp
+	if prev_launch:
+		GameSettings.begin_match_launch()
+	return ok
+
+func _test_ai_vs_ai_match_config() -> bool:
+	var prev_mode := GameSettings.match_mode
+	var prev_size := GameSettings.match_map_size
+	GameSettings.set_match_mode(GameSettings.MATCH_MODE_AI_VS_AI, false)
+	GameSettings.set_match_map_size(3, false)
+	var config := GameSettings.build_match_config()
+	var ok := true
+	if config.ai_team_ids.size() != 2:
+		push_error("AI vs AI should have 2 AI teams, got %d" % config.ai_team_ids.size())
+		ok = false
+	if not config.is_ai_team("GREEN"):
+		push_error("GREEN should be AI in AI vs AI mode")
+		ok = false
+	if not config.is_ai_team("BLUE"):
+		push_error("BLUE should be AI in AI vs AI mode")
+		ok = false
+	if not is_equal_approx(config.ai_budget_mult, 1.0):
+		push_error("AI vs AI budget mult should be 1.0")
+		ok = false
+	if config.budget_for_team("GREEN") != config.budget_for_team("BLUE"):
+		push_error("AI vs AI budgets should be equal")
+		ok = false
+	GameSettings.set_match_mode(prev_mode, false)
+	GameSettings.set_match_map_size(prev_size, false)
+	return ok
+
+func _test_ai_vs_ai_display_names() -> bool:
+	var prev_mode := GameSettings.match_mode
+	var prev_opp := GameSettings.match_opponent_name
+	var prev_launch := GameSettings.is_match_launch_active()
+
+	GameSettings.clear_match_launch()
+	GameSettings.set_match_mode(GameSettings.MATCH_MODE_AI_VS_AI, false)
+	GameSettings.begin_match_launch()
+	var ok := true
+	var green_name := GameSettings.display_name_for_team("GREEN")
+	var blue_name := GameSettings.display_name_for_team("BLUE")
+	if green_name.is_empty() or green_name == "Commander":
+		push_error("AI vs AI GREEN should get AI name, got: %s" % green_name)
+		ok = false
+	if blue_name.is_empty() or blue_name == "Commander":
+		push_error("AI vs AI BLUE should get AI name, got: %s" % blue_name)
+		ok = false
+	if green_name == blue_name:
+		push_error("AI vs AI names should differ: %s vs %s" % [green_name, blue_name])
+		ok = false
+
+	GameSettings.clear_match_launch()
+	GameSettings.match_mode = prev_mode
 	GameSettings.match_opponent_name = prev_opp
 	if prev_launch:
 		GameSettings.begin_match_launch()
