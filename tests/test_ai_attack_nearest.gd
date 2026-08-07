@@ -48,6 +48,8 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_fighter_flank_repositions_for_allies():
 		return false
+	if not _test_no_flank_without_path_choke():
+		return false
 	print("Success: AI attack-nearest tests")
 	return true
 
@@ -827,7 +829,7 @@ func _test_activation_order_uses_path_not_bird() -> bool:
 		return false
 	return true
 
-## Adjacent fighter with AP left should flank-step so a rear ally can advance.
+## Adjacent fighter with AP left should flank-step when a rear ally is path-blocked on that hex.
 func _test_fighter_flank_repositions_for_allies() -> bool:
 	var session := MinigameTestHelpersScript.prepare_session()
 	var started: Dictionary = MinigameTestHelpersScript.start_two_legion_battle(session)
@@ -838,7 +840,10 @@ func _test_fighter_flank_repositions_for_allies() -> bool:
 	var enemy_coords := Vector2i(1, 0)
 	var fight_coords := Vector2i(0, 0)
 	var rear_coords := Vector2i(-1, 0)
-	for c in [enemy_coords, fight_coords, rear_coords]:
+	var block_n := Vector2i(-1, 1)
+	var block_s := Vector2i(-1, -1)
+	var block_sw := Vector2i(0, -1)
+	for c in [enemy_coords, fight_coords, rear_coords, block_n, block_s, block_sw]:
 		if session.grid.get(c) == null:
 			return true
 
@@ -850,30 +855,83 @@ func _test_fighter_flank_repositions_for_allies() -> bool:
 	var rear := Legion.new("GOBLIN", 1, rear_coords, team_a)
 	session.grid[rear_coords].legion = rear
 	session.legions.append(rear)
+	for bc in [block_n, block_s, block_sw]:
+		var plug := Legion.new("GOBLIN", 1, bc, team_a)
+		session.grid[bc].legion = plug
+		session.legions.append(plug)
 	fighter.max_ap = 2
 	fighter.current_ap = 2
 	rear.refresh_ap()
 	session.turn_manager.waited_coords.clear()
 
+	# Sanity: rear must route through the fighter tile to reach a melee stand hex.
+	var choke_ok := false
+	for goal in Utils.get_surrounding_coords(enemy_coords):
+		var tile: Tile = session.grid.get(goal)
+		if tile == null or not tile.walkable or tile.has_legion():
+			continue
+		var path := HexPathfinder.find_path(session.grid, rear_coords, goal, {}, true)
+		if path.size() >= 2 and fight_coords in path:
+			choke_ok = true
+			break
+	if not choke_ok:
+		return true
+
 	var cmd: Dictionary = AttackNearestEnemyBehavior.decide(session, fighter)
 	if cmd.get("type") != "use_action" or cmd.get("action_id") != "move":
-		# If map has no free flank hex that still attacks, accept melee as fallback.
-		if cmd.get("action_id") == "melee_attack":
-			var flank_exists := false
-			for adj in Utils.get_surrounding_coords(enemy_coords):
-				if adj == fight_coords:
-					continue
-				var tile: Tile = session.grid.get(adj)
-				if tile != null and tile.walkable and not tile.has_legion():
-					if HexPathfinder.hex_distance(fight_coords, adj) == 1:
-						flank_exists = true
-						break
-			if not flank_exists:
-				return true
 		push_error("Expected flank reposition move before attack, got %s" % cmd)
 		return false
 	var to_coords: Vector2i = cmd.get("to")
 	if HexPathfinder.hex_distance(to_coords, enemy_coords) != 1:
 		push_error("Flank step must stay adjacent to enemy, got %s" % to_coords)
+		return false
+	return true
+
+## In contact with enemy but ally is not path-blocked — attack, don't sidestep.
+func _test_no_flank_without_path_choke() -> bool:
+	var session := MinigameTestHelpersScript.prepare_session()
+	var started: Dictionary = MinigameTestHelpersScript.start_two_legion_battle(session)
+	var fighter: Legion = started["a"]
+	var enemy: Legion = started["b"]
+	var team_a: String = started["team_a"]
+
+	var enemy_coords := Vector2i(1, 0)
+	var fight_coords := Vector2i(0, 0)
+	var far_ally_coords := Vector2i(0, 2)
+	for c in [enemy_coords, fight_coords, far_ally_coords]:
+		if session.grid.get(c) == null:
+			return true
+
+	for c in [fighter.tile_coords, enemy.tile_coords]:
+		if session.grid.get(c):
+			session.grid[c].legion = null
+	_teleport_legion(session, enemy, enemy_coords)
+	_teleport_legion(session, fighter, fight_coords)
+	var far_ally := Legion.new("GOBLIN", 1, far_ally_coords, team_a)
+	session.grid[far_ally_coords].legion = far_ally
+	session.legions.append(far_ally)
+	fighter.max_ap = 2
+	fighter.current_ap = 2
+	far_ally.refresh_ap()
+	session.turn_manager.waited_coords.clear()
+
+	# Confirm ally's soft path to an engage tile does not require the fighter's hex.
+	var focus_path_ok := false
+	for goal in Utils.get_surrounding_coords(enemy_coords):
+		var tile: Tile = session.grid.get(goal)
+		if tile == null or not tile.walkable or tile.has_legion():
+			continue
+		var path := HexPathfinder.find_path(
+			session.grid, far_ally_coords, goal, {}, true
+		)
+		if path.size() >= 2 and fight_coords not in path:
+			focus_path_ok = true
+			break
+	if not focus_path_ok:
+		return true
+
+	var cmd: Dictionary = AttackNearestEnemyBehavior.decide(session, fighter)
+	if cmd.get("type") != "use_action" or cmd.get("action_id") != "melee_attack":
+		push_error("Should melee when flank does not unblock an ally, got %s" % cmd)
 		return false
 	return true

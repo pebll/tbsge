@@ -16,6 +16,11 @@ const HEAL_SAFE_ENEMY_DISTANCE := 3
 const HEAL_MIN_SCORE_CRITICAL := 1.0
 const HEAL_MIN_SCORE_SAFE := 4.0
 
+## Flank only when an ally's engage path improves by at least this much (soft cost).
+const FLANK_MIN_PATH_IMPROVEMENT := 1.0
+## Prefer attacking now unless unblocking is worth more than this combat delta.
+const FLANK_OPPORTUNITY_TAX := 2.5
+
 static func decide(session: MatchSessionScript, legion: Legion) -> Dictionary:
 	var cmd := _decide_internal(session, legion)
 	if debug_enabled:
@@ -104,7 +109,7 @@ static func _min_path_engage_cost(
 			best = minf(best, _path_soft_cost(session.grid, path))
 	return best
 
-## While threatening: take a 1-step flank that still attacks the same enemy, to unblock allies.
+## While threatening: sidestep only if an ally's path to engage materially improves.
 static func _best_attack_preserving_reposition(
 	session: MatchSessionScript,
 	legion: Legion,
@@ -114,19 +119,20 @@ static func _best_attack_preserving_reposition(
 		return {}
 	if not legion.can_afford(1):
 		return {}
-	if not _team_has_other_ally(session, legion):
-		return {}
 	var threatened := _threatened_enemy_coords(session, legion)
 	if threatened.is_empty():
+		return {}
+
+	var attack_now := _best_combat_score(session, legion, enemies)
+	if attack_now <= -INF / 2.0:
 		return {}
 
 	var from := legion.tile_coords
 	var movable := session.get_movable_coords(from)
 	var best_to := Vector2i.ZERO
-	var best_score := -INF
+	var best_benefit := -INF
 	var found := false
 	for to_coords in movable:
-		# Keep 1 AP for the follow-up attack.
 		if HexPathfinder.hex_distance(from, to_coords) != 1:
 			continue
 		var tile: Tile = session.grid.get(to_coords)
@@ -134,12 +140,14 @@ static func _best_attack_preserving_reposition(
 			continue
 		if not _still_threatens_from(session, legion, to_coords, threatened):
 			continue
-		var score := float(_empty_neighbor_count(session, to_coords))
-		score += _ally_clearance_bonus(session, legion, to_coords)
-		if _reposition_helps_allies(session, legion, enemies, from, to_coords):
-			score += 4.0
-		if score > best_score:
-			best_score = score
+		var benefit := _flank_path_benefit(session, legion, enemies, from, to_coords)
+		if benefit < FLANK_MIN_PATH_IMPROVEMENT:
+			continue
+		var attack_after := _best_combat_score_from(session, legion, to_coords, enemies, threatened)
+		if attack_now > attack_after + FLANK_OPPORTUNITY_TAX:
+			continue
+		if benefit > best_benefit:
+			best_benefit = benefit
 			best_to = to_coords
 			found = true
 	if not found:
@@ -150,12 +158,140 @@ static func _best_attack_preserving_reposition(
 		"from": from,
 		"to": best_to,
 		"path": [from, best_to],
-		"reason": "flank-reposition to free path @ %s" % best_to,
+		"reason": "flank unblock path +%.1f @ %s" % [best_benefit, best_to],
 	}
 
-static func _team_has_other_ally(session: MatchSessionScript, legion: Legion) -> bool:
-	for other in session.legions:
-		if other != null and other != legion and other.team_id == legion.team_id and not other.units.is_empty():
+static func _best_combat_score(
+	session: MatchSessionScript,
+	legion: Legion,
+	enemies: Array[Legion]
+) -> float:
+	var cmd := _best_action_of(session, legion, enemies, ["melee_attack", "ranged_attack"])
+	return float(cmd.get("score", -INF))
+
+static func _best_combat_score_from(
+	session: MatchSessionScript,
+	legion: Legion,
+	at_coords: Vector2i,
+	enemies: Array[Legion],
+	threatened: Array[Vector2i]
+) -> float:
+	var old := legion.tile_coords
+	var tile_old: Tile = session.grid.get(old)
+	var tile_new: Tile = session.grid.get(at_coords)
+	if tile_new == null:
+		return -INF
+	var prev_new = tile_new.legion
+	legion.tile_coords = at_coords
+	if tile_old and tile_old.legion == legion:
+		tile_old.legion = null
+	tile_new.legion = legion
+	var best := -INF
+	for action_id in ["melee_attack", "ranged_attack"]:
+		if action_id not in ActionDefs.legion_action_ids(legion):
+			continue
+		for to_coords in session.get_action_targets(legion, action_id):
+			if to_coords not in threatened:
+				continue
+			var score := AiActionScorer.score_action(session, legion, action_id, to_coords)
+			score += _focus_bonus_at(session, to_coords, enemies)
+			best = maxf(best, score)
+	legion.tile_coords = old
+	if tile_old:
+		tile_old.legion = legion
+	tile_new.legion = prev_new
+	return best
+
+## Max reduction in soft path cost for a teammate trying to reach an engage hex.
+static func _flank_path_benefit(
+	session: MatchSessionScript,
+	legion: Legion,
+	enemies: Array[Legion],
+	from_coords: Vector2i,
+	to_coords: Vector2i
+) -> float:
+	if enemies.is_empty():
+		return 0.0
+	var focus: Legion = _pick_focus_enemy(from_coords, enemies)
+	var best := 0.0
+	for ally in session.legions:
+		if not _ally_needs_lane_through(session, legion, ally, focus, from_coords):
+			continue
+		for goal in _stand_goals(session, ally, focus):
+			var blocked_path := HexPathfinder.find_path(
+				session.grid, ally.tile_coords, goal, {}, true
+			)
+			if blocked_path.size() < 2:
+				continue
+			if from_coords not in blocked_path:
+				continue
+			var blocked_cost := _path_soft_cost(session.grid, blocked_path)
+			var freed_cost := _soft_path_cost_after_fighter_flank(
+				session, legion, from_coords, to_coords, ally.tile_coords, goal
+			)
+			if freed_cost >= INF / 2.0:
+				continue
+			var improvement := blocked_cost - freed_cost
+			if improvement > best:
+				best = improvement
+			# Ally can walk onto the freed hex this turn — strong signal.
+			if (
+				improvement >= FLANK_MIN_PATH_IMPROVEMENT
+				and from_coords in session.get_movable_coords(ally.tile_coords)
+			):
+				best = maxf(best, improvement + 0.5)
+	return best
+
+static func _soft_path_cost_after_fighter_flank(
+	session: MatchSessionScript,
+	fighter: Legion,
+	from_coords: Vector2i,
+	to_coords: Vector2i,
+	ally_start: Vector2i,
+	goal: Vector2i
+) -> float:
+	var old := fighter.tile_coords
+	var tile_from: Tile = session.grid.get(from_coords)
+	var tile_to: Tile = session.grid.get(to_coords)
+	if tile_from == null or tile_to == null:
+		return INF
+	var prev_to = tile_to.legion
+	fighter.tile_coords = to_coords
+	if tile_from.legion == fighter:
+		tile_from.legion = null
+	tile_to.legion = fighter
+	var path := HexPathfinder.find_path(session.grid, ally_start, goal, {}, true)
+	var cost := INF
+	if path.size() >= 2:
+		cost = _path_soft_cost(session.grid, path)
+	fighter.tile_coords = old
+	tile_from.legion = fighter
+	tile_to.legion = prev_to
+	return cost
+
+## Ally is relevant if they still need to reach the fight and aren't already striking.
+static func _ally_needs_lane_through(
+	session: MatchSessionScript,
+	fighter: Legion,
+	ally: Legion,
+	focus: Legion,
+	from_coords: Vector2i
+) -> bool:
+	if ally == null or ally == fighter or ally.units.is_empty():
+		return false
+	if ally.team_id != fighter.team_id:
+		return false
+	if focus == null:
+		return false
+	if _can_fight_now(session, ally.tile_coords):
+		return false
+	if not session.can_act_legion(ally) and ally.current_ap <= 0:
+		return false
+	# Must be behind the choke (path toward enemy goes through our tile).
+	var goals := _stand_goals(session, ally, focus)
+	for goal in goals:
+		var path := HexPathfinder.find_path(session.grid, ally.tile_coords, goal, {}, true)
+		if path.size() >= 2 and from_coords in path:
 			return true
 	return false
 
@@ -196,71 +332,6 @@ static func _still_threatens_from(
 		tile_old.legion = legion
 	tile_new.legion = prev_new
 	return still
-
-## True when at least one ally is farther from the fight (by path) and our hex sits on a soft path.
-static func _reposition_helps_allies(
-	session: MatchSessionScript,
-	legion: Legion,
-	enemies: Array[Legion],
-	from_coords: Vector2i,
-	_to_coords: Vector2i
-) -> bool:
-	if enemies.is_empty():
-		return false
-	var focus: Legion = _pick_focus_enemy(from_coords, enemies)
-	for other in session.legions:
-		if other == null or other == legion or other.team_id != legion.team_id:
-			continue
-		if other.units.is_empty():
-			continue
-		if not session.can_act_legion(other) and other.current_ap <= 0:
-			# Still count waiting rear allies that need the lane next turn.
-			pass
-		var goals := _stand_goals(session, other, focus)
-		for goal in goals:
-			var path := HexPathfinder.find_path(
-				session.grid, other.tile_coords, goal, {}, true
-			)
-			if path.size() < 2:
-				continue
-			if from_coords in path:
-				return true
-	# Also rotate when an ally is bird-adjacent behind us toward the enemy.
-	for adj in Utils.get_surrounding_coords(from_coords):
-		var tile: Tile = session.grid.get(adj)
-		if tile == null or not tile.has_legion():
-			continue
-		var ally: Legion = tile.legion
-		if ally.team_id != legion.team_id or ally == legion:
-			continue
-		var ally_d := HexPathfinder.hex_distance(ally.tile_coords, focus.tile_coords)
-		var my_d := HexPathfinder.hex_distance(from_coords, focus.tile_coords)
-		if ally_d > my_d:
-			return true
-	return false
-
-static func _empty_neighbor_count(session: MatchSessionScript, coords: Vector2i) -> int:
-	var n := 0
-	for adj in Utils.get_surrounding_coords(coords):
-		var tile: Tile = session.grid.get(adj)
-		if tile != null and tile.walkable and not tile.has_legion():
-			n += 1
-	return n
-
-static func _ally_clearance_bonus(
-	session: MatchSessionScript,
-	legion: Legion,
-	coords: Vector2i
-) -> float:
-	var bonus := 0.0
-	for adj in Utils.get_surrounding_coords(coords):
-		var tile: Tile = session.grid.get(adj)
-		if tile == null or not tile.has_legion():
-			continue
-		var other: Legion = tile.legion
-		if other.team_id == legion.team_id and other != legion:
-			bonus -= 1.5
-	return bonus
 
 static func _decide_internal(session: MatchSessionScript, legion: Legion) -> Dictionary:
 	if legion == null:
