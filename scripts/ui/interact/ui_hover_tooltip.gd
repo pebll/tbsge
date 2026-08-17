@@ -83,7 +83,7 @@ func _build() -> void:
 
 	_body = Label.new()
 	_body.add_theme_color_override("font_color", UiTheme.COLOR_TEXT_MUTED)
-	_body.add_theme_font_size_override("font_size", 18)
+	_body.add_theme_font_size_override("font_size", 25)
 	_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_body.custom_minimum_size = Vector2(200, 0)
 	vbox.add_child(_body)

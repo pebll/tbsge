@@ -49,6 +49,12 @@ var show_battle_log_end_turns: bool = false
 var ai_debug_enabled: bool = false
 ## Debug: legion strip unit HP — 0 = full-width background bar, 1 = narrow right bar.
 var legion_strip_hp_style: int = 0
+## Monte Carlo sims for battle expectation preview (attack-target hover).
+var battle_expectation_sim_count: int = 50
+## Print timing / bounds for battle expectation Monte Carlo runs.
+var battle_expectation_log_timing: bool = false
+
+const BATTLE_EXPECTATION_SIM_OPTIONS: Array[int] = [25, 50, 100, 200, 500]
 
 ## Last Play setup choices (persisted for the setup UI).
 var match_map_size: int = 3
@@ -105,6 +111,35 @@ func set_legion_strip_hp_style(value: int, persist: bool = true) -> void:
 func toggle_legion_strip_hp_style(persist: bool = true) -> int:
 	set_legion_strip_hp_style(1 - legion_strip_hp_style, persist)
 	return legion_strip_hp_style
+
+func set_battle_expectation_sim_count(value: int, persist: bool = true) -> void:
+	if value not in BATTLE_EXPECTATION_SIM_OPTIONS:
+		return
+	if battle_expectation_sim_count == value:
+		return
+	battle_expectation_sim_count = value
+	_emit_and_maybe_save(persist)
+
+func cycle_battle_expectation_sim_count(persist: bool = true) -> int:
+	var idx := BATTLE_EXPECTATION_SIM_OPTIONS.find(battle_expectation_sim_count)
+	if idx < 0:
+		idx = 1
+	idx = (idx + 1) % BATTLE_EXPECTATION_SIM_OPTIONS.size()
+	set_battle_expectation_sim_count(BATTLE_EXPECTATION_SIM_OPTIONS[idx], persist)
+	return battle_expectation_sim_count
+
+func battle_expectation_sim_label() -> String:
+	return "Expect sims: %d" % battle_expectation_sim_count
+
+func set_battle_expectation_log_timing(value: bool, persist: bool = true) -> void:
+	if battle_expectation_log_timing == value:
+		return
+	battle_expectation_log_timing = value
+	_emit_and_maybe_save(persist)
+
+func toggle_battle_expectation_log_timing(persist: bool = true) -> bool:
+	set_battle_expectation_log_timing(not battle_expectation_log_timing, persist)
+	return battle_expectation_log_timing
 
 func set_match_map_size(value: int, persist: bool = true) -> void:
 	if value not in MAP_SIZE_OPTIONS:
@@ -280,6 +315,10 @@ func _load_settings() -> void:
 	show_battle_log_end_turns = bool(cfg.get_value(SETTINGS_SECTION, "show_battle_log_end_turns", false))
 	ai_debug_enabled = bool(cfg.get_value(SETTINGS_SECTION, "ai_debug", false))
 	legion_strip_hp_style = clampi(int(cfg.get_value(SETTINGS_SECTION, "legion_strip_hp_style", 0)), 0, 1)
+	var expect_sims := int(cfg.get_value(SETTINGS_SECTION, "battle_expectation_sim_count", 50))
+	if expect_sims in BATTLE_EXPECTATION_SIM_OPTIONS:
+		battle_expectation_sim_count = expect_sims
+	battle_expectation_log_timing = bool(cfg.get_value(SETTINGS_SECTION, "battle_expectation_log_timing", false))
 
 	var map_size := int(cfg.get_value(MATCH_SECTION, "map_size", 3))
 	if map_size in MAP_SIZE_OPTIONS:
@@ -306,6 +345,8 @@ func _save_settings() -> void:
 	cfg.set_value(SETTINGS_SECTION, "show_battle_log_end_turns", show_battle_log_end_turns)
 	cfg.set_value(SETTINGS_SECTION, "ai_debug", ai_debug_enabled)
 	cfg.set_value(SETTINGS_SECTION, "legion_strip_hp_style", legion_strip_hp_style)
+	cfg.set_value(SETTINGS_SECTION, "battle_expectation_sim_count", battle_expectation_sim_count)
+	cfg.set_value(SETTINGS_SECTION, "battle_expectation_log_timing", battle_expectation_log_timing)
 	cfg.set_value(MATCH_SECTION, "map_size", match_map_size)
 	cfg.set_value(MATCH_SECTION, "difficulty", match_difficulty)
 	cfg.set_value(MATCH_SECTION, "mode", match_mode)

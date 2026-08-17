@@ -9,6 +9,7 @@ const BattleActionRunnerScript = preload("res://scripts/battle/battle_action_run
 const BattleHostWiringScript = preload("res://scripts/battle/battle_host_wiring.gd")
 const ActionPlaybackScript = preload("res://scripts/battle/action_playback.gd")
 const GridPresenterScript = preload("res://scripts/visu/grid_presenter.gd")
+const BattleExpectationBarScript = preload("res://scripts/ui/battle_expectation_bar.gd")
 
 const DEFAULT_CONFIG_PATH := "res://data/sandbox/preview_r2.tres"
 
@@ -34,7 +35,7 @@ var battle_ui: BattleUIAdapterScript
 var action_runner: BattleActionRunnerScript
 var input: GameInput
 var tile_info_panel
-var legion_strip: LegionStrip
+var legion_strip: BattleExpectationBarScript
 var tile_info_layer: CanvasLayer
 var combat_fx_layer: CanvasLayer
 var turn_hud: TurnHud
@@ -260,9 +261,19 @@ func _setup_tile_info_ui() -> void:
 	tile_info_layer.add_child(tile_info_panel)
 	tile_info_panel.hide()
 
-	legion_strip = preload("res://scenes/ui/legion_strip.tscn").instantiate()
+	legion_strip = BattleExpectationBarScript.new()
 	tile_info_layer.add_child(legion_strip)
 	legion_strip.hide()
+	battle_context.expectation_preview_fn = func(
+		attacker: Legion,
+		defender: Legion,
+		action_id: String,
+		from_coords: Vector2i,
+		to_coords: Vector2i
+	) -> void:
+		legion_strip.show_attack_preview(attacker, defender, action_id, from_coords, to_coords)
+	battle_context.clear_expectation_preview_fn = func() -> void:
+		legion_strip.hide_attack_preview()
 
 	var action_bar = preload("res://scenes/ui/battle_action_bar.tscn").instantiate()
 	tile_info_layer.add_child(action_bar)

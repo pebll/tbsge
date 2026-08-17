@@ -14,6 +14,8 @@ var _moves_btn: GameButton
 var _end_turns_btn: GameButton
 var _ai_debug_btn: GameButton
 var _hp_style_btn: GameButton
+var _expect_sims_btn: GameButton
+var _expect_log_btn: GameButton
 var _back_btn: GameButton
 
 func _ready() -> void:
@@ -30,6 +32,8 @@ func sync_from_settings() -> void:
 	_end_turns_btn.text = _on_off_label("Show turn starts", GameSettings.show_battle_log_end_turns)
 	_ai_debug_btn.text = _on_off_label("AI debug", GameSettings.is_ai_debug_enabled())
 	_hp_style_btn.text = _hp_style_label()
+	_expect_sims_btn.text = GameSettings.battle_expectation_sim_label()
+	_expect_log_btn.text = _on_off_label("Expect log", GameSettings.battle_expectation_log_timing)
 
 func _build() -> void:
 	add_theme_constant_override("separation", 16)
@@ -43,6 +47,8 @@ func _build() -> void:
 	_end_turns_btn = _make_button("Show turn starts: OFF")
 	_ai_debug_btn = _make_button("AI debug: OFF")
 	_hp_style_btn = _make_button("Strip HP: A")
+	_expect_sims_btn = _make_button("Expect sims: 50")
+	_expect_log_btn = _make_button("Expect log: OFF")
 	_back_btn = _make_button("Back")
 
 func _make_button(text: String) -> GameButton:
@@ -58,7 +64,7 @@ func _apply_styles() -> void:
 		if child is Label:
 			child.add_theme_color_override("font_color", UiTheme.COLOR_TEXT)
 			child.add_theme_font_size_override("font_size", 22)
-	for btn in [_moves_btn, _end_turns_btn, _ai_debug_btn, _hp_style_btn, _back_btn]:
+	for btn in [_moves_btn, _end_turns_btn, _ai_debug_btn, _hp_style_btn, _expect_sims_btn, _expect_log_btn, _back_btn]:
 		if btn:
 			btn.preferred_width = MENU_BTN_WIDTH
 
@@ -71,6 +77,10 @@ func _connect_signals() -> void:
 		_ai_debug_btn.pressed.connect(_on_ai_debug)
 	if not _hp_style_btn.pressed.is_connected(_on_hp_style):
 		_hp_style_btn.pressed.connect(_on_hp_style)
+	if not _expect_sims_btn.pressed.is_connected(_on_expect_sims):
+		_expect_sims_btn.pressed.connect(_on_expect_sims)
+	if not _expect_log_btn.pressed.is_connected(_on_expect_log):
+		_expect_log_btn.pressed.connect(_on_expect_log)
 	if not _back_btn.pressed.is_connected(_on_back):
 		_back_btn.pressed.connect(_on_back)
 
@@ -94,6 +104,14 @@ func _on_ai_debug() -> void:
 
 func _on_hp_style() -> void:
 	GameSettings.toggle_legion_strip_hp_style()
+	sync_from_settings()
+
+func _on_expect_sims() -> void:
+	GameSettings.cycle_battle_expectation_sim_count()
+	sync_from_settings()
+
+func _on_expect_log() -> void:
+	GameSettings.toggle_battle_expectation_log_timing()
 	sync_from_settings()
 
 func _on_back() -> void:

@@ -17,6 +17,8 @@ var inspect_fn: Callable = func(_coords: Vector2i) -> void: pass
 var clear_inspect_fn: Callable = func() -> void: pass
 var preview_inspect_fn: Callable = Callable()
 var clear_preview_inspect_fn: Callable = Callable()
+var expectation_preview_fn: Callable = Callable()
+var clear_expectation_preview_fn: Callable = Callable()
 var overlay_ui_fn: Callable = Callable()
 
 func battle_state() -> BattleStateScript:
@@ -90,3 +92,17 @@ func clear_preview_inspect() -> void:
 func clear_inspect() -> void:
 	if clear_inspect_fn.is_valid():
 		clear_inspect_fn.call()
+
+func show_expectation_preview(
+	attacker: Legion,
+	defender: Legion,
+	action_id: String,
+	from_coords: Vector2i,
+	to_coords: Vector2i
+) -> void:
+	if expectation_preview_fn.is_valid():
+		expectation_preview_fn.call(attacker, defender, action_id, from_coords, to_coords)
+
+func clear_expectation_preview() -> void:
+	if clear_expectation_preview_fn.is_valid():
+		clear_expectation_preview_fn.call()

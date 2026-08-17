@@ -15,6 +15,7 @@ const MinigamePresenterScript = preload("res://scripts/minigame/minigame_present
 const MinigamePhaseDepsScript = preload("res://scripts/minigame/minigame_phase_deps.gd")
 const DraftPhaseControllerScript = preload("res://scripts/minigame/draft_phase_controller.gd")
 const BattlePhaseControllerScript = preload("res://scripts/minigame/battle_phase_controller.gd")
+const BattleExpectationBarScript = preload("res://scripts/ui/battle_expectation_bar.gd")
 
 @export var config_path: String = CONFIG_PATH
 
@@ -33,7 +34,7 @@ var _setup_panel: MinigameSetupPanel
 var _unit_picker: MinigameUnitPicker
 var _turn_hud: TurnHud
 var _tile_info_panel: TileInfoPanel
-var _legion_strip: LegionStrip
+var _legion_strip: BattleExpectationBarScript
 var _combat_fx_layer: CanvasLayer
 var _action_playback: RefCounted
 var _pass_overlay: PanelContainer
@@ -177,6 +178,18 @@ func _setup_battle_context() -> void:
 	)
 	battle_context.preview_inspect_fn = func(coords: Vector2i) -> void: preview_inspect(coords)
 	battle_context.clear_preview_inspect_fn = func() -> void: clear_preview_inspect()
+	battle_context.expectation_preview_fn = func(
+		attacker: Legion,
+		defender: Legion,
+		action_id: String,
+		from_coords: Vector2i,
+		to_coords: Vector2i
+	) -> void:
+		if _legion_strip:
+			_legion_strip.show_attack_preview(attacker, defender, action_id, from_coords, to_coords)
+	battle_context.clear_expectation_preview_fn = func() -> void:
+		if _legion_strip:
+			_legion_strip.hide_attack_preview()
 	battle_context.apply_move_path_fn = func(path: Array) -> void:
 		battle.request_move_path(path)
 	battle_context.battle_phase_fn = func() -> bool: return session.phase == MinigameSessionScript.Phase.BATTLE
@@ -228,7 +241,7 @@ func _setup_ui() -> void:
 	_ui_layer.add_child(_tile_info_panel)
 	_tile_info_panel.hide()
 
-	_legion_strip = preload("res://scenes/ui/legion_strip.tscn").instantiate()
+	_legion_strip = BattleExpectationBarScript.new()
 	_ui_layer.add_child(_legion_strip)
 	_legion_strip.hide()
 

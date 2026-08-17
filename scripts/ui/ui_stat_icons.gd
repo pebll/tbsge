@@ -12,9 +12,14 @@ const ICON_SHIELD := preload("res://assets/icons/base_icons_sprites/shield.png")
 const ICON_AP := preload("res://assets/icons/base_icons_sprites/boot.png")
 const ICON_PRICE := preload("res://assets/icons/base_icons_sprites/coin.png")
 
-const TOOLTIP_ICON_PX := 28
-const TOOLTIP_FONT_SIZE := 20
-const TOOLTIP_TITLE_FONT_SIZE := 24
+const TOOLTIP_ICON_PX := 39
+const TOOLTIP_FONT_SIZE := 28
+const TOOLTIP_TITLE_FONT_SIZE := 34
+
+## Legion strip aggregate row + unit hover tooltip (≈1.4× prior strip sizes).
+const STRIP_AGG_ICON_PX := 36
+const STRIP_AGG_FONT_SIZE := 28
+const STRIP_AGG_SEPARATION := 8
 
 static func make_row(
 	icon: Texture2D,

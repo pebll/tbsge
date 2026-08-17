@@ -11,6 +11,8 @@ func run(_tree: SceneTree) -> bool:
 		"res://scripts/ui/ui_stat_icons.gd",
 		"res://scripts/ui/legion_unit_cell.gd",
 		"res://scripts/ui/legion_strip.gd",
+		"res://scripts/battle/battle_expectation_estimator.gd",
+		"res://scripts/ui/battle_expectation_bar.gd",
 		"res://scripts/minigame/minigame_root.gd",
 		"res://scripts/core/sandbox_root.gd",
 		"res://scenes/ui/legion_strip.tscn",

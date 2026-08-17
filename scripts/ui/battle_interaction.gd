@@ -45,6 +45,8 @@ var _inspect_fn: Callable = func(_coords: Vector2i) -> void: pass
 var _clear_inspect_fn: Callable = func() -> void: pass
 var _preview_inspect_fn: Callable = Callable()
 var _clear_preview_inspect_fn: Callable = Callable()
+var _expectation_preview_fn: Callable = Callable()
+var _clear_expectation_preview_fn: Callable = Callable()
 var turn_manager_fn: Callable
 var legions_fn: Callable
 var _events_bound: bool = false
@@ -54,6 +56,7 @@ var _pending_move_active: bool = false
 var _pending_first_steps: Array[Vector2i] = []
 var _pending_parents: Dictionary = {}
 var _context = null
+var _hovered_attack_target: Vector2i = Vector2i(2147483645, 2147483645)
 
 func bind_from_context(context) -> void:
 	## Single wiring entry so hosts don't re-declare the same Callables.
@@ -80,6 +83,21 @@ func bind_from_context(context) -> void:
 		_clear_preview_inspect_fn = func() -> void: context.clear_preview_inspect()
 	else:
 		_clear_preview_inspect_fn = Callable()
+	if context.expectation_preview_fn.is_valid():
+		_expectation_preview_fn = func(
+			attacker: Legion,
+			defender: Legion,
+			action_id: String,
+			from_coords: Vector2i,
+			to_coords: Vector2i
+		) -> void:
+			context.show_expectation_preview(attacker, defender, action_id, from_coords, to_coords)
+	else:
+		_expectation_preview_fn = Callable()
+	if context.clear_expectation_preview_fn.is_valid():
+		_clear_expectation_preview_fn = func() -> void: context.clear_expectation_preview()
+	else:
+		_clear_expectation_preview_fn = Callable()
 	if context.overlay_ui_fn.is_valid():
 		overlay_ui_fn = context.overlay_ui_fn
 
@@ -122,6 +140,7 @@ func deselect() -> void:
 	_pending_first_steps.clear()
 	_pending_parents.clear()
 	_info_visible_for_tile = false
+	_clear_expectation_preview()
 	_clear_inspect_fn.call()
 	if action_bar:
 		action_bar.clear_bar()
@@ -161,6 +180,7 @@ func select_action(action: ActionDefinitionScript) -> void:
 	if legion == null or not bool(can_act_fn.call(legion)):
 		return
 	_hide_attack_choice_popup()
+	_clear_expectation_preview()
 	if selected_action and selected_action.id == action.id:
 		selected_action = null
 		target_coords.clear()
@@ -318,6 +338,8 @@ func _on_tile_hover_entered(coords: Vector2i) -> void:
 			if selected_visu and selected_visu.legion_visu and tile_visu:
 				var dir := (tile_visu.position - selected_visu.position).normalized()
 				selected_visu.legion_visu.update_direction(dir)
+	if _is_attack_target_hover(coords):
+		_show_expectation_for_target(coords)
 
 func _on_tile_hover_exited(coords: Vector2i) -> void:
 	if coords in _overlay_coords:
@@ -328,6 +350,61 @@ func _on_tile_hover_exited(coords: Vector2i) -> void:
 		var selected_visu: TileVisu = tile_visu_fn.call(selected_coords)
 		if selected_visu and selected_visu.legion_visu:
 			selected_visu.legion_visu.juice_direct_reset()
+	if coords == _hovered_attack_target:
+		_hovered_attack_target = Vector2i(2147483645, 2147483645)
+		_clear_expectation_preview()
+
+func _is_attack_target_hover(coords: Vector2i) -> bool:
+	if not has_selected:
+		return false
+	if selected_action:
+		var selected_id := selected_action.id
+		if selected_id == "melee_attack" or selected_id == "ranged_attack":
+			return coords in target_coords
+		if selected_id == "self_heal":
+			return coords == selected_coords
+		if selected_id == "heal_ally":
+			return coords in target_coords
+		return false
+	if default_target_actions.has(coords):
+		var actions: Array = default_target_actions[coords]
+		return "melee_attack" in actions or "ranged_attack" in actions
+	return false
+
+func _attack_action_for_target(coords: Vector2i) -> String:
+	if selected_action:
+		var selected_id := selected_action.id
+		if selected_id == "melee_attack" or selected_id == "ranged_attack":
+			return selected_id
+		if selected_id == "self_heal" or selected_id == "heal_ally":
+			return selected_id
+	if default_target_actions.has(coords):
+		var actions: Array = default_target_actions[coords]
+		if "melee_attack" in actions:
+			return "melee_attack"
+		if "ranged_attack" in actions:
+			return "ranged_attack"
+	return ""
+
+func _show_expectation_for_target(coords: Vector2i) -> void:
+	if not _expectation_preview_fn.is_valid():
+		return
+	var state: BattleStateScript = battle_state_fn.call()
+	if state == null:
+		return
+	var attacker: Legion = _legion_at(state, selected_coords)
+	var defender: Legion = _legion_at(state, coords)
+	if attacker == null or defender == null:
+		return
+	var action_id := _attack_action_for_target(coords)
+	if action_id.is_empty():
+		return
+	_hovered_attack_target = coords
+	_expectation_preview_fn.call(attacker, defender, action_id, selected_coords, coords)
+
+func _clear_expectation_preview() -> void:
+	if _clear_expectation_preview_fn.is_valid():
+		_clear_expectation_preview_fn.call()
 
 func _dispatch_click(coords: Vector2i) -> void:
 	if _attack_choice_popup != null and is_instance_valid(_attack_choice_popup):

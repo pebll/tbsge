@@ -30,6 +30,7 @@ var _legion: Legion = null
 var _sticky: bool = false
 var _settings_connected := false
 var _placements: Array = []
+var _embedded_hud: bool = false
 
 func _ready() -> void:
 	name = "LegionStrip"
@@ -96,9 +97,16 @@ func refresh_if_legion(legion: Legion) -> void:
 		return
 	_render()
 
+func configure_embedded_hud() -> void:
+	_embedded_hud = true
+	_layout_anchors()
+
 func _layout_anchors() -> void:
 	var total_h := _estimate_height()
 	var total_w := BOARD_PX.x + float(TEAM_BORDER * 2) + BOARD_INSET * 2.0 + 8.0
+	custom_minimum_size = Vector2(total_w, total_h)
+	if _embedded_hud:
+		return
 	set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
 	anchor_left = 0.5
 	anchor_right = 0.5
@@ -111,7 +119,7 @@ func _layout_anchors() -> void:
 	custom_minimum_size = Vector2(total_w, total_h)
 
 func _estimate_height() -> float:
-	return 44.0 + AGG_GAP + BOARD_PX.y + float(TEAM_BORDER * 2) + BOARD_INSET * 2.0
+	return 56.0 + AGG_GAP + BOARD_PX.y + float(TEAM_BORDER * 2) + BOARD_INSET * 2.0
 
 func _build() -> void:
 	_root = VBoxContainer.new()
@@ -187,12 +195,36 @@ func _rebuild_aggregates(legion: Legion) -> void:
 		if u.has_ranged():
 			any_ranged = true
 			ranged += u.ranged_attack
-	_agg_row.add_child(UiStatIcons.make_row(UiStatIcons.ICON_HEALTH, "%d" % int(round(hp)), 26, 20, 6))
+	_agg_row.add_child(UiStatIcons.make_row(
+		UiStatIcons.ICON_HEALTH,
+		"%d" % int(round(hp)),
+		UiStatIcons.STRIP_AGG_ICON_PX,
+		UiStatIcons.STRIP_AGG_FONT_SIZE,
+		UiStatIcons.STRIP_AGG_SEPARATION
+	))
 	if shield > 0.0:
-		_agg_row.add_child(UiStatIcons.make_row(UiStatIcons.ICON_SHIELD, "%d" % int(round(shield)), 26, 20, 6))
-	_agg_row.add_child(UiStatIcons.make_row(UiStatIcons.ICON_ATTACK, "%d" % int(round(atk)), 26, 20, 6))
+		_agg_row.add_child(UiStatIcons.make_row(
+			UiStatIcons.ICON_SHIELD,
+			"%d" % int(round(shield)),
+			UiStatIcons.STRIP_AGG_ICON_PX,
+			UiStatIcons.STRIP_AGG_FONT_SIZE,
+			UiStatIcons.STRIP_AGG_SEPARATION
+		))
+	_agg_row.add_child(UiStatIcons.make_row(
+		UiStatIcons.ICON_ATTACK,
+		"%d" % int(round(atk)),
+		UiStatIcons.STRIP_AGG_ICON_PX,
+		UiStatIcons.STRIP_AGG_FONT_SIZE,
+		UiStatIcons.STRIP_AGG_SEPARATION
+	))
 	if any_ranged:
-		_agg_row.add_child(UiStatIcons.make_row(UiStatIcons.ICON_BOW, "%d" % int(round(ranged)), 26, 20, 6))
+		_agg_row.add_child(UiStatIcons.make_row(
+			UiStatIcons.ICON_BOW,
+			"%d" % int(round(ranged)),
+			UiStatIcons.STRIP_AGG_ICON_PX,
+			UiStatIcons.STRIP_AGG_FONT_SIZE,
+			UiStatIcons.STRIP_AGG_SEPARATION
+		))
 
 func _rebuild_cells() -> void:
 	_clear_cells()
