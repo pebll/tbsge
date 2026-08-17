@@ -7,6 +7,7 @@ extends RefCounted
 const MinigameSessionScript = preload("res://scripts/minigame/minigame_session.gd")
 const MinigamePresenterScript = preload("res://scripts/minigame/minigame_presenter.gd")
 const BattleUIAdapterScript = preload("res://scripts/ui/battle_ui_adapter.gd")
+const BattleExpectationBarScript = preload("res://scripts/ui/battle_expectation_bar.gd")
 const BattleActionRunnerScript = preload("res://scripts/battle/battle_action_runner.gd")
 
 var host: Node
@@ -19,6 +20,7 @@ var setup_panel: MinigameSetupPanel
 var unit_picker: MinigameUnitPicker
 var turn_hud: TurnHud
 var tile_info_panel: TileInfoPanel
+var legion_strip: BattleExpectationBarScript
 var pass_overlay: PanelContainer
 var status_label: Label
 var game_over_panel: GameOverPanel

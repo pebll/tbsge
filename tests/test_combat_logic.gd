@@ -130,9 +130,14 @@ func _test_shield_absorbs_first_hit_only() -> bool:
 		return false
 
 	target.shield_remaining = 0
-	target.reset_turn_state()
+	if not target.reset_turn_state():
+		push_error("reset_turn_state should report a restore when shield was empty")
+		return false
 	if target.shield_remaining != 2:
 		push_error("reset_turn_state should restore shield at turn start")
+		return false
+	if target.reset_turn_state():
+		push_error("reset_turn_state should not report restore when already full")
 		return false
 	return true
 

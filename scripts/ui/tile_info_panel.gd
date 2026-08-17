@@ -46,6 +46,8 @@ const MinigameRulesScript = preload("res://scripts/minigame/minigame_rules.gd")
 @onready var clear_button: GameButton = %ClearButton
 
 var _draft_mode: bool = false
+## Previewing a unit type from the picker (not yet placed) — hide counts / draft +/-.
+var _draft_preview_only: bool = false
 var _draft_unit_type: String = ""
 var _draft_unit_count: int = 0
 var _remaining_budget: int = 0
@@ -55,7 +57,9 @@ const COLOR_BORDER := Color(0.78, 0.70, 0.58)
 const COLOR_TEXT := Color(0.12, 0.10, 0.08)
 const COLOR_BAR_BG := Color(0.82, 0.77, 0.68)
 const COLOR_BAR_FILL := Color(0.60, 0.16, 0.12)
+const COLOR_BAR_SHIELD := Color(0.55, 0.58, 0.62)
 const COLOR_BLOCK_BG := Color(0.93, 0.89, 0.82)
+const COLOR_SHIELD_TEXT := Color(0.52, 0.54, 0.58)
 
 const BORDER_THICK := 4
 const RADIUS := 16
@@ -87,6 +91,8 @@ var _units_header: HBoxContainer = null
 var _units_header_count: Label = null
 var _units_header_icon: TextureRect = null
 var _move_button: GameButton = null
+## unit -> { grey_bar, red_bar, hp_label, shield_label, shield_wrap, total_max, tweens }
+var _unit_vitals: Dictionary = {}
 
 func _ready() -> void:
 	_apply_style()
@@ -129,6 +135,9 @@ func _apply_style() -> void:
 	clip_contents = true
 
 	legion_name.add_theme_color_override("font_color", COLOR_TEXT)
+	legion_name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	legion_name.max_lines_visible = 2
+	legion_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	attack_value.add_theme_color_override("font_color", COLOR_TEXT)
 	health_value.add_theme_color_override("font_color", COLOR_TEXT)
 	unit_count_value.add_theme_color_override("font_color", COLOR_TEXT)
@@ -199,21 +208,21 @@ func show_legion(legion: Legion) -> void:
 		_set_empty_state()
 		hide()
 		return
+	_draft_preview_only = false
 	set_draft_mode(false)
 	_render_legion(legion)
 	show()
 
 func set_draft_mode(enabled: bool) -> void:
 	_draft_mode = enabled
-	draft_controls.visible = enabled
+	# Preview-only inspect hides placement controls; placed stacks keep them.
+	draft_controls.visible = enabled and not _draft_preview_only
 	if _row_mobility:
 		_row_mobility.visible = not enabled
 	else:
 		ap_stat.visible = not enabled
-	if _actions_block:
-		_actions_block.visible = not enabled
 	if _move_button:
-		_move_button.visible = enabled
+		_move_button.visible = enabled and not _draft_preview_only
 
 func show_draft_legion(
 	legion: Legion,
@@ -225,12 +234,33 @@ func show_draft_legion(
 		_set_empty_state()
 		hide()
 		return
+	_draft_preview_only = false
 	_draft_unit_type = legion.unit_type
 	_draft_unit_count = placement_count if placement_count >= 0 else legion.unit_count
 	_remaining_budget = remaining_budget
 	set_draft_mode(true)
 	_render_legion(legion)
 	_refresh_draft_controls()
+	show()
+
+## Inspect a unit type from the draft picker (right-click). No placement count yet.
+func show_draft_unit_preview(unit_type: String, team_id: String, remaining_budget: int = 0) -> void:
+	if unit_type.is_empty():
+		hide()
+		return
+	var legion := Legion.new(unit_type, 1, Vector2i.ZERO, team_id)
+	_draft_preview_only = true
+	_draft_unit_type = unit_type
+	_draft_unit_count = 1
+	_remaining_budget = remaining_budget
+	set_draft_mode(true)
+	_render_legion(legion)
+	# Hide per-unit roster — nothing placed yet.
+	if _units_header:
+		_units_header.hide()
+	for c in units_list.get_children():
+		c.queue_free()
+	cost_value.text = "Not placed yet — left-click a card to deploy"
 	show()
 
 func show_draft_message(text: String) -> void:
@@ -243,7 +273,7 @@ func _refresh_draft_controls() -> void:
 	var cost := MinigameRulesScript.legion_cost(_draft_unit_type, _draft_unit_count)
 	var fill := MinigameRulesScript.legion_fill(_draft_unit_type, _draft_unit_count)
 	count_value.text = "%d / %d" % [_draft_unit_count, legion_cap]
-	cost_value.text = "Legion cost: %d gold  •  Size %.1f / 12" % [cost, fill]
+	cost_value.text = "Legion cost: %d gold\nSize %.1f / 12 (max %d)" % [cost, fill, legion_cap]
 	min_button.button_disabled = _draft_unit_count <= 1
 	minus_button.button_disabled = _draft_unit_count <= 1
 	plus_button.button_disabled = _draft_unit_count >= affordable_max
@@ -260,7 +290,7 @@ func _can_add_draft_unit() -> bool:
 func _render_legion(legion: Legion) -> void:
 	_apply_team_accent(legion.team_id)
 	legion_block.show()
-	legion_name.text = "%s LEGION" % legion.unit_type
+	legion_name.text = _format_legion_title(legion.unit_type)
 
 	var unit0: Unit = legion.units[0] if legion.units.size() > 0 else null
 	if unit0:
@@ -281,6 +311,7 @@ func _render_legion(legion: Legion) -> void:
 	_render_actions(legion)
 	_render_units_header(legion)
 
+	_clear_unit_vitals()
 	for c in units_list.get_children():
 		c.queue_free()
 
@@ -294,6 +325,20 @@ func _render_legion(legion: Legion) -> void:
 	)
 	for u in sorted_units:
 		units_list.add_child(_build_unit_row(legion.unit_type, u))
+
+func apply_unit_vitals_fx(unit: Unit, hp: float, shield: float) -> void:
+	if unit == null or not _unit_vitals.has(unit):
+		return
+	var row: Dictionary = _unit_vitals[unit]
+	_set_unit_vitals_display(row, hp, shield, true)
+
+func _clear_unit_vitals() -> void:
+	for key in _unit_vitals.keys():
+		var row: Dictionary = _unit_vitals[key]
+		var tw: Tween = row.get("tween")
+		if tw and tw.is_running():
+			tw.kill()
+	_unit_vitals.clear()
 
 func _build_unit_row(unit_type: String, u: Unit) -> Control:
 	var wrapper := PanelContainer.new()
@@ -332,7 +377,6 @@ func _build_unit_row(unit_type: String, u: Unit) -> Control:
 	icon.texture = u.definition.icon if u.definition and u.definition.icon else _load_unit_icon(unit_type)
 	row.add_child(icon)
 
-	# Vertically center the bar without affecting its horizontal expand.
 	var bar_vbox := VBoxContainer.new()
 	bar_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bar_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -343,53 +387,181 @@ func _build_unit_row(unit_type: String, u: Unit) -> Control:
 	spacer_top.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	bar_vbox.add_child(spacer_top)
 
-	var bar := ProgressBar.new()
-	bar.min_value = 0
-	bar.max_value = max(1.0, float(u.max_health))
-	bar.value = clamp(float(u.current_health), 0.0, bar.max_value)
-	bar.show_percentage = false
-	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	bar.custom_minimum_size = Vector2(0, 28)
+	var hp_max := maxf(1.0, float(u.max_health))
+	var sh_max := maxf(0.0, float(u.shield_max))
+	var total_max := hp_max + sh_max
 
-	var sb_bg := StyleBoxFlat.new()
-	sb_bg.bg_color = COLOR_BAR_BG
-	sb_bg.border_color = COLOR_BORDER
-	sb_bg.border_width_left = BORDER_THICK
-	sb_bg.border_width_right = BORDER_THICK
-	sb_bg.border_width_top = BORDER_THICK
-	sb_bg.border_width_bottom = BORDER_THICK
-	sb_bg.corner_radius_top_left = 10
-	sb_bg.corner_radius_top_right = 10
-	sb_bg.corner_radius_bottom_left = 10
-	sb_bg.corner_radius_bottom_right = 10
-	bar.add_theme_stylebox_override("background", sb_bg)
+	var stack := Control.new()
+	stack.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	stack.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	stack.custom_minimum_size = Vector2(0, 28)
+	bar_vbox.add_child(stack)
 
-	var sb_fill := StyleBoxFlat.new()
-	sb_fill.bg_color = COLOR_BAR_FILL
-	sb_fill.corner_radius_top_left = 10
-	sb_fill.corner_radius_top_right = 10
-	sb_fill.corner_radius_bottom_left = 10
-	sb_fill.corner_radius_bottom_right = 10
-	bar.add_theme_stylebox_override("fill", sb_fill)
+	var grey := ProgressBar.new()
+	grey.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	grey.min_value = 0.0
+	grey.max_value = total_max
+	grey.show_percentage = false
+	grey.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stack.add_child(grey)
 
-	bar_vbox.add_child(bar)
+	var grey_bg := StyleBoxFlat.new()
+	grey_bg.bg_color = COLOR_BAR_BG
+	grey_bg.border_color = COLOR_BORDER
+	grey_bg.border_width_left = BORDER_THICK
+	grey_bg.border_width_right = BORDER_THICK
+	grey_bg.border_width_top = BORDER_THICK
+	grey_bg.border_width_bottom = BORDER_THICK
+	grey_bg.corner_radius_top_left = 10
+	grey_bg.corner_radius_top_right = 10
+	grey_bg.corner_radius_bottom_left = 10
+	grey_bg.corner_radius_bottom_right = 10
+	grey.add_theme_stylebox_override("background", grey_bg)
+	var grey_fill := StyleBoxFlat.new()
+	grey_fill.bg_color = COLOR_BAR_SHIELD
+	grey_fill.corner_radius_top_left = 10
+	grey_fill.corner_radius_top_right = 10
+	grey_fill.corner_radius_bottom_left = 10
+	grey_fill.corner_radius_bottom_right = 10
+	grey.add_theme_stylebox_override("fill", grey_fill)
+
+	var red := ProgressBar.new()
+	red.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	red.min_value = 0.0
+	red.max_value = total_max
+	red.show_percentage = false
+	red.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stack.add_child(red)
+
+	var red_bg := StyleBoxFlat.new()
+	red_bg.bg_color = Color(0, 0, 0, 0)
+	red.add_theme_stylebox_override("background", red_bg)
+	var red_fill := StyleBoxFlat.new()
+	red_fill.bg_color = COLOR_BAR_FILL
+	red_fill.corner_radius_top_left = 10
+	red_fill.corner_radius_top_right = 10
+	red_fill.corner_radius_bottom_left = 10
+	red_fill.corner_radius_bottom_right = 10
+	red.add_theme_stylebox_override("fill", red_fill)
 
 	var spacer_bottom := Control.new()
 	spacer_bottom.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	bar_vbox.add_child(spacer_bottom)
 
-	var hp := Label.new()
-	hp.text = "%d/%d" % [int(u.current_health), int(u.max_health)]
-	hp.add_theme_color_override("font_color", COLOR_TEXT)
-	hp.add_theme_font_size_override("font_size", 18)
-	hp.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	hp.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	hp.custom_minimum_size = Vector2(64, 0)
-	hp.size_flags_horizontal = Control.SIZE_SHRINK_END
-	row.add_child(hp)
+	var vitals := HBoxContainer.new()
+	vitals.add_theme_constant_override("separation", 8)
+	vitals.alignment = BoxContainer.ALIGNMENT_END
+	vitals.size_flags_horizontal = Control.SIZE_SHRINK_END
+	vitals.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(vitals)
+
+	var hp_wrap := HBoxContainer.new()
+	hp_wrap.add_theme_constant_override("separation", 3)
+	hp_wrap.alignment = BoxContainer.ALIGNMENT_CENTER
+	vitals.add_child(hp_wrap)
+	var hp_icon := TextureRect.new()
+	hp_icon.texture = ICON_HEALTH
+	hp_icon.custom_minimum_size = Vector2(20, 20)
+	hp_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	hp_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	hp_wrap.add_child(hp_icon)
+	var hp_label := Label.new()
+	hp_label.add_theme_color_override("font_color", COLOR_TEXT)
+	hp_label.add_theme_font_size_override("font_size", 16)
+	hp_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	hp_wrap.add_child(hp_label)
+
+	var shield_wrap := HBoxContainer.new()
+	shield_wrap.add_theme_constant_override("separation", 3)
+	shield_wrap.alignment = BoxContainer.ALIGNMENT_CENTER
+	shield_wrap.visible = sh_max > 0.0
+	vitals.add_child(shield_wrap)
+	var sh_icon := TextureRect.new()
+	sh_icon.texture = ICON_SHIELD
+	sh_icon.custom_minimum_size = Vector2(20, 20)
+	sh_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	sh_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	shield_wrap.add_child(sh_icon)
+	var shield_label := Label.new()
+	shield_label.add_theme_color_override("font_color", COLOR_SHIELD_TEXT)
+	shield_label.add_theme_font_size_override("font_size", 16)
+	shield_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	shield_wrap.add_child(shield_label)
+
+	var vitals_row := {
+		"grey_bar": grey,
+		"red_bar": red,
+		"hp_label": hp_label,
+		"shield_label": shield_label,
+		"shield_wrap": shield_wrap,
+		"hp_max": hp_max,
+		"shield_max": sh_max,
+		"total_max": total_max,
+		"tween": null,
+	}
+	_unit_vitals[u] = vitals_row
+	_set_unit_vitals_display(vitals_row, float(u.current_health), float(u.shield_remaining), false)
 
 	return wrapper
+
+func _set_unit_vitals_display(row: Dictionary, hp: float, shield: float, animate: bool) -> void:
+	var grey: ProgressBar = row.get("grey_bar")
+	var red: ProgressBar = row.get("red_bar")
+	var hp_label: Label = row.get("hp_label")
+	var shield_label: Label = row.get("shield_label")
+	var shield_wrap: Control = row.get("shield_wrap")
+	if grey == null or red == null:
+		return
+	var hp_max: float = float(row.get("hp_max", 1.0))
+	var sh_max: float = float(row.get("shield_max", 0.0))
+	var total_max: float = maxf(1.0, float(row.get("total_max", hp_max)))
+	var hp_clamped := clampf(hp, 0.0, hp_max)
+	var sh_clamped := clampf(shield, 0.0, sh_max)
+	var grey_val := hp_clamped + sh_clamped
+	var red_val := hp_clamped
+
+	if hp_label:
+		hp_label.text = "%d/%d" % [int(round(hp_clamped)), int(round(hp_max))]
+	if shield_wrap:
+		shield_wrap.visible = sh_max > 0.0
+	if shield_label and sh_max > 0.0:
+		shield_label.text = "%d/%d" % [int(round(sh_clamped)), int(round(sh_max))]
+
+	var prev_tw: Tween = row.get("tween")
+	if prev_tw and is_instance_valid(prev_tw) and prev_tw.is_running():
+		prev_tw.kill()
+
+	if not animate:
+		grey.max_value = total_max
+		red.max_value = total_max
+		grey.value = grey_val
+		red.value = red_val
+		row["tween"] = null
+		return
+
+	grey.max_value = total_max
+	red.max_value = total_max
+	var tw := grey.create_tween()
+	tw.set_parallel(true)
+	tw.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tw.tween_property(grey, "value", grey_val, 0.18)
+	tw.tween_property(red, "value", red_val, 0.18)
+	row["tween"] = tw
+
+func _format_legion_title(unit_type: String) -> String:
+	var title := _unit_display_name(unit_type).strip_edges().to_upper()
+	if title.is_empty():
+		title = unit_type.replace("_", " ").to_upper()
+	# Multi-word names wrap onto two lines so the header does not overflow.
+	if " " in title:
+		return "%s\nLEGION" % title
+	return "%s LEGION" % title
+
+func _unit_display_name(unit_type: String) -> String:
+	var def := UnitDefs.get_def(unit_type)
+	if def != null and not String(def.display_name).strip_edges().is_empty():
+		return String(def.display_name)
+	return unit_type.replace("_", " ").capitalize()
 
 func _team_accent_stylebox(color: Color) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
@@ -406,11 +578,9 @@ func _contrasting_text_color(bg: Color) -> Color:
 func _apply_team_accent(team_id: String) -> void:
 	var team_res: Resource = TeamDefs.get_def(team_id)
 	var accent: Color = COLOR_BORDER
-	var label_text: String = team_id
+	var label_text: String = GameSettings.display_name_for_team(team_id)
 	if team_res is TeamDefinition:
-		var team: TeamDefinition = team_res
-		accent = team.color
-		label_text = team.display_name
+		accent = (team_res as TeamDefinition).color
 
 	team_name_label.text = label_text
 	team_name_label.add_theme_color_override("font_color", _contrasting_text_color(accent))
@@ -438,7 +608,10 @@ func _render_unit_type_stats(unit0: Unit, unit_type: String) -> void:
 		_update_ranged_stat_rows(null)
 		return
 
-	size_value.text = "%.1f" % def.size
+	size_value.text = "%.1f (max %d)" % [
+		def.size,
+		MinigameRulesScript.max_units_in_legion(def.id),
+	]
 	price_value.text = "%d" % def.price
 	if def.shield > 0:
 		shield_stat.show()
@@ -484,6 +657,7 @@ func _ensure_stat_rows_layout() -> void:
 	_row_vitals = _make_stat_line()
 	_row_damage = _make_stat_line()
 	_row_economy = _make_stat_line()
+	var row_price := _make_stat_line()
 	_row_mobility = _make_stat_line()
 
 	# Row 1: Health, Shield
@@ -491,10 +665,11 @@ func _ensure_stat_rows_layout() -> void:
 	_row_vitals.add_child(shield_stat)
 	# Row 2: Melee, Ranged (ranged added later)
 	_row_damage.add_child(attack_stat)
-	# Row 3: Size, Cost
+	# Row 3: Size
 	_row_economy.add_child(size_stat)
-	_row_economy.add_child(price_stat)
-	# Row 4: AP, Range (range added later)
+	# Row 4: Cost (own line)
+	row_price.add_child(price_stat)
+	# Row 5: AP, Range (range added later)
 	_row_mobility.add_child(ap_stat)
 
 	# Hide the old unit-count chip from the header — count lives above the unit list.
@@ -511,8 +686,10 @@ func _ensure_stat_rows_layout() -> void:
 	header_text.move_child(_row_damage, insert_at + 2)
 	header_text.add_child(_row_economy)
 	header_text.move_child(_row_economy, insert_at + 3)
+	header_text.add_child(row_price)
+	header_text.move_child(row_price, insert_at + 4)
 	header_text.add_child(_row_mobility)
-	header_text.move_child(_row_mobility, insert_at + 4)
+	header_text.move_child(_row_mobility, insert_at + 5)
 
 func _make_stat_line() -> HBoxContainer:
 	var row := HBoxContainer.new()
@@ -587,6 +764,9 @@ func _render_units_header(legion: Legion) -> void:
 	_ensure_units_header()
 	if _units_header == null:
 		return
+	if _draft_preview_only:
+		_units_header.hide()
+		return
 	_units_header.show()
 	_units_header_count.text = str(legion.units.size())
 	var tex: Texture2D = null
@@ -617,10 +797,6 @@ func _ensure_move_button() -> void:
 func _render_actions(legion: Legion) -> void:
 	_ensure_actions_block()
 	if _inspect_action_bar == null:
-		return
-	if _draft_mode:
-		if _actions_block:
-			_actions_block.hide()
 		return
 	_actions_block.show()
 	_inspect_action_bar.set_tooltip_context_legion(legion)

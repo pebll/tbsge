@@ -1,0 +1,28 @@
+---
+description: FableQuest UI chrome — always reuse UiTheme; legion strip conventions
+alwaysApply: true
+---
+
+# UI chrome & legion strip
+
+## Always reuse shared styling
+
+- **Do not invent new panel colors, radii, or borders.** Use [`scripts/ui/ui_theme.gd`](scripts/ui/ui_theme.gd) (`UiTheme`): `COLOR_PANEL` / `COLOR_CARD` / `COLOR_BLOCK` / `COLOR_BORDER` / `COLOR_TEXT`, `RADIUS`, `BORDER_THICK`, `panel_stylebox()`, `apply_button_chrome()`, `juice_*`.
+- **Stat rows** (HP, attack, shield, AP, gold, ranged): use [`scripts/ui/ui_stat_icons.gd`](scripts/ui/ui_stat_icons.gd) — shared icon textures + `make_row()` / `unit_stat_rows()`. Do not spell out "Attack 5" without the sword/heart/etc. icon.
+- Match battle HUD chrome to existing pieces (action bar, pause, parchment panels). Prefer the same beige parchment look; team color is for **accent borders / headers only**, not a full team-tinted fill unless explicitly requested.
+- Hover / select / entry motion for **Control UI** goes through `scripts/ui/interact/` (`UiInteractable`, `UiTooltipPolicy`) and `UiTheme.INTERACT_*` constants — do not one-off tween scales on panels.
+- **Do not** restyle world tiles/legions with this framework (map lift/juice stays separate).
+
+## Legion strip (battle HUD)
+
+Bottom compact legion inspect (replaces right `TileInfoPanel` in battle; draft still uses the right panel):
+
+- **Board**: plain beige `COLOR_PANEL` (no empty-slot grid). Units are **pasted tiles** over the board with parchment `COLOR_BORDER`, rounded corners, fill their footprint.
+- **Stats display**: use shared [`UiStatIcons`](scripts/ui/ui_stat_icons.gd) (heart/sword/bow/shield/boot/coin) for aggregate chip and unit hover tooltips — not text-only labels.
+- **Outer border**: thick team color only. No select-highlight chrome on the strip.
+- Size/footprints (`UnitFootprint`, width × height): height is **always 1** (size ≤ 1.5 → `size × 1`) or **2** (size ≥ 2 → `(size/2) × 2`). Allowed sizes `0.75, 1, 1.5, 2, 3, 4, 6, 8, 10, 12`. Pack into 6×2; reject bad packs in draft rules.
+- Place strip **under** the action bar but **not flush** to the screen bottom (leave breathing room). Keep action bar raised accordingly.
+
+## When changing UI
+
+Touch `UiTheme` (or interact framework) once rather than copying StyleBoxFlat / color literals into new panels. If a new chrome token is needed, add it to `UiTheme` first.

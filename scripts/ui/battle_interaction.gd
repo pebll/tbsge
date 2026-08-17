@@ -43,6 +43,10 @@ var _info_tile_coords: Vector2i
 var _info_visible_for_tile: bool = false
 var _inspect_fn: Callable = func(_coords: Vector2i) -> void: pass
 var _clear_inspect_fn: Callable = func() -> void: pass
+var _preview_inspect_fn: Callable = Callable()
+var _clear_preview_inspect_fn: Callable = Callable()
+var _expectation_preview_fn: Callable = Callable()
+var _clear_expectation_preview_fn: Callable = Callable()
 var turn_manager_fn: Callable
 var legions_fn: Callable
 var _events_bound: bool = false
@@ -52,6 +56,7 @@ var _pending_move_active: bool = false
 var _pending_first_steps: Array[Vector2i] = []
 var _pending_parents: Dictionary = {}
 var _context = null
+var _hovered_attack_target: Vector2i = Vector2i(2147483645, 2147483645)
 
 func bind_from_context(context) -> void:
 	## Single wiring entry so hosts don't re-declare the same Callables.
@@ -70,6 +75,29 @@ func bind_from_context(context) -> void:
 	legions_fn = func() -> Array: return context.legions()
 	_inspect_fn = func(coords: Vector2i) -> void: context.inspect_tile(coords)
 	_clear_inspect_fn = func() -> void: context.clear_inspect()
+	if context.preview_inspect_fn.is_valid():
+		_preview_inspect_fn = func(coords: Vector2i) -> void: context.preview_inspect(coords)
+	else:
+		_preview_inspect_fn = Callable()
+	if context.clear_preview_inspect_fn.is_valid():
+		_clear_preview_inspect_fn = func() -> void: context.clear_preview_inspect()
+	else:
+		_clear_preview_inspect_fn = Callable()
+	if context.expectation_preview_fn.is_valid():
+		_expectation_preview_fn = func(
+			attacker: Legion,
+			defender: Legion,
+			action_id: String,
+			from_coords: Vector2i,
+			to_coords: Vector2i
+		) -> void:
+			context.show_expectation_preview(attacker, defender, action_id, from_coords, to_coords)
+	else:
+		_expectation_preview_fn = Callable()
+	if context.clear_expectation_preview_fn.is_valid():
+		_clear_expectation_preview_fn = func() -> void: context.clear_expectation_preview()
+	else:
+		_clear_expectation_preview_fn = Callable()
 	if context.overlay_ui_fn.is_valid():
 		overlay_ui_fn = context.overlay_ui_fn
 
@@ -112,6 +140,7 @@ func deselect() -> void:
 	_pending_first_steps.clear()
 	_pending_parents.clear()
 	_info_visible_for_tile = false
+	_clear_expectation_preview()
 	_clear_inspect_fn.call()
 	if action_bar:
 		action_bar.clear_bar()
@@ -121,7 +150,7 @@ func select_tile(coords: Vector2i) -> void:
 	if state == null:
 		return
 	var legion: Legion = _legion_at(state, coords)
-	if legion == null or not bool(can_act_fn.call(legion)):
+	if legion == null:
 		return
 	_hide_attack_choice_popup()
 	_clear_overlay_visuals()
@@ -131,7 +160,8 @@ func select_tile(coords: Vector2i) -> void:
 	target_coords.clear()
 	default_target_actions.clear()
 	_paint_tile(coords, "selected", LIFT_SELECTED)
-	_paint_default_targets(state, legion)
+	if bool(can_act_fn.call(legion)):
+		_paint_default_targets(state, legion)
 	_info_tile_coords = coords
 	_info_visible_for_tile = true
 	_inspect_fn.call(coords)
@@ -147,9 +177,10 @@ func select_action(action: ActionDefinitionScript) -> void:
 	if state == null:
 		return
 	var legion: Legion = _legion_at(state, selected_coords)
-	if legion == null:
+	if legion == null or not bool(can_act_fn.call(legion)):
 		return
 	_hide_attack_choice_popup()
+	_clear_expectation_preview()
 	if selected_action and selected_action.id == action.id:
 		selected_action = null
 		target_coords.clear()
@@ -184,9 +215,10 @@ func _refresh_action_bar(
 	if action_bar == null:
 		return
 	var listed := ActionTargetingScript.listed_actions(legion)
+	var can_act := bool(can_act_fn.call(legion))
 	var reasons: Dictionary = {}
 	for action in listed:
-		var reason := ActionTargetingScript.disable_reason(state, legion, action)
+		var reason := ActionTargetingScript.disable_reason(state, legion, action, not can_act)
 		if not reason.is_empty():
 			reasons[action.id] = reason
 	action_bar.set_actions(listed, selected, reasons)
@@ -241,10 +273,13 @@ func pass_current_legion() -> void:
 	if not can_accept_command():
 		return
 	if has_selected:
-		var tm: TurnManager = turn_manager_fn.call()
-		tm.wait_legion(selected_coords)
+		var state: BattleStateScript = battle_state_fn.call()
+		var legion: Legion = _legion_at(state, selected_coords) if state else null
+		if legion and bool(can_act_fn.call(legion)):
+			var tm: TurnManager = turn_manager_fn.call()
+			tm.wait_legion(selected_coords)
+			_sync_spent_visuals()
 		deselect()
-		_sync_spent_visuals()
 	cycle_legion_tab()
 
 func _on_action_bar_pressed(action: ActionDefinitionScript) -> void:
@@ -252,10 +287,9 @@ func _on_action_bar_pressed(action: ActionDefinitionScript) -> void:
 		return
 	var state: BattleStateScript = battle_state_fn.call()
 	var legion: Legion = _legion_at(state, selected_coords) if state else null
-	if legion:
-		AudioManager.play_unit_click(legion.unit_type)
-	else:
-		AudioManager.play_sfx("tile_click")
+	if legion == null or not bool(can_act_fn.call(legion)):
+		return
+	AudioManager.play_unit_click(legion.unit_type)
 	select_action(action)
 
 func _on_tile_clicked(coords: Vector2i) -> void:
@@ -280,22 +314,32 @@ func _play_click_sound_for_tile(coords: Vector2i) -> void:
 func _on_tile_right_clicked(coords: Vector2i) -> void:
 	if not battle_phase_fn.is_valid() or not bool(battle_phase_fn.call()):
 		return
+	if not can_accept_command():
+		return
+	var state: BattleStateScript = battle_state_fn.call()
+	if state == null:
+		return
+	var legion: Legion = _legion_at(state, coords)
+	if legion:
+		select_tile(coords)
+		return
 	_info_tile_coords = coords
 	_info_visible_for_tile = true
 	_inspect_fn.call(coords)
 
 func _on_tile_hover_entered(coords: Vector2i) -> void:
-	if not coords in _overlay_coords:
-		return
-	AudioManager.play_sfx("tile_hover")
-	var tile_visu: TileVisu = tile_visu_fn.call(coords)
-	if tile_visu:
-		tile_visu.set_hover_boost(true)
-	if has_selected:
-		var selected_visu: TileVisu = tile_visu_fn.call(selected_coords)
-		if selected_visu and selected_visu.legion_visu and tile_visu:
-			var dir := (tile_visu.position - selected_visu.position).normalized()
-			selected_visu.legion_visu.update_direction(dir)
+	if coords in _overlay_coords:
+		AudioManager.play_sfx("tile_hover")
+		var tile_visu: TileVisu = tile_visu_fn.call(coords)
+		if tile_visu:
+			tile_visu.set_hover_boost(true)
+		if has_selected:
+			var selected_visu: TileVisu = tile_visu_fn.call(selected_coords)
+			if selected_visu and selected_visu.legion_visu and tile_visu:
+				var dir := (tile_visu.position - selected_visu.position).normalized()
+				selected_visu.legion_visu.update_direction(dir)
+	if _is_attack_target_hover(coords):
+		_show_expectation_for_target(coords)
 
 func _on_tile_hover_exited(coords: Vector2i) -> void:
 	if coords in _overlay_coords:
@@ -306,6 +350,61 @@ func _on_tile_hover_exited(coords: Vector2i) -> void:
 		var selected_visu: TileVisu = tile_visu_fn.call(selected_coords)
 		if selected_visu and selected_visu.legion_visu:
 			selected_visu.legion_visu.juice_direct_reset()
+	if coords == _hovered_attack_target:
+		_hovered_attack_target = Vector2i(2147483645, 2147483645)
+		_clear_expectation_preview()
+
+func _is_attack_target_hover(coords: Vector2i) -> bool:
+	if not has_selected:
+		return false
+	if selected_action:
+		var selected_id := selected_action.id
+		if selected_id == "melee_attack" or selected_id == "ranged_attack":
+			return coords in target_coords
+		if selected_id == "self_heal":
+			return coords == selected_coords
+		if selected_id == "heal_ally":
+			return coords in target_coords
+		return false
+	if default_target_actions.has(coords):
+		var actions: Array = default_target_actions[coords]
+		return "melee_attack" in actions or "ranged_attack" in actions
+	return false
+
+func _attack_action_for_target(coords: Vector2i) -> String:
+	if selected_action:
+		var selected_id := selected_action.id
+		if selected_id == "melee_attack" or selected_id == "ranged_attack":
+			return selected_id
+		if selected_id == "self_heal" or selected_id == "heal_ally":
+			return selected_id
+	if default_target_actions.has(coords):
+		var actions: Array = default_target_actions[coords]
+		if "melee_attack" in actions:
+			return "melee_attack"
+		if "ranged_attack" in actions:
+			return "ranged_attack"
+	return ""
+
+func _show_expectation_for_target(coords: Vector2i) -> void:
+	if not _expectation_preview_fn.is_valid():
+		return
+	var state: BattleStateScript = battle_state_fn.call()
+	if state == null:
+		return
+	var attacker: Legion = _legion_at(state, selected_coords)
+	var defender: Legion = _legion_at(state, coords)
+	if attacker == null or defender == null:
+		return
+	var action_id := _attack_action_for_target(coords)
+	if action_id.is_empty():
+		return
+	_hovered_attack_target = coords
+	_expectation_preview_fn.call(attacker, defender, action_id, selected_coords, coords)
+
+func _clear_expectation_preview() -> void:
+	if _clear_expectation_preview_fn.is_valid():
+		_clear_expectation_preview_fn.call()
 
 func _dispatch_click(coords: Vector2i) -> void:
 	if _attack_choice_popup != null and is_instance_valid(_attack_choice_popup):
@@ -319,6 +418,10 @@ func _dispatch_click(coords: Vector2i) -> void:
 			)
 			_pending_move_active = false
 			_execute_move_path(path)
+		else:
+			# Clicked outside the first-step choices — cancel the pending move.
+			_pending_move_active = false
+			deselect()
 		return
 
 	if has_selected and selected_action:
@@ -355,9 +458,9 @@ func _dispatch_click(coords: Vector2i) -> void:
 		return
 	var tile: Tile = state.tile_at(coords)
 	if tile and tile.has_legion():
-		deselect()
-		var legion: Legion = tile.legion
-		if bool(can_act_fn.call(legion)):
+		if has_selected and coords == selected_coords:
+			deselect()
+		else:
 			select_tile(coords)
 		return
 

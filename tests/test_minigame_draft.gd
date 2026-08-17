@@ -14,6 +14,10 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_ai_drafts_multiple_legions():
 		return false
+	if not _test_ai_draft_prefers_maxed_stacks():
+		return false
+	if not _test_ai_draft_spends_large_budget():
+		return false
 	print("Success: Minigame draft tests")
 	return true
 
@@ -156,5 +160,95 @@ func _test_ai_drafts_multiple_legions() -> bool:
 	var draft: DraftState = session.drafts[team_b_id] as DraftState
 	if draft.placements.size() < 2:
 		push_error("AI should draft at least two legions (got %d)" % draft.placements.size())
+		return false
+	return true
+
+## Sample many AI drafts: stacks should trend fat (no fixed legion-count cap).
+func _test_ai_draft_prefers_maxed_stacks() -> bool:
+	var AiDrafter = preload("res://scripts/ai/ai_drafter.gd")
+	var total_legions := 0
+	var total_units := 0
+	var samples := 24
+	for i in range(samples):
+		var session := MinigameTestHelpersScript.prepare_session()
+		var team_a_id: String = MinigameTestHelpersScript.team_a(session)
+		var team_b_id: String = MinigameTestHelpersScript.team_b(session)
+		var slots_a: Array = session.get_deploy_slots(team_a_id)
+		session.apply({
+			"type": "draft_set_legion",
+			"team": team_a_id,
+			"coords": slots_a[0],
+			"unit_type": "GOBLIN",
+			"unit_count": 1,
+		})
+		session.apply({"type": "draft_ready", "team": team_a_id})
+		var rng := RandomNumberGenerator.new()
+		rng.seed = 1000 + i * 17
+		for cmd in AiDrafter.build_draft_commands(session, team_b_id, rng):
+			var result: Dictionary = session.apply(cmd)
+			if not result["ok"]:
+				push_error("AI draft failed in fill-bias sample: %s" % result.get("error"))
+				return false
+		var draft: DraftState = session.drafts[team_b_id] as DraftState
+		total_legions += draft.placements.size()
+		for p in draft.placements:
+			total_units += int(p.unit_count)
+
+	var avg_units_per_legion := float(total_units) / float(maxi(1, total_legions))
+	if avg_units_per_legion < 2.5:
+		push_error("Expected AI avg units/legion >= 2.5, got %.2f" % avg_units_per_legion)
+		return false
+	return true
+
+## Impossible-style gold: keep opening stacks until almost all budget is spent.
+func _test_ai_draft_spends_large_budget() -> bool:
+	var AiDrafter = preload("res://scripts/ai/ai_drafter.gd")
+	var session := MinigameTestHelpersScript.prepare_session()
+	session.config.budget = 200
+	session.config.ai_budget_mult = 2.0
+	# Rebuild drafts with the inflated AI budget.
+	session.drafts.clear()
+	for team_id in session.config.team_ids:
+		session.drafts[team_id] = DraftState.new(team_id, session.config.budget_for_team(team_id))
+
+	var team_a_id: String = MinigameTestHelpersScript.team_a(session)
+	var team_b_id: String = MinigameTestHelpersScript.team_b(session)
+	var ai_budget := int(session.drafts[team_b_id].remaining_budget)
+	if ai_budget < 350:
+		push_error("Expected large AI budget (~400), got %d" % ai_budget)
+		return false
+
+	var slots_a: Array = session.get_deploy_slots(team_a_id)
+	session.apply({
+		"type": "draft_set_legion",
+		"team": team_a_id,
+		"coords": slots_a[0],
+		"unit_type": "GOBLIN",
+		"unit_count": 1,
+	})
+	session.apply({"type": "draft_ready", "team": team_a_id})
+
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 4242
+	for cmd in AiDrafter.build_draft_commands(session, team_b_id, rng):
+		var result: Dictionary = session.apply(cmd)
+		if not result["ok"]:
+			push_error("AI large-budget draft failed: %s" % result.get("error"))
+			return false
+
+	var draft: DraftState = session.drafts[team_b_id] as DraftState
+	var remaining := int(draft.remaining_budget)
+	var cheapest := MinigameRulesScript.unit_price("GOBLIN")
+	# Allow leftover smaller than one cheapest unit (can't always spend exact).
+	if remaining >= cheapest * 2:
+		push_error(
+			"AI should spend most of a large budget (remaining %d, budget %d, stacks %d)"
+			% [remaining, ai_budget, draft.placements.size()]
+		)
+		return false
+	if draft.placements.size() < 5:
+		push_error(
+			"Large budget should open many maxed stacks, got %d" % draft.placements.size()
+		)
 		return false
 	return true

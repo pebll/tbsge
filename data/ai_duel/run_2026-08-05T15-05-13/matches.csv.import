@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://vv5o0tlak1ud"
+
+[deps]
+
+files=["res://data/ai_duel/run_2026-08-05T15-05-13/matches.map.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/matches.budget.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/matches.map.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/matches.combat.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/matches.team.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/matches.elapsed.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/matches.winner.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/matches.timed.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/matches.survivors.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/matches.survivors.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/matches.green.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/matches.blue.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/matches.green.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/matches.blue.translation"]
+
+source_file="res://data/ai_duel/run_2026-08-05T15-05-13/matches.csv"
+dest_files=["res://data/ai_duel/run_2026-08-05T15-05-13/matches.map.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/matches.budget.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/matches.map.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/matches.combat.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/matches.team.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/matches.elapsed.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/matches.winner.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/matches.timed.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/matches.survivors.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/matches.survivors.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/matches.green.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/matches.blue.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/matches.green.translation", "res://data/ai_duel/run_2026-08-05T15-05-13/matches.blue.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true

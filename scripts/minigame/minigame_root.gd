@@ -15,6 +15,7 @@ const MinigamePresenterScript = preload("res://scripts/minigame/minigame_present
 const MinigamePhaseDepsScript = preload("res://scripts/minigame/minigame_phase_deps.gd")
 const DraftPhaseControllerScript = preload("res://scripts/minigame/draft_phase_controller.gd")
 const BattlePhaseControllerScript = preload("res://scripts/minigame/battle_phase_controller.gd")
+const BattleExpectationBarScript = preload("res://scripts/ui/battle_expectation_bar.gd")
 
 @export var config_path: String = CONFIG_PATH
 
@@ -33,6 +34,7 @@ var _setup_panel: MinigameSetupPanel
 var _unit_picker: MinigameUnitPicker
 var _turn_hud: TurnHud
 var _tile_info_panel: TileInfoPanel
+var _legion_strip: BattleExpectationBarScript
 var _combat_fx_layer: CanvasLayer
 var _action_playback: RefCounted
 var _pass_overlay: PanelContainer
@@ -68,6 +70,8 @@ func _ready() -> void:
 	EventBus.tile_clicked.connect(_on_tile_clicked)
 	EventBus.tile_right_clicked.connect(_on_tile_right_clicked)
 	EventBus.legion_ap_changed.connect(_on_legion_ap_changed)
+	EventBus.legion_shields_refilled.connect(_on_legion_shields_refilled)
+	EventBus.unit_vitals_fx.connect(_on_unit_vitals_fx)
 
 func _exit_tree() -> void:
 	if battle_ui:
@@ -115,9 +119,23 @@ func inspect_tile(coords: Vector2i) -> void:
 	else:
 		battle.inspect_tile(coords)
 
+func preview_inspect(coords: Vector2i) -> void:
+	if session.phase == MinigameSessionScript.Phase.BATTLE:
+		battle.preview_inspect(coords)
+
+func clear_preview_inspect() -> void:
+	if session.phase == MinigameSessionScript.Phase.BATTLE:
+		battle.clear_preview_inspect()
+
 func clear_inspect() -> void:
-	if _tile_info_panel:
-		_tile_info_panel.hide()
+	if session.phase == MinigameSessionScript.Phase.DRAFT:
+		if _tile_info_panel:
+			_tile_info_panel.hide()
+	else:
+		if battle:
+			battle.clear_battle_inspect()
+		elif _legion_strip:
+			_legion_strip.hide_strip()
 
 func request_use_action(action_id: String, from_coords: Vector2i, to_coords: Vector2i) -> void:
 	await battle.request_use_action(action_id, from_coords, to_coords)
@@ -133,6 +151,7 @@ func _setup_phase_controllers() -> void:
 	deps.unit_picker = _unit_picker
 	deps.turn_hud = _turn_hud
 	deps.tile_info_panel = _tile_info_panel
+	deps.legion_strip = _legion_strip
 	deps.pass_overlay = _pass_overlay
 	deps.status_label = _status_label
 	deps.game_over_panel = _game_over_panel
@@ -157,13 +176,29 @@ func _setup_battle_context() -> void:
 		func() -> void: clear_inspect(),
 		func() -> Node: return _overlay_layer
 	)
+	battle_context.preview_inspect_fn = func(coords: Vector2i) -> void: preview_inspect(coords)
+	battle_context.clear_preview_inspect_fn = func() -> void: clear_preview_inspect()
+	battle_context.expectation_preview_fn = func(
+		attacker: Legion,
+		defender: Legion,
+		action_id: String,
+		from_coords: Vector2i,
+		to_coords: Vector2i
+	) -> void:
+		if _legion_strip:
+			_legion_strip.show_attack_preview(attacker, defender, action_id, from_coords, to_coords)
+	battle_context.clear_expectation_preview_fn = func() -> void:
+		if _legion_strip:
+			_legion_strip.hide_attack_preview()
 	battle_context.apply_move_path_fn = func(path: Array) -> void:
 		battle.request_move_path(path)
 	battle_context.battle_phase_fn = func() -> bool: return session.phase == MinigameSessionScript.Phase.BATTLE
 
 func _connect_phase_signals() -> void:
 	_setup_panel.ready_pressed.connect(func() -> void: draft.handle_ready())
+	_setup_panel.random_team_pressed.connect(func() -> void: draft.handle_random_team())
 	_unit_picker.unit_selected.connect(func(unit_type: String) -> void: draft.handle_unit_picked(unit_type))
+	_unit_picker.unit_inspected.connect(func(unit_type: String) -> void: draft.handle_unit_inspected(unit_type))
 	_unit_picker.cancelled.connect(func() -> void: draft.handle_picker_cancelled())
 	_turn_hud.next_turn_pressed.connect(func() -> void: battle.handle_end_turn())
 	_tile_info_panel.draft_count_min_pressed.connect(func() -> void: draft.handle_count_min())
@@ -173,8 +208,14 @@ func _connect_phase_signals() -> void:
 	_tile_info_panel.draft_clear_slot_pressed.connect(func() -> void: draft.handle_clear_slot())
 	_tile_info_panel.draft_change_type_pressed.connect(func() -> void: draft.handle_change_type())
 	_tile_info_panel.draft_move_pressed.connect(func() -> void: draft.handle_move_mode())
-	_pass_continue_btn.pressed.connect(func() -> void: draft.handle_pass_continue())
+	_pass_continue_btn.pressed.connect(_on_pass_continue_pressed)
 	battle_ui.attach_action_bar(_action_bar)
+
+func _on_pass_continue_pressed() -> void:
+	if session.phase == MinigameSessionScript.Phase.BATTLE:
+		battle.handle_pass_continue()
+	else:
+		draft.handle_pass_continue()
 
 func _setup_ui() -> void:
 	_ui_layer = CanvasLayer.new()
@@ -200,6 +241,10 @@ func _setup_ui() -> void:
 	_ui_layer.add_child(_tile_info_panel)
 	_tile_info_panel.hide()
 
+	_legion_strip = BattleExpectationBarScript.new()
+	_ui_layer.add_child(_legion_strip)
+	_legion_strip.hide()
+
 	_action_bar = preload("res://scenes/ui/battle_action_bar.tscn").instantiate()
 	_ui_layer.add_child(_action_bar)
 
@@ -214,6 +259,7 @@ func _setup_ui() -> void:
 	_ui_layer.add_child(_action_log_panel)
 	_action_log_panel.set_tooltip_controller(_tooltip_controller)
 	EventBus.battle_log_entry_added.connect(_on_battle_log_entry_added)
+	EventBus.battle_log_live_tick.connect(_on_battle_log_live_tick)
 
 	_combat_fx_layer = CanvasLayer.new()
 	_combat_fx_layer.name = "CombatFX"
@@ -276,14 +322,41 @@ func _on_battle_log_entry_added(entry: Dictionary) -> void:
 	if _action_log_panel and session and session.phase == MinigameSessionScript.Phase.BATTLE:
 		_action_log_panel.receive_entry(entry)
 
+func _on_battle_log_live_tick(tick: Dictionary) -> void:
+	if _action_log_panel and session and session.phase == MinigameSessionScript.Phase.BATTLE:
+		_action_log_panel.apply_live_tick(tick)
+
 func _on_legion_ap_changed(legion: Legion) -> void:
 	if presenter and session:
 		presenter.sync_spent_visuals(session)
+	if session.phase == MinigameSessionScript.Phase.BATTLE:
+		if _legion_strip and _legion_strip.visible:
+			_legion_strip.refresh_if_legion(legion)
+		return
 	if not _tile_info_panel or not _tile_info_panel.visible:
 		return
 	var tile: Tile = session.grid.get(legion.tile_coords)
 	if tile and tile.has_legion():
 		_tile_info_panel.show_tile(tile)
+
+func _on_legion_shields_refilled(legion: Legion) -> void:
+	if session.phase == MinigameSessionScript.Phase.BATTLE:
+		if _legion_strip and _legion_strip.visible:
+			_legion_strip.refresh_if_legion(legion)
+		return
+	if not _tile_info_panel or not _tile_info_panel.visible or legion == null:
+		return
+	var tile: Tile = session.grid.get(legion.tile_coords)
+	if tile and tile.has_legion() and tile.legion == legion:
+		_tile_info_panel.show_tile(tile)
+
+func _on_unit_vitals_fx(unit: Unit, hp: float, shield: float) -> void:
+	if session.phase == MinigameSessionScript.Phase.BATTLE:
+		if _legion_strip and _legion_strip.visible:
+			_legion_strip.apply_unit_vitals_fx(unit, hp, shield)
+		return
+	if _tile_info_panel and _tile_info_panel.visible:
+		_tile_info_panel.apply_unit_vitals_fx(unit, hp, shield)
 
 func _on_game_over_new_game() -> void:
 	get_tree().change_scene_to_file(MINIGAME_SCENE)

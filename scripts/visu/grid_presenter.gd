@@ -18,6 +18,13 @@ func _ready() -> void:
 	tiles_container = Node2D.new()
 	tiles_container.name = "Tiles"
 	add_child(tiles_container)
+	if not EventBus.legion_shields_refilled.is_connected(_on_legion_shields_refilled):
+		EventBus.legion_shields_refilled.connect(_on_legion_shields_refilled)
+
+func _on_legion_shields_refilled(legion: Legion) -> void:
+	var lv := get_legion_visu(legion)
+	if lv:
+		lv.juice_shield_restore()
 
 func build_map_from_grid(grid: Dictionary) -> void:
 	_clear_map()

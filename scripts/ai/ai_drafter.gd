@@ -5,8 +5,12 @@ const MinigameRulesScript = preload("res://scripts/minigame/minigame_rules.gd")
 const DraftPlacementScript = preload("res://scripts/minigame/draft_placement.gd")
 
 const MIN_LEGIONS := 2
+## Prefer counts at or near the fill / gold cap when placing.
+const FILL_BIAS := 0.92
+## When spending leftover gold, prefer topping up underfilled stacks first.
+const TOP_UP_BIAS := 0.85
 const RANDOM_PLACEMENT_ATTEMPTS := 24
-const RANDOM_EXTRA_SPEND_ATTEMPTS := 32
+const RANDOM_EXTRA_SPEND_ATTEMPTS := 48
 
 static func build_draft_commands(
 	session,
@@ -30,15 +34,14 @@ static func build_draft_commands(
 	_shuffle(shuffled_slots, rng)
 
 	var cheapest := _cheapest_unit_price()
-	var max_legions := mini(
-		shuffled_slots.size(),
-		maxi(MIN_LEGIONS, budget_left / maxi(1, cheapest))
-	)
-	var legion_count := rng.randi_range(MIN_LEGIONS, max_legions)
 
+	# Keep opening maxed (or near-max) stacks on empty slots until gold or slots run out.
+	# No fixed legion-count target — budget and deploy slots decide how many.
 	for coords in shuffled_slots:
-		if placements.size() >= legion_count:
+		if budget_left < cheapest:
 			break
+		if placements.has(coords):
+			continue
 		var placement := _try_random_placement(
 			session, team_id, coords, draft, slots, placements, budget_left, rng, false
 		)
@@ -60,15 +63,25 @@ static func build_draft_commands(
 				continue
 			budget_left = _apply_simulated_placement(placements, placement, draft, budget_left, snapshot)
 
+	# Spend leftovers: top up underfilled stacks, then open more stacks if slots remain.
 	var extra_attempts := RANDOM_EXTRA_SPEND_ATTEMPTS
 	while budget_left >= cheapest and extra_attempts > 0:
 		extra_attempts -= 1
-		if placements.size() >= shuffled_slots.size() and rng.randf() > 0.35:
-			break
-		if rng.randf() > 0.55:
-			continue
-		var coords: Vector2i = shuffled_slots[rng.randi() % shuffled_slots.size()]
-		var allow_replace := placements.has(coords) or rng.randf() < 0.65
+		var coords: Vector2i
+		var allow_replace := true
+		var underfilled := _underfilled_coords(session, placements)
+		if not underfilled.is_empty() and rng.randf() < TOP_UP_BIAS:
+			coords = underfilled[rng.randi() % underfilled.size()]
+		else:
+			var empty := _empty_slots(shuffled_slots, placements)
+			if not empty.is_empty():
+				coords = empty[rng.randi() % empty.size()]
+				allow_replace = false
+			elif not placements.is_empty():
+				var keys: Array = placements.keys()
+				coords = keys[rng.randi() % keys.size()]
+			else:
+				break
 		var placement := _try_random_placement(
 			session, team_id, coords, draft, slots, placements, budget_left, rng, allow_replace
 		)
@@ -90,6 +103,25 @@ static func build_draft_commands(
 
 	commands.append({"type": "draft_ready", "team": team_id})
 	return commands
+
+static func _underfilled_coords(session, placements: Dictionary) -> Array:
+	var out: Array = []
+	var max_fill: float = session.config.max_legion_fill
+	for coords in placements.keys():
+		var p: Dictionary = placements[coords]
+		var unit_type := String(p["unit_type"])
+		var count := int(p["unit_count"])
+		var cap := MinigameRulesScript.max_units_in_legion(unit_type, max_fill)
+		if count < cap:
+			out.append(coords)
+	return out
+
+static func _empty_slots(slots: Array, placements: Dictionary) -> Array:
+	var out: Array = []
+	for coords in slots:
+		if not placements.has(coords):
+			out.append(coords)
+	return out
 
 static func _cheapest_unit_price() -> int:
 	var cheapest := 0
@@ -212,11 +244,14 @@ static func _random_count_placement(
 
 	var count := lowest
 	if max_count > lowest:
-		count = (
-			lowest
-			if rng == null
-			else rng.randi_range(lowest, max_count)
-		)
+		if rng == null:
+			count = lowest
+		elif rng.randf() < FILL_BIAS:
+			# Strive for maxed stacks: pick from the top of the affordable range.
+			var lo := maxi(lowest, int(ceili(float(lowest + max_count * 3) / 4.0)))
+			count = rng.randi_range(lo, max_count)
+		else:
+			count = rng.randi_range(lowest, max_count)
 
 	var spend := MinigameRulesScript.legion_cost(unit_type, count) - current_cost
 	if spend <= 0 or spend > budget_left:

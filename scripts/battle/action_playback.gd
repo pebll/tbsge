@@ -104,13 +104,14 @@ func play_combat(from_coords: Vector2i, to_coords: Vector2i, combat: Dictionary,
 		var hit_is_ranged := hit_mode == CombatResolver.MODE_RANGED
 
 		if hit_is_ranged:
-			await _play_ranged_hit(atk_visu, def_visu, atk_unit, def_unit, direction, h, deaths_by_hit)
+			await _play_ranged_hit(atk_visu, def_visu, atk_unit, def_unit, direction, h, deaths_by_hit, attacker, defender)
 		else:
 			atk_visu.animate_unit_attack(atk_unit, direction)
 			AudioManager.play_unit_hit(atk_unit.unit_type)
 			var died_on_hit := _apply_defender_reaction(
 				def_visu, def_legion, def_unit, direction, def_hp_before, def_hp_after, h, deaths_by_hit
 			)
+			_emit_combat_log_tick(attacker, defender, def_legion, h, died_on_hit)
 			var beat := COMBAT_DEATH_BEAT if died_on_hit else COMBAT_HIT_BEAT
 			await _beat(beat)
 
@@ -144,7 +145,9 @@ func _play_ranged_hit(
 	def_unit: Unit,
 	direction: Vector2,
 	hit: Dictionary,
-	deaths_by_hit: Dictionary
+	deaths_by_hit: Dictionary,
+	attacker: Legion,
+	defender: Legion
 ) -> void:
 	atk_visu.animate_unit_ranged_attack(atk_unit, direction)
 	# Fire as soon as windup ends — no polling gap after the anim callback.
@@ -177,6 +180,7 @@ func _play_ranged_hit(
 	var died_on_hit := _apply_defender_reaction(
 		def_visu, def_legion, def_unit, direction, def_hp_before, def_hp_after, hit, deaths_by_hit
 	)
+	_emit_combat_log_tick(attacker, defender, def_legion, hit, died_on_hit)
 	await _beat(COMBAT_DEATH_BEAT if died_on_hit else 0.15)
 
 func _apply_defender_reaction(
@@ -208,6 +212,13 @@ func _apply_defender_reaction(
 			float(def_unit.max_health),
 			shield_absorbed
 		)
+		EventBus.unit_vitals_fx.emit(
+			def_unit,
+			def_hp_after,
+			float(def_unit.shield_remaining)
+		)
+	else:
+		EventBus.unit_vitals_fx.emit(def_unit, 0.0, 0.0)
 	return died_on_hit
 
 func play_heal(coords: Vector2i, payload: Dictionary, options: Dictionary = {}) -> void:
@@ -245,6 +256,17 @@ func play_heal(coords: Vector2i, payload: Dictionary, options: Dictionary = {}) 
 			float(entry.get("hp_after", 0)),
 			float(unit.max_health)
 		)
+		EventBus.unit_vitals_fx.emit(
+			unit,
+			float(entry.get("hp_after", unit.current_health)),
+			float(unit.shield_remaining)
+		)
+		var heal_amt := int(round(float(entry.get("hp_after", 0)) - float(entry.get("hp_before", 0))))
+		if heal_amt > 0:
+			EventBus.battle_log_live_tick.emit({
+				"healed_total_delta": heal_amt,
+				"heal_side": "caster" if is_self_heal else "target",
+			})
 		AudioManager.play_heal_sfx()
 		if heal_tween:
 			await heal_tween.finished
@@ -289,7 +311,9 @@ func play_teleport(
 		pass
 
 	const FADE := 0.18
-	if legion_visu:
+	if legion_visu and is_instance_valid(legion_visu):
+		if legion_visu.active_tween and legion_visu.active_tween.is_running():
+			legion_visu.active_tween.kill()
 		var fade_out := _host.create_tween()
 		fade_out.tween_property(legion_visu, "modulate:a", 0.0, FADE)
 		await fade_out.finished
@@ -300,18 +324,21 @@ func play_teleport(
 			rewire.call()
 
 	var to_tile: TileVisu = _tile_visu_at.call(to_coords)
-	legion_visu = to_tile.legion_visu if to_tile else legion_visu
+	legion_visu = to_tile.legion_visu if to_tile else null
 	if legion_visu == null:
-		var legion: Legion = payload.get("legion")
-		if legion and _legion_visu_at.is_valid():
-			legion_visu = _legion_visu_at.call(legion)
+		var payload_legion: Legion = payload.get("legion")
+		if payload_legion and _legion_visu_at.is_valid():
+			legion_visu = _legion_visu_at.call(payload_legion)
 
-	if legion_visu:
+	if legion_visu and is_instance_valid(legion_visu):
 		legion_visu.modulate.a = 0.0
 		var fade_in := _host.create_tween()
 		fade_in.tween_property(legion_visu, "modulate:a", 1.0, FADE)
 		await fade_in.finished
+		# Force opaque in case a concurrent tween/spent tint raced the fade-in.
 		legion_visu.modulate.a = 1.0
+		if legion_visu.has_method("_sync_depth_sort"):
+			legion_visu._sync_depth_sort()
 
 	var legion: Legion = payload.get("legion")
 	if options.has("on_ap_changed"):
@@ -388,6 +415,30 @@ func _register_legion_visu(legion_to_visu: Dictionary, legion: Legion) -> void:
 	var visu: LegionVisu = _legion_visu_at.call(legion)
 	if visu:
 		legion_to_visu[legion] = visu
+
+func _emit_combat_log_tick(
+	attacker: Legion,
+	defender: Legion,
+	def_legion: Legion,
+	hit: Dictionary,
+	died_on_hit: bool
+) -> void:
+	var hp_lost := int(round(float(hit.get("hp_lost", 0.0))))
+	if hp_lost <= 0 and not died_on_hit:
+		return
+	var tick := {}
+	if def_legion == attacker:
+		if hp_lost > 0:
+			tick["caster_hp_lost"] = hp_lost
+		if died_on_hit:
+			tick["caster_deaths"] = 1
+	elif def_legion == defender:
+		if hp_lost > 0:
+			tick["target_hp_lost"] = hp_lost
+		if died_on_hit:
+			tick["target_deaths"] = 1
+	if not tick.is_empty():
+		EventBus.battle_log_live_tick.emit(tick)
 
 func _restart_idle_animations(legion_to_visu: Dictionary) -> void:
 	for lv in legion_to_visu.values():

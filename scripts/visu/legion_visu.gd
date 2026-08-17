@@ -55,6 +55,13 @@ func sync_all_unit_hp_bars() -> void:
 		if uv:
 			uv.sync_damage_hp_bar()
 
+func juice_shield_restore() -> void:
+	for uv in _unit_to_visu.values():
+		if uv == null:
+			continue
+		if uv.unit and uv.unit.shield_max > 0:
+			uv.juice_shield_restore()
+
 func _apply_team_banner() -> void:
 	if not banner:
 		return

@@ -5,6 +5,8 @@ const MinigameSessionScript = preload("res://scripts/minigame/minigame_session.g
 const AttackNearestEnemyBehavior = preload("res://scripts/ai/behaviors/attack_nearest_enemy.gd")
 const BattleInputLockScript = preload("res://scripts/battle/battle_input_lock.gd")
 const BattleHostWiringScript = preload("res://scripts/battle/battle_host_wiring.gd")
+const BattleActionLogFormatterScript = preload("res://scripts/battle/battle_action_log_formatter.gd")
+const MatchBattleStats = preload("res://scripts/battle/match_battle_stats.gd")
 
 const AI_LEGION_DELAY := 0.5
 
@@ -13,6 +15,7 @@ signal ai_turn_finished
 var deps: MinigamePhaseDeps
 var ai_running: bool = false
 var _lock: BattleInputLockScript = BattleInputLockScript.new()
+var battle_stats: MatchBattleStats = MatchBattleStats.new()
 
 func _init(phase_deps: MinigamePhaseDeps) -> void:
 	deps = phase_deps
@@ -20,12 +23,31 @@ func _init(phase_deps: MinigamePhaseDeps) -> void:
 func enter() -> void:
 	deps.tile_info_panel.set_draft_mode(false)
 	deps.tile_info_panel.hide()
+	if deps.legion_strip:
+		deps.legion_strip.hide_strip()
 	deps.presenter.sync_legions(deps.session)
 	deps.turn_hud.show()
 	deps.turn_hud.show_active_team(deps.session.turn_manager.active_team_id)
 	if deps.action_log_panel:
 		deps.action_log_panel.enter_battle(deps.session.action_log)
+	battle_stats = MatchBattleStats.new()
+	battle_stats.begin(deps.session)
+	_log_battle_opening_turn()
 	maybe_start_ai_turn()
+
+func _log_battle_opening_turn() -> void:
+	if deps.session == null or deps.session.action_log == null:
+		return
+	# Avoid duplicate if rematch somehow already logged turn 1.
+	for entry in deps.session.action_log.entries:
+		if String(entry.get("action_id", "")) == "turn_start" and int(entry.get("turn", 0)) == 1:
+			return
+	var team := deps.session.turn_manager.active_team_id
+	var turn_no := deps.session.turn_manager.turn_index
+	deps.session.action_log.append(
+		BattleActionLogFormatterScript.from_turn_start(deps.session, team, turn_no)
+	)
+	EventBus.battle_log_entry_added.emit(deps.session.action_log.latest())
 
 func exit() -> void:
 	deps.turn_hud.hide()
@@ -33,10 +55,19 @@ func exit() -> void:
 		deps.action_log_panel.exit_battle()
 
 func is_input_locked() -> bool:
-	return _lock.is_locked() or ai_running or (deps.pause_menu != null and deps.pause_menu.is_open())
+	return (
+		_lock.is_locked()
+		or ai_running
+		or (deps.pause_menu != null and deps.pause_menu.is_open())
+		or (deps.pass_overlay != null and deps.pass_overlay.visible)
+	)
 
 func is_blocking_input() -> bool:
-	return deps.game_over_panel.visible or (deps.pause_menu != null and deps.pause_menu.is_open())
+	return (
+		deps.game_over_panel.visible
+		or (deps.pause_menu != null and deps.pause_menu.is_open())
+		or (deps.pass_overlay != null and deps.pass_overlay.visible)
+	)
 
 func handle_end_turn() -> void:
 	if is_input_locked():
@@ -46,7 +77,15 @@ func handle_end_turn() -> void:
 	if result["ok"]:
 		deps.turn_hud.show_active_team(deps.session.turn_manager.active_team_id)
 		deps.presenter.sync_spent_visuals(deps.session)
+		if _maybe_show_hotseat_pass():
+			return
 		maybe_start_ai_turn()
+
+func handle_pass_continue() -> void:
+	if deps.pass_overlay:
+		deps.pass_overlay.hide()
+	deps.turn_hud.show_active_team(deps.session.turn_manager.active_team_id)
+	maybe_start_ai_turn()
 
 func request_use_action(action_id: String, from_coords: Vector2i, to_coords: Vector2i) -> void:
 	if is_input_locked():
@@ -58,6 +97,8 @@ func request_move_path(path: Array) -> void:
 		return
 	if path.size() < 2:
 		return
+	# Hold the lock for the entire multi-step walk so input can't interleave.
+	_lock.begin()
 	deps.battle_ui.deselect()
 	deps.battle_ui.clear_overlays()
 	var start: Vector2i = path[0]
@@ -68,7 +109,8 @@ func request_move_path(path: Array) -> void:
 		var from_c: Vector2i = path[i - 1]
 		var to_c: Vector2i = path[i]
 		# Suppress per-step log; one coalesced card covers the whole path.
-		var step: Dictionary = await perform_use_action("move", from_c, to_c, 0, true)
+		# Call _perform_use_action_unlocked to avoid double-locking.
+		var step: Dictionary = await _perform_use_action_unlocked("move", from_c, to_c, 0, true)
 		if not step.get("ok", false):
 			break
 		steps_ok += 1
@@ -80,11 +122,13 @@ func request_move_path(path: Array) -> void:
 			last_ok_to,
 			steps_ok == 1 and last_was_swap
 		)
-	var end_coords: Vector2i = last_ok_to if steps_ok > 0 else path[path.size() - 1]
-	# Use last successfully intended end; if mid-fail, legion may be elsewhere.
+	# If no steps succeeded the legion is still at start, not the planned destination.
+	var end_coords: Vector2i = last_ok_to
 	var tile: Tile = deps.session.grid.get(end_coords)
 	if tile and tile.has_legion() and deps.session.can_act_legion(tile.legion):
 		deps.battle_ui.select_tile(end_coords)
+	_lock.end()
+	check_match_end()
 	maybe_start_ai_turn()
 
 func perform_use_action(
@@ -97,6 +141,22 @@ func perform_use_action(
 	if _lock.is_locked():
 		return {"ok": false, "error": "Input locked", "events": [], "payload": {}}
 	_lock.begin()
+	var result: Dictionary = await _perform_use_action_unlocked(
+		action_id, from_coords, to_coords, rng_seed, skip_action_log
+	)
+	_lock.end()
+	check_match_end()
+	return result
+
+## Core action execution without lock management — used by both
+## perform_use_action (single) and request_move_path (multi-step).
+func _perform_use_action_unlocked(
+	action_id: String,
+	from_coords: Vector2i,
+	to_coords: Vector2i,
+	rng_seed: int = 0,
+	skip_action_log: bool = false
+) -> Dictionary:
 	if ai_running:
 		deps.battle_ui.deselect()
 		deps.battle_ui.clear_overlays()
@@ -113,7 +173,6 @@ func perform_use_action(
 
 	var from_tile: Tile = deps.session.grid.get(from_coords)
 	if from_tile == null or not from_tile.has_legion():
-		_lock.end()
 		return {"ok": false, "error": "No legion", "events": [], "payload": {}}
 
 	var result: Dictionary = deps.session.apply(cmd)
@@ -123,8 +182,9 @@ func perform_use_action(
 				"[AI] action rejected: %s %s -> %s (%s)"
 				% [action_id, from_coords, to_coords, result.get("error", "?")]
 			)
-		_lock.end()
 		return result
+
+	battle_stats.record_apply(result)
 
 	await deps.action_runner.play_result(
 		deps.host,
@@ -137,8 +197,6 @@ func perform_use_action(
 	)
 	if deps.action_log_panel:
 		deps.action_log_panel.reveal_pending()
-	_lock.end()
-	check_match_end()
 	return result
 
 func maybe_start_ai_turn() -> void:
@@ -160,24 +218,64 @@ func check_match_end() -> void:
 	deps.setup_panel.hide()
 	deps.unit_picker.hide()
 	deps.tile_info_panel.hide()
+	if deps.legion_strip:
+		deps.legion_strip.hide_strip()
+	if deps.pass_overlay:
+		deps.pass_overlay.hide()
 	if deps.action_bar:
 		deps.action_bar.hide()
 	if deps.action_log_panel:
 		deps.action_log_panel.exit_battle()
-	deps.game_over_panel.show_for_winner(deps.session.winner)
+	var report: Dictionary = {}
+	if battle_stats != null:
+		report = battle_stats.build_report(deps.session.winner)
+	deps.game_over_panel.show_for_winner(deps.session.winner, report)
 
 func inspect_tile(coords: Vector2i) -> void:
-	if not deps.tile_info_panel:
+	_show_strip_for_coords(coords, true)
+
+func preview_inspect(coords: Vector2i) -> void:
+	_show_strip_for_coords(coords, false)
+
+func clear_preview_inspect() -> void:
+	if deps.legion_strip and not deps.legion_strip.is_sticky():
+		deps.legion_strip.hide_strip()
+
+func clear_battle_inspect() -> void:
+	if deps.legion_strip:
+		deps.legion_strip.hide_strip()
+
+func _show_strip_for_coords(coords: Vector2i, sticky: bool) -> void:
+	if deps.tile_info_panel:
+		deps.tile_info_panel.hide()
+	if not deps.legion_strip:
 		return
 	var tile: Tile = deps.session.grid.get(coords)
 	if tile and tile.has_legion():
-		deps.tile_info_panel.show_tile(tile)
-	else:
-		deps.tile_info_panel.hide()
+		deps.legion_strip.show_legion(tile.legion, sticky)
+	elif sticky or (deps.legion_strip and not deps.legion_strip.is_sticky()):
+		deps.legion_strip.hide_strip()
+
+## Hotseat: after a human ends turn, pause so the other player can take the device.
+func _maybe_show_hotseat_pass() -> bool:
+	if deps.session.phase != MinigameSessionScript.Phase.BATTLE:
+		return false
+	var cfg = deps.config()
+	if cfg == null or not cfg.ai_team_ids.is_empty():
+		return false
+	var active: String = deps.session.turn_manager.active_team_id
+	if deps.is_ai_team(active):
+		return false
+	deps.battle_ui.deselect()
+	deps.battle_ui.clear_overlays()
+	deps.status_label.text = "Pass device to %s" % GameSettings.display_name_for_team(active)
+	deps.pass_overlay.show()
+	return true
 
 func _run_ai_turn_async() -> void:
 	ai_running = true
 	deps.battle_ui.deselect()
+	var prefer_coords := Vector2i(2147483646, 2147483646)
 	while (
 		deps.session.phase == MinigameSessionScript.Phase.BATTLE
 		and deps.is_ai_team(deps.session.turn_manager.active_team_id)
@@ -198,13 +296,17 @@ func _run_ai_turn_async() -> void:
 				deps.presenter.sync_spent_visuals(deps.session)
 			break
 
+		# After teleport/move, finish that legion's remaining AP before switching.
 		var coords: Vector2i = actionable[0]
+		if prefer_coords in actionable:
+			coords = prefer_coords
 		var legion: Legion = deps.session.get_legion_at(coords)
 		if legion == null:
 			if AttackNearestEnemyBehavior.debug_enabled:
 				print("[AI] stale legion slot @ %s, skipping" % coords)
 			deps.session.pass_legion_or_force_wait(coords)
 			deps.presenter.sync_spent_visuals(deps.session)
+			prefer_coords = Vector2i(2147483646, 2147483646)
 			await deps.host.get_tree().create_timer(AI_LEGION_DELAY).timeout
 			continue
 
@@ -229,9 +331,14 @@ func _run_ai_turn_async() -> void:
 						print("[AI] action failed for %s @ %s, passing legion" % [legion.team_id, coords])
 					deps.session.pass_legion_or_force_wait(legion.tile_coords)
 					deps.presenter.sync_spent_visuals(deps.session)
+					prefer_coords = Vector2i(2147483646, 2147483646)
+				else:
+					# Stick to this legion so teleport can be followed by melee.
+					prefer_coords = legion.tile_coords
 			_:
 				deps.session.pass_legion_or_force_wait(coords)
 				deps.presenter.sync_spent_visuals(deps.session)
+				prefer_coords = Vector2i(2147483646, 2147483646)
 
 		await deps.host.get_tree().create_timer(AI_LEGION_DELAY).timeout
 		if deps.session.phase == MinigameSessionScript.Phase.ENDED:

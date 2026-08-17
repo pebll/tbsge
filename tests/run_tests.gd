@@ -16,6 +16,8 @@ func _initialize() -> void:
 		"res://tests/test_legion_ap.gd",
 		"res://tests/test_turn_manager.gd",
 		"res://tests/test_minigame_rules.gd",
+		"res://tests/test_unit_footprint.gd",
+		"res://tests/smoke_ui_scripts.gd",
 		"res://tests/test_map_builder.gd",
 		"res://tests/test_balance_runner.gd",
 		"res://tests/test_minigame_draft.gd",
@@ -25,11 +27,14 @@ func _initialize() -> void:
 		"res://tests/test_minigame_battle.gd",
 		"res://tests/test_legion_sfx.gd",
 		"res://tests/test_battle_interaction_helpers.gd",
+		"res://tests/test_battle_expectation.gd",
 		"res://tests/test_tooltips.gd",
 		"res://tests/test_battle_action_log.gd",
 		"res://tests/test_action_cooldowns.gd",
 		"res://tests/test_match_setup.gd",
 		"res://tests/test_playtest_polish.gd",
+		"res://tests/test_ai_duel_report.gd",
+		"res://tests/test_match_battle_stats.gd",
 	]
 
 	for path in tests:

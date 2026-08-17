@@ -24,6 +24,10 @@ func enter(first_team_id: String) -> void:
 	deps.tile_info_panel.set_draft_mode(true)
 	if deps.action_log_panel:
 		deps.action_log_panel.exit_battle()
+	# AI vs AI: auto-draft all AI teams and jump straight to battle.
+	if deps.is_ai_team(first_team_id):
+		_auto_draft_all_ai_teams()
+		return
 	refresh_view()
 
 func exit() -> void:
@@ -125,6 +129,30 @@ func handle_ready() -> void:
 		return
 	_show_pass_overlay()
 
+func handle_random_team() -> void:
+	if deps.session.phase != MinigameSessionScript.Phase.DRAFT:
+		return
+	if deps.session.active_draft_team != viewing_team:
+		return
+	if deps.is_ai_team(viewing_team):
+		return
+	move_mode = false
+	picker_for_change_type = false
+	deps.unit_picker.hide()
+	_clear_all_draft_placements()
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	for cmd in AiDrafter.build_draft_commands(deps.session, viewing_team, rng):
+		if String(cmd.get("type", "")) == "draft_ready":
+			continue
+		var result: Dictionary = deps.session.apply(cmd)
+		if not result["ok"]:
+			_show_error_toast(String(result.get("error", "Random team failed")))
+			refresh_view()
+			return
+	selected_coords = INVALID_COORDS
+	refresh_view()
+
 func handle_pass_continue() -> void:
 	deps.pass_overlay.hide()
 	viewing_team = deps.session.active_draft_team
@@ -141,6 +169,13 @@ func handle_unit_picked(unit_type: String) -> void:
 		var existing := _find_placement(draft, selected_coords)
 		count = int(existing.get("unit_count", 1))
 	_apply_placement(unit_type, count)
+
+func handle_unit_inspected(unit_type: String) -> void:
+	if unit_type.is_empty():
+		return
+	var draft: Dictionary = deps.session.get_view_state(viewing_team).get("draft", {})
+	var remaining := int(draft.get("remaining_budget", 0))
+	deps.tile_info_panel.show_draft_unit_preview(unit_type, viewing_team, remaining)
 
 func handle_picker_cancelled() -> void:
 	if picker_for_change_type:
@@ -224,7 +259,11 @@ func handle_move_mode() -> void:
 func refresh_view() -> void:
 	var view: Dictionary = deps.session.get_view_state(viewing_team)
 	var draft: Dictionary = view.get("draft", {})
-	deps.setup_panel.show_for_team(viewing_team, draft)
+	var can_edit := (
+		deps.session.active_draft_team == viewing_team
+		and not deps.is_ai_team(viewing_team)
+	)
+	deps.setup_panel.show_for_team(viewing_team, draft, can_edit)
 
 	var slots: Array = view.get("deploy_slots", [])
 	var occupied: Array = []
@@ -259,16 +298,26 @@ func _apply_placement(unit_type: String, unit_count: int) -> void:
 
 func _show_pass_overlay() -> void:
 	var next_team: String = deps.session.active_draft_team
-	var team_res: Resource = TeamDefs.get_def(next_team)
-	var display_name: String = next_team
-	if team_res is TeamDefinition:
-		display_name = (team_res as TeamDefinition).display_name
-	deps.status_label.text = "Pass device to %s" % display_name
+	deps.status_label.text = "Pass device to %s" % GameSettings.display_name_for_team(next_team)
 	deps.pass_overlay.show()
 	deps.setup_panel.hide()
 	deps.unit_picker.hide()
 	deps.presenter.clear_deploy_overlays()
 	deps.presenter.sync_draft_previews([], viewing_team)
+
+func _auto_draft_all_ai_teams() -> void:
+	# AiDrafter.build_draft_commands already ends with draft_ready, which advances
+	# active_draft_team (or starts battle). Do not apply draft_ready again here.
+	deps.setup_panel.hide()
+	while deps.session.phase == MinigameSessionScript.Phase.DRAFT:
+		var team: String = deps.session.active_draft_team
+		if not deps.is_ai_team(team):
+			# Unexpected non-AI team; fall back to normal draft UI.
+			refresh_view()
+			return
+		_apply_ai_draft(team)
+	if deps.session.phase == MinigameSessionScript.Phase.BATTLE:
+		battle_started.emit()
 
 func _apply_ai_draft(team_id: String) -> void:
 	var rng := RandomNumberGenerator.new()
@@ -278,6 +327,18 @@ func _apply_ai_draft(team_id: String) -> void:
 		if not draft_result["ok"]:
 			push_error("AI draft failed: %s" % draft_result["error"])
 			return
+
+func _clear_all_draft_placements() -> void:
+	var draft: Dictionary = deps.session.get_view_state(viewing_team).get("draft", {})
+	var coords_list: Array = []
+	for p in draft.get("placements", []):
+		coords_list.append(p.get("coords", Vector2i.ZERO))
+	for coords in coords_list:
+		deps.session.apply({
+			"type": "draft_clear_slot",
+			"team": viewing_team,
+			"coords": coords,
+		})
 
 func _show_draft_tile_info(coords: Vector2i) -> void:
 	var draft: Dictionary = deps.session.get_view_state(viewing_team).get("draft", {})

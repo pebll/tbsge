@@ -25,7 +25,8 @@ enum ProjectileMotion {
 ## Relative sprite scale after auto-normalizing texture sheet size (~1.0 = default).
 @export var image_size: float = 1.0
 
-## How much of a legion's 12-point capacity one unit consumes (default 1.5 → up to 8 units).
+## Legion capacity + strip footprint. Allowed: 0.75, 1, 1.5, 2, 3, 4, 6, 8, 10, 12.
+## See UnitFootprint for size→cell mapping and packing into the 6×2 board.
 @export var size: float = 1.5
 ## Gold cost per individual unit (not per legion).
 @export var price: int = 5
@@ -43,6 +44,10 @@ enum ProjectileMotion {
 
 func has_ranged() -> bool:
 	return attack_range > 0 and ranged_attack > 0
+
+func has_allowed_size() -> bool:
+	const UnitFootprintScript = preload("res://scripts/ui/interact/unit_footprint.gd")
+	return UnitFootprintScript.is_allowed(size)
 
 func projectile_texture_path() -> String:
 	if projectile_id.is_empty():

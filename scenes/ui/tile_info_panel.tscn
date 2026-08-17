@@ -280,7 +280,8 @@ preferred_width = 72
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
-text = "Legion cost: 12 gold"
+text = "Legion cost: 12 gold
+Size 3.0 / 12 (max 4)"
 horizontal_alignment = 1
 
 [node name="ChangeTypeButton" parent="VBox/LegionBlock/DraftControls" instance=ExtResource("2_gb")]

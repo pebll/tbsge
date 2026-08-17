@@ -119,11 +119,16 @@ func _test_pass_and_end_turn_log() -> bool:
 		push_error("End turn failed")
 		return false
 	var end_entry: Dictionary = session.action_log.latest()
-	if String(end_entry.get("action_id", "")) != "end_turn":
-		push_error("Expected end_turn log")
+	if String(end_entry.get("action_id", "")) != "turn_start":
+		push_error("Expected turn_start log, got %s" % end_entry.get("action_id", ""))
 		return false
-	if "ended" not in String(end_entry.get("result_summary", "")):
-		push_error("End turn summary wrong")
+	var summary := String(end_entry.get("result_summary", ""))
+	if not summary.begins_with("Turn start:"):
+		push_error("Expected 'Turn start: …' summary, got %s" % summary)
+		return false
+	# After GREEN ends global turn 1, BLUE's first turn is team-turn 1.
+	if int(end_entry.get("turn", -1)) != 1:
+		push_error("Expected team-local turn 1 for second player, got %s" % end_entry.get("turn"))
 		return false
 	return true
 
@@ -141,7 +146,10 @@ func _test_filter_defaults() -> bool:
 		push_error("Moved result_summary should follow moves filter")
 		return false
 	if log.is_entry_visible({"action_id": "end_turn"}):
-		push_error("End turn entries should be hidden by default")
+		push_error("Turn start entries should be hidden by default")
+		return false
+	if log.is_entry_visible({"action_id": "turn_start"}):
+		push_error("Turn start entries should be hidden by default")
 		return false
 	if not log.is_entry_visible({"action_id": "melee_attack"}):
 		push_error("Combat entries should stay visible")
@@ -163,8 +171,11 @@ func _test_filter_defaults() -> bool:
 		push_error("Teleport should still appear when moves are enabled")
 		return false
 	GameSettings.set_show_battle_log_end_turns(true, false)
+	if not log.is_entry_visible({"action_id": "turn_start"}):
+		push_error("Turn starts should appear when option enabled")
+		return false
 	if not log.is_entry_visible({"action_id": "end_turn"}):
-		push_error("End turns should appear when option enabled")
+		push_error("Legacy end_turn id should still follow turn-start filter")
 		return false
 	GameSettings.set_show_battle_log_moves(false, false)
 	GameSettings.set_show_battle_log_end_turns(false, false)

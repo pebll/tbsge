@@ -35,8 +35,11 @@ func _init(unit_type: String) -> void:
 func has_ranged() -> bool:
 	return attack_range > 0 and ranged_attack > 0
 
-func reset_turn_state() -> void:
+func reset_turn_state() -> bool:
+	## Returns true if a depleted (or partial) shield was restored.
+	var restored := shield_max > 0 and shield_remaining < shield_max
 	shield_remaining = shield_max
+	return restored
 
 func absorb_damage(raw_damage: float) -> Dictionary:
 	var raw := maxf(0.0, raw_damage)

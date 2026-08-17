@@ -7,13 +7,16 @@ Agents: use branches + commits per `.cursor/rules/git-workflow.mdc` when impleme
 
 ## Status snapshot
 
-**Done recently (on `main`)**
-- Engine vs modes refactor; minigame draft → battle; AI; balance runner.
-- Combat: melee, ranged, self-heal, shield, ally heal (focused), cooldowns, teleport.
-- UX: tooltips + glossary, battle log, action bar clarity, Options/Sounds, pause menu, parchment theme.
-- Git: `main` aligned with refactor line (Aug 2026).
+**Done recently (Aug 2026 — `cursor/ux-turnstart-vitals` merged)**
+- **Playable v0.1 loop:** main menu Play → setup (Vs AI / Hotseat, names) → draft → battle → win/lose → rematch.
+- **Battle HUD:** bottom legion strip (6×2 footprints, aggregates, unit hover tooltips); replaces right panel in battle.
+- **Battle expectation preview:** hover attack/heal targets for damage/loss/heal ranges (Monte Carlo combat + deterministic heal).
+- **Battle log:** turn-start banners, icon stat cards, **live combat/heal ticks** synced to playback (numbers bump per hit).
+- **Selection UX:** click any legion to inspect; action bar shows greyed actions with reasons.
+- AI vs AI duel runner, flanking/positioning pass, units_v2 art, unit footprints, interact/tooltip framework.
+- Prior: engine refactor, tooltips/glossary, action bar clarity, cooldowns, teleport, ally heal, playtest polish P1–P9.
 
-**Next focus — Playtest polish (epic P below), then finish playable v0.1, then**
+**Next focus**
 1. **Terrain (T3)** — LOS, forest defense, terrain inspect.  
 2. **Statuses (T4)** — buffs/debuffs.  
 3. **Campaign / unlock pacing** — tier I→IV, not required for first skirmish loop.
@@ -33,7 +36,6 @@ Agents: use branches + commits per `.cursor/rules/git-workflow.mdc` when impleme
 - [x] Play → game setup (map size / difficulty) + AI debug persistence
 
 ### Still open (your side)
-- [ ] Manual smoke — report ok / what failed (see below)
 - [ ] Later: approve delete list from `assets/_archive/`
 
 ---
@@ -60,16 +62,15 @@ Goal: a friend can launch from **main menu → Play → draft → fight → win/
 
 ### Must-have (ship blockers)
 - [x] **Single entry path** — main menu **Play** → setup (map size / difficulty) → minigame.
-- [ ] **End-to-end loop** — game over → rematch or main menu; no dead ends.
-- [ ] **Manual smoke green** — all items in “How manual smoke works” + pause/tooltips/log/heal/teleport checklist (from recent UX work).
-- [ ] **AI completes a full battle** — no soft-lock; human can win and lose.
+- [x] **End-to-end loop** — game over → rematch or main menu; no dead ends.
+- [x] **Manual smoke green** — move re-highlight, attack-choice popup, pause/tooltips/log/heal/teleport (Aug 2026).
+- [x] **AI completes a full battle** — no soft-lock; human can win and lose (smoke + AI duel runs).
 - [x] **Draft is understandable** — budget, unit cap, deploy slots, pass/continue; **8 role-distinct units** in the pool (chaff, shield tank, HP wall, long range, short spit, healer, assassin, AP3 bruiser).
-- [ ] **Fix doc drift** — `README.md` / `AGENT_NOTES.md` panel + action list match current behavior (select-sticky info, full action set).
+- [x] **Fix doc drift** — `README.md` / `AGENT_NOTES.md` match legion strip, full action set, battle inspect UX.
 
 ### Should-have (polish)
-- [ ] **First-run hints** — one line on first select: “Pick a legion, then an action” (coach mark or tooltip footer; no full tutorial yet).
 - [ ] **Turn clarity** — whose turn + end turn obvious (`TurnHud` + wait/pass discoverable).
-- [ ] **Win screen copy** — winner team name, short “Draft again?” CTA.
+- [x] **Win screen copy** — winner display name, Victory/Defeat, “Draft again?” / Main menu; Play setup names + Vs AI / Hotseat.
 - [ ] **Dev Test** — keep for sandbox/duel variants but label as “Advanced / Lab”.
 - [ ] **Delete local `git replace` refs** if any reappear (`git replace -l`) so history matches GitHub.
 - [x] **Depth while moving** — legion z-index updates during move tweens from current world Y (no longer only at path end).
@@ -149,6 +150,7 @@ Ship early so every new feature emits a clear, modular event the UI can render �
 - Each line: **caster** → **action** → **target** (if any) → **short result** (e.g. “healed 4”, “hit for 3”, “moved”, “teleported”, “waited”).
 - Optional: small icons (unit portrait / action icon); click/right-click entry to inspect via tooltip (U1).
 - Hide or collapse in draft; show in battle (+ optional sandbox).
+- [x] **Live combat/heal cards** — entry appears at action start; damage/heal/death numbers tick with playback (bump animation).
 
 **Engine contract (modular)**
 - [x] Structured log entries from the session/resolver path (not only `print`):  
@@ -178,13 +180,13 @@ Ship early so every new feature emits a clear, modular event the UI can render �
 ### Phase U4 — Other UX improvements (backlog)
 
 - [ ] **Confirm dangerous terminal** optional (first time / settings)  
-- [ ] **Ghost preview** on hover target (heal amount estimate, damage band — keep fuzzy: “strong / weak”)  
+- [ ] **Ghost preview** on hover target (heal amount estimate, damage band — keep fuzzy: “strong / weak”) — **partial:** battle expectation bar on attack/heal hover  
 - [ ] **AP / turn strip** always visible: remaining AP on selected legion  
 - [ ] **Keyboard hints** in tooltip footer (Tab cycle, Space wait)  
 - [ ] **Colorblind-safe** overlays (icons + patterns, not only red/green)  
 - [ ] **Undo last action** (sandbox / optional) — huge for learning  
 - [ ] **Battle log** — see **U1b** (primary); keep this as “polish depth” only if needed (filters, export)
-- [ ] **First-time coach marks** when a new keyword appears (“This action is Terminal”)  
+- [ ] **First-time coach marks** when a new keyword appears (“This action is Terminal”) — **parked:** full tutorial much later  
 - [ ] Minimap / turn order list when multi-legion gets busy  
 
 ---

@@ -4,9 +4,9 @@ extends Node2D
 const ICON_COIN := preload("res://assets/icons/base_icons_sprites/coin.png")
 
 func _ready() -> void:
-	# Absolute draw above legion banners/bodies (depth*10 is typically < 2k).
+	# Absolute draw above legion banners/bodies; must stay <= CANVAS_ITEM_Z_MAX (4096).
 	z_as_relative = false
-	z_index = 8000
+	z_index = 3800
 
 func set_cost(cost: int) -> void:
 	for child in get_children():

@@ -148,6 +148,12 @@ func _add_action_button(action: ActionDefinitionScript) -> void:
 		btn.text = action.display_name.substr(0, 1)
 		btn.add_theme_color_override("font_color", COLOR_TEXT)
 
+	var interact := preload("res://scripts/ui/interact/ui_interactable.gd").new()
+	interact.enable_select = false
+	interact.enable_entry = false
+	btn.add_child(interact)
+	interact.bind(btn)
+
 	var captured_action: ActionDefinitionScript = action
 	var captured_reason := reason
 	if not _display_only and not disabled:
