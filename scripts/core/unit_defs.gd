@@ -7,6 +7,10 @@ func _ready() -> void:
 	_db = load(DB_PATH)
 	if _db == null:
 		push_error("UnitDefs failed to load DB at %s" % DB_PATH)
+		return
+	for def in _db.get_all_defs():
+		if def and not def.has_allowed_size():
+			push_error("Unit '%s' has disallowed size %s" % [def.id, def.size])
 
 func get_def(id: String) -> UnitDefinition:
 	if _db == null:

@@ -19,6 +19,7 @@ var setup_panel: MinigameSetupPanel
 var unit_picker: MinigameUnitPicker
 var turn_hud: TurnHud
 var tile_info_panel: TileInfoPanel
+var legion_strip: LegionStrip
 var pass_overlay: PanelContainer
 var status_label: Label
 var game_over_panel: GameOverPanel

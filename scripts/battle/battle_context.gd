@@ -15,6 +15,8 @@ var allows_spawn_fn: Callable = func(_coords: Vector2i) -> bool: return false
 var spawn_fn: Callable = func(_coords: Vector2i) -> void: pass
 var inspect_fn: Callable = func(_coords: Vector2i) -> void: pass
 var clear_inspect_fn: Callable = func() -> void: pass
+var preview_inspect_fn: Callable = Callable()
+var clear_preview_inspect_fn: Callable = Callable()
 var overlay_ui_fn: Callable = Callable()
 
 func battle_state() -> BattleStateScript:
@@ -72,6 +74,18 @@ func spawn_at(coords: Vector2i) -> void:
 func inspect_tile(coords: Vector2i) -> void:
 	if inspect_fn.is_valid():
 		inspect_fn.call(coords)
+
+func preview_inspect(coords: Vector2i) -> void:
+	if preview_inspect_fn.is_valid():
+		preview_inspect_fn.call(coords)
+	elif inspect_fn.is_valid():
+		inspect_fn.call(coords)
+
+func clear_preview_inspect() -> void:
+	if clear_preview_inspect_fn.is_valid():
+		clear_preview_inspect_fn.call()
+	elif clear_inspect_fn.is_valid():
+		clear_inspect_fn.call()
 
 func clear_inspect() -> void:
 	if clear_inspect_fn.is_valid():

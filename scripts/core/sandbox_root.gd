@@ -34,6 +34,7 @@ var battle_ui: BattleUIAdapterScript
 var action_runner: BattleActionRunnerScript
 var input: GameInput
 var tile_info_panel
+var legion_strip: LegionStrip
 var tile_info_layer: CanvasLayer
 var combat_fx_layer: CanvasLayer
 var turn_hud: TurnHud
@@ -109,18 +110,31 @@ func end_team_turn() -> void:
 		presenter.sync_spent_visuals(session)
 
 func inspect_tile(coords: Vector2i) -> void:
-	if not tile_info_panel:
-		return
-	var tile: Tile = session.grid.get(coords)
-	if not tile or not tile.has_legion():
-		tile_info_panel.hide()
-		return
-	tile_info_panel.show_tile(tile)
-	tile_info_panel.show()
+	_show_strip_for_coords(coords, true)
+
+func preview_inspect(coords: Vector2i) -> void:
+	_show_strip_for_coords(coords, false)
+
+func clear_preview_inspect() -> void:
+	if legion_strip and not legion_strip.is_sticky():
+		legion_strip.hide_strip()
 
 func clear_inspect() -> void:
+	if legion_strip:
+		legion_strip.hide_strip()
 	if tile_info_panel:
 		tile_info_panel.hide()
+
+func _show_strip_for_coords(coords: Vector2i, sticky: bool) -> void:
+	if tile_info_panel:
+		tile_info_panel.hide()
+	if not legion_strip:
+		return
+	var tile: Tile = session.grid.get(coords)
+	if tile and tile.has_legion():
+		legion_strip.show_legion(tile.legion, sticky)
+	elif sticky or (legion_strip and not legion_strip.is_sticky()):
+		legion_strip.hide_strip()
 
 func _on_battle_log_entry_added(entry: Dictionary) -> void:
 	if _action_log_panel:
@@ -195,6 +209,8 @@ func _setup_battle_context() -> void:
 		func() -> void: clear_inspect(),
 		func() -> Node: return tile_info_layer
 	)
+	battle_context.preview_inspect_fn = func(coords: Vector2i) -> void: preview_inspect(coords)
+	battle_context.clear_preview_inspect_fn = func() -> void: clear_preview_inspect()
 	battle_context.allows_spawn_fn = func(_coords: Vector2i) -> bool: return session.config.allow_spawn
 	battle_context.spawn_fn = func(coords: Vector2i) -> void: spawn_unit(coords)
 	battle_context.apply_move_path_fn = func(path: Array) -> void:
@@ -220,15 +236,12 @@ func _apply_move_path(path: Array) -> void:
 func _on_legion_ap_changed(legion: Legion) -> void:
 	if presenter and session:
 		presenter.sync_spent_visuals(session)
-	if not tile_info_panel or not tile_info_panel.visible:
-		return
-	var tile: Tile = session.grid.get(legion.tile_coords)
-	if tile and tile.has_legion():
-		tile_info_panel.show_tile(tile)
+	if legion_strip and legion_strip.visible:
+		legion_strip.refresh_if_legion(legion)
 
 func _on_unit_vitals_fx(unit: Unit, hp: float, shield: float) -> void:
-	if tile_info_panel and tile_info_panel.visible:
-		tile_info_panel.apply_unit_vitals_fx(unit, hp, shield)
+	if legion_strip and legion_strip.visible:
+		legion_strip.apply_unit_vitals_fx(unit, hp, shield)
 
 func _setup_turn_hud() -> void:
 	if not tile_info_layer:
@@ -246,6 +259,10 @@ func _setup_tile_info_ui() -> void:
 	tile_info_panel = preload("res://scenes/ui/tile_info_panel.tscn").instantiate()
 	tile_info_layer.add_child(tile_info_panel)
 	tile_info_panel.hide()
+
+	legion_strip = preload("res://scenes/ui/legion_strip.tscn").instantiate()
+	tile_info_layer.add_child(legion_strip)
+	legion_strip.hide()
 
 	var action_bar = preload("res://scenes/ui/battle_action_bar.tscn").instantiate()
 	tile_info_layer.add_child(action_bar)

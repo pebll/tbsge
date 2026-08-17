@@ -16,6 +16,8 @@ func _initialize() -> void:
 		"res://tests/test_legion_ap.gd",
 		"res://tests/test_turn_manager.gd",
 		"res://tests/test_minigame_rules.gd",
+		"res://tests/test_unit_footprint.gd",
+		"res://tests/smoke_ui_scripts.gd",
 		"res://tests/test_map_builder.gd",
 		"res://tests/test_balance_runner.gd",
 		"res://tests/test_minigame_draft.gd",

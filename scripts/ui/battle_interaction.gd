@@ -43,6 +43,8 @@ var _info_tile_coords: Vector2i
 var _info_visible_for_tile: bool = false
 var _inspect_fn: Callable = func(_coords: Vector2i) -> void: pass
 var _clear_inspect_fn: Callable = func() -> void: pass
+var _preview_inspect_fn: Callable = Callable()
+var _clear_preview_inspect_fn: Callable = Callable()
 var turn_manager_fn: Callable
 var legions_fn: Callable
 var _events_bound: bool = false
@@ -70,6 +72,14 @@ func bind_from_context(context) -> void:
 	legions_fn = func() -> Array: return context.legions()
 	_inspect_fn = func(coords: Vector2i) -> void: context.inspect_tile(coords)
 	_clear_inspect_fn = func() -> void: context.clear_inspect()
+	if context.preview_inspect_fn.is_valid():
+		_preview_inspect_fn = func(coords: Vector2i) -> void: context.preview_inspect(coords)
+	else:
+		_preview_inspect_fn = Callable()
+	if context.clear_preview_inspect_fn.is_valid():
+		_clear_preview_inspect_fn = func() -> void: context.clear_preview_inspect()
+	else:
+		_clear_preview_inspect_fn = Callable()
 	if context.overlay_ui_fn.is_valid():
 		overlay_ui_fn = context.overlay_ui_fn
 
@@ -285,17 +295,22 @@ func _on_tile_right_clicked(coords: Vector2i) -> void:
 	_inspect_fn.call(coords)
 
 func _on_tile_hover_entered(coords: Vector2i) -> void:
-	if not coords in _overlay_coords:
-		return
-	AudioManager.play_sfx("tile_hover")
-	var tile_visu: TileVisu = tile_visu_fn.call(coords)
-	if tile_visu:
-		tile_visu.set_hover_boost(true)
-	if has_selected:
-		var selected_visu: TileVisu = tile_visu_fn.call(selected_coords)
-		if selected_visu and selected_visu.legion_visu and tile_visu:
-			var dir := (tile_visu.position - selected_visu.position).normalized()
-			selected_visu.legion_visu.update_direction(dir)
+	if coords in _overlay_coords:
+		AudioManager.play_sfx("tile_hover")
+		var tile_visu: TileVisu = tile_visu_fn.call(coords)
+		if tile_visu:
+			tile_visu.set_hover_boost(true)
+		if has_selected:
+			var selected_visu: TileVisu = tile_visu_fn.call(selected_coords)
+			if selected_visu and selected_visu.legion_visu and tile_visu:
+				var dir := (tile_visu.position - selected_visu.position).normalized()
+				selected_visu.legion_visu.update_direction(dir)
+	if not has_selected and _preview_inspect_fn.is_valid():
+		var state: BattleStateScript = battle_state_fn.call()
+		if state:
+			var legion: Legion = _legion_at(state, coords)
+			if legion:
+				_preview_inspect_fn.call(coords)
 
 func _on_tile_hover_exited(coords: Vector2i) -> void:
 	if coords in _overlay_coords:
@@ -306,6 +321,9 @@ func _on_tile_hover_exited(coords: Vector2i) -> void:
 		var selected_visu: TileVisu = tile_visu_fn.call(selected_coords)
 		if selected_visu and selected_visu.legion_visu:
 			selected_visu.legion_visu.juice_direct_reset()
+	elif not has_selected:
+		if _clear_preview_inspect_fn.is_valid():
+			_clear_preview_inspect_fn.call()
 
 func _dispatch_click(coords: Vector2i) -> void:
 	if _attack_choice_popup != null and is_instance_valid(_attack_choice_popup):

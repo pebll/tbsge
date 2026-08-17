@@ -18,6 +18,15 @@ const COLOR_TEXT_DISABLED := Color(0.42, 0.38, 0.34)
 const BORDER_THICK := 4
 const RADIUS := 16
 
+## Shared interact / tooltip motion (UiInteractable). Change here to retune globally.
+const INTERACT_HOVER_SCALE := 1.03
+const INTERACT_SELECT_SCALE := 1.06
+const INTERACT_ENTRY_SCALE := 0.9
+const INTERACT_HOVER_DURATION := 0.12
+const INTERACT_SELECT_DURATION := 0.14
+const INTERACT_ENTRY_DURATION := 0.16
+const INTERACT_SELECT_MODULATE := Color(1.08, 1.05, 0.92, 1.0)
+
 static func panel_stylebox(
 	bg: Color = COLOR_PANEL,
 	border: Color = COLOR_BORDER,

@@ -23,6 +23,8 @@ func _init(phase_deps: MinigamePhaseDeps) -> void:
 func enter() -> void:
 	deps.tile_info_panel.set_draft_mode(false)
 	deps.tile_info_panel.hide()
+	if deps.legion_strip:
+		deps.legion_strip.hide_strip()
 	deps.presenter.sync_legions(deps.session)
 	deps.turn_hud.show()
 	deps.turn_hud.show_active_team(deps.session.turn_manager.active_team_id)
@@ -216,6 +218,8 @@ func check_match_end() -> void:
 	deps.setup_panel.hide()
 	deps.unit_picker.hide()
 	deps.tile_info_panel.hide()
+	if deps.legion_strip:
+		deps.legion_strip.hide_strip()
 	if deps.pass_overlay:
 		deps.pass_overlay.hide()
 	if deps.action_bar:
@@ -228,13 +232,29 @@ func check_match_end() -> void:
 	deps.game_over_panel.show_for_winner(deps.session.winner, report)
 
 func inspect_tile(coords: Vector2i) -> void:
-	if not deps.tile_info_panel:
+	_show_strip_for_coords(coords, true)
+
+func preview_inspect(coords: Vector2i) -> void:
+	_show_strip_for_coords(coords, false)
+
+func clear_preview_inspect() -> void:
+	if deps.legion_strip and not deps.legion_strip.is_sticky():
+		deps.legion_strip.hide_strip()
+
+func clear_battle_inspect() -> void:
+	if deps.legion_strip:
+		deps.legion_strip.hide_strip()
+
+func _show_strip_for_coords(coords: Vector2i, sticky: bool) -> void:
+	if deps.tile_info_panel:
+		deps.tile_info_panel.hide()
+	if not deps.legion_strip:
 		return
 	var tile: Tile = deps.session.grid.get(coords)
 	if tile and tile.has_legion():
-		deps.tile_info_panel.show_tile(tile)
-	else:
-		deps.tile_info_panel.hide()
+		deps.legion_strip.show_legion(tile.legion, sticky)
+	elif sticky or (deps.legion_strip and not deps.legion_strip.is_sticky()):
+		deps.legion_strip.hide_strip()
 
 ## Hotseat: after a human ends turn, pause so the other player can take the device.
 func _maybe_show_hotseat_pass() -> bool:

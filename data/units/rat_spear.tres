@@ -9,6 +9,6 @@ id = "RAT_SPEAR"
 display_name = "Rat Spear"
 attack = 4
 image_size = 0.96
-size = 1.2
+size = 1.0
 price = 4
 icon = ExtResource("2_icon")

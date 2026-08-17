@@ -1,6 +1,8 @@
 class_name MinigameRules
 extends RefCounted
 
+const UnitFootprintScript = preload("res://scripts/ui/interact/unit_footprint.gd")
+
 const DEFAULT_UNIT_SIZE := 1.5
 const DEFAULT_UNIT_PRICE := 5
 const DEPLOY_ROW_COUNT := 2
@@ -23,7 +25,8 @@ static func max_units_in_legion(unit_type: String, max_fill: float = 12.0) -> in
 	var size := unit_size(unit_type)
 	if size <= 0.0:
 		return 1
-	return maxi(1, int(floor(max_fill / size)))
+	var packed := UnitFootprintScript.max_packable_count(size, max_fill)
+	return maxi(1, packed)
 
 static func max_affordable_unit_count(
 	unit_type: String,
@@ -179,6 +182,11 @@ static func validate_draft_placement(
 		return "Too many units for this type"
 	if legion_fill(unit_type, unit_count) > max_fill + 0.001:
 		return "Legion exceeds max size"
+	var sizes: Array = []
+	sizes.resize(unit_count)
+	sizes.fill(unit_size(unit_type))
+	if not UnitFootprintScript.can_pack(sizes):
+		return "Units do not fit legion layout"
 	var cost := legion_cost(unit_type, unit_count)
 	var existing = draft.find_placement(coords)
 	var old_cost: int = 0

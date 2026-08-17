@@ -47,6 +47,8 @@ const AI_FUNNY_NAMES: Array[String] = [
 var show_battle_log_moves: bool = false
 var show_battle_log_end_turns: bool = false
 var ai_debug_enabled: bool = false
+## Debug: legion strip unit HP — 0 = full-width background bar, 1 = narrow right bar.
+var legion_strip_hp_style: int = 0
 
 ## Last Play setup choices (persisted for the setup UI).
 var match_map_size: int = 3
@@ -92,6 +94,17 @@ func is_ai_debug_enabled() -> bool:
 func toggle_ai_debug(persist: bool = true) -> bool:
 	set_ai_debug_enabled(not ai_debug_enabled, persist)
 	return is_ai_debug_enabled()
+
+func set_legion_strip_hp_style(value: int, persist: bool = true) -> void:
+	var style := clampi(value, 0, 1)
+	if legion_strip_hp_style == style:
+		return
+	legion_strip_hp_style = style
+	_emit_and_maybe_save(persist)
+
+func toggle_legion_strip_hp_style(persist: bool = true) -> int:
+	set_legion_strip_hp_style(1 - legion_strip_hp_style, persist)
+	return legion_strip_hp_style
 
 func set_match_map_size(value: int, persist: bool = true) -> void:
 	if value not in MAP_SIZE_OPTIONS:
@@ -266,6 +279,7 @@ func _load_settings() -> void:
 	show_battle_log_moves = bool(cfg.get_value(SETTINGS_SECTION, "show_battle_log_moves", false))
 	show_battle_log_end_turns = bool(cfg.get_value(SETTINGS_SECTION, "show_battle_log_end_turns", false))
 	ai_debug_enabled = bool(cfg.get_value(SETTINGS_SECTION, "ai_debug", false))
+	legion_strip_hp_style = clampi(int(cfg.get_value(SETTINGS_SECTION, "legion_strip_hp_style", 0)), 0, 1)
 
 	var map_size := int(cfg.get_value(MATCH_SECTION, "map_size", 3))
 	if map_size in MAP_SIZE_OPTIONS:
@@ -291,6 +305,7 @@ func _save_settings() -> void:
 	cfg.set_value(SETTINGS_SECTION, "show_battle_log_moves", show_battle_log_moves)
 	cfg.set_value(SETTINGS_SECTION, "show_battle_log_end_turns", show_battle_log_end_turns)
 	cfg.set_value(SETTINGS_SECTION, "ai_debug", ai_debug_enabled)
+	cfg.set_value(SETTINGS_SECTION, "legion_strip_hp_style", legion_strip_hp_style)
 	cfg.set_value(MATCH_SECTION, "map_size", match_map_size)
 	cfg.set_value(MATCH_SECTION, "difficulty", match_difficulty)
 	cfg.set_value(MATCH_SECTION, "mode", match_mode)
