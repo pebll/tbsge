@@ -2,11 +2,13 @@ class_name MinigameSetupPanel
 extends Control
 
 signal ready_pressed
+signal random_team_pressed
 
 @onready var gold_panel: PanelContainer = %GoldPanel
 @onready var team_label: Label = %TeamLabel
 @onready var gold_value: Label = %GoldValue
 @onready var gold_total: Label = %GoldTotal
+@onready var random_team_button: GameButton = %RandomTeamButton
 @onready var ready_button: GameButton = %ReadyButton
 
 const ICON_COIN := preload("res://assets/icons/base_icons_sprites/coin.png")
@@ -21,6 +23,7 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_apply_style()
 	_add_gold_icon()
+	random_team_button.pressed.connect(func(): random_team_pressed.emit())
 	ready_button.pressed.connect(func(): ready_pressed.emit())
 
 func _add_gold_icon() -> void:
@@ -56,12 +59,14 @@ func _apply_style() -> void:
 	for label in [team_label, gold_value, gold_total]:
 		label.add_theme_color_override("font_color", COLOR_TEXT)
 
-func show_for_team(team_id: String, draft_data: Dictionary) -> void:
+func show_for_team(team_id: String, draft_data: Dictionary, can_edit: bool = true) -> void:
 	_apply_team_accent(team_id)
 	var remaining := int(draft_data.get("remaining_budget", 0))
 	var budget_total := int(draft_data.get("budget_total", 0))
 	gold_value.text = "%d" % remaining
 	gold_total.text = "/ %d gold left" % budget_total
+	random_team_button.disabled = not can_edit
+	ready_button.disabled = not can_edit
 	show()
 
 func _apply_team_accent(team_id: String) -> void:

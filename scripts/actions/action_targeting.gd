@@ -25,12 +25,15 @@ static func listed_actions(legion: Legion) -> Array[ActionDefinitionScript]:
 static func disable_reason(
 	state: BattleStateScript,
 	legion: Legion,
-	action: ActionDefinitionScript
+	action: ActionDefinitionScript,
+	inspect_only: bool = false
 ) -> String:
 	if legion == null or action == null:
 		return "Unavailable"
-	if state == null or not state.can_act_legion(legion):
+	if not inspect_only and (state == null or not state.can_act_legion(legion)):
 		return "Cannot act now"
+	if inspect_only and state != null and not state.turn_manager.is_legion_active(legion):
+		return "Enemy unit"
 	var cd_left := legion.get_cooldown_remaining(action.id)
 	if cd_left > 0:
 		return "Ready in %d turn%s" % [cd_left, "s" if cd_left != 1 else ""]

@@ -129,6 +129,30 @@ func handle_ready() -> void:
 		return
 	_show_pass_overlay()
 
+func handle_random_team() -> void:
+	if deps.session.phase != MinigameSessionScript.Phase.DRAFT:
+		return
+	if deps.session.active_draft_team != viewing_team:
+		return
+	if deps.is_ai_team(viewing_team):
+		return
+	move_mode = false
+	picker_for_change_type = false
+	deps.unit_picker.hide()
+	_clear_all_draft_placements()
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	for cmd in AiDrafter.build_draft_commands(deps.session, viewing_team, rng):
+		if String(cmd.get("type", "")) == "draft_ready":
+			continue
+		var result: Dictionary = deps.session.apply(cmd)
+		if not result["ok"]:
+			_show_error_toast(String(result.get("error", "Random team failed")))
+			refresh_view()
+			return
+	selected_coords = INVALID_COORDS
+	refresh_view()
+
 func handle_pass_continue() -> void:
 	deps.pass_overlay.hide()
 	viewing_team = deps.session.active_draft_team
@@ -235,7 +259,11 @@ func handle_move_mode() -> void:
 func refresh_view() -> void:
 	var view: Dictionary = deps.session.get_view_state(viewing_team)
 	var draft: Dictionary = view.get("draft", {})
-	deps.setup_panel.show_for_team(viewing_team, draft)
+	var can_edit := (
+		deps.session.active_draft_team == viewing_team
+		and not deps.is_ai_team(viewing_team)
+	)
+	deps.setup_panel.show_for_team(viewing_team, draft, can_edit)
 
 	var slots: Array = view.get("deploy_slots", [])
 	var occupied: Array = []
@@ -299,6 +327,18 @@ func _apply_ai_draft(team_id: String) -> void:
 		if not draft_result["ok"]:
 			push_error("AI draft failed: %s" % draft_result["error"])
 			return
+
+func _clear_all_draft_placements() -> void:
+	var draft: Dictionary = deps.session.get_view_state(viewing_team).get("draft", {})
+	var coords_list: Array = []
+	for p in draft.get("placements", []):
+		coords_list.append(p.get("coords", Vector2i.ZERO))
+	for coords in coords_list:
+		deps.session.apply({
+			"type": "draft_clear_slot",
+			"team": viewing_team,
+			"coords": coords,
+		})
 
 func _show_draft_tile_info(coords: Vector2i) -> void:
 	var draft: Dictionary = deps.session.get_view_state(viewing_team).get("draft", {})

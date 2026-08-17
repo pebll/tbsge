@@ -131,7 +131,7 @@ func select_tile(coords: Vector2i) -> void:
 	if state == null:
 		return
 	var legion: Legion = _legion_at(state, coords)
-	if legion == null or not bool(can_act_fn.call(legion)):
+	if legion == null:
 		return
 	_hide_attack_choice_popup()
 	_clear_overlay_visuals()
@@ -141,7 +141,8 @@ func select_tile(coords: Vector2i) -> void:
 	target_coords.clear()
 	default_target_actions.clear()
 	_paint_tile(coords, "selected", LIFT_SELECTED)
-	_paint_default_targets(state, legion)
+	if bool(can_act_fn.call(legion)):
+		_paint_default_targets(state, legion)
 	_info_tile_coords = coords
 	_info_visible_for_tile = true
 	_inspect_fn.call(coords)
@@ -157,7 +158,7 @@ func select_action(action: ActionDefinitionScript) -> void:
 	if state == null:
 		return
 	var legion: Legion = _legion_at(state, selected_coords)
-	if legion == null:
+	if legion == null or not bool(can_act_fn.call(legion)):
 		return
 	_hide_attack_choice_popup()
 	if selected_action and selected_action.id == action.id:
@@ -194,9 +195,10 @@ func _refresh_action_bar(
 	if action_bar == null:
 		return
 	var listed := ActionTargetingScript.listed_actions(legion)
+	var can_act := bool(can_act_fn.call(legion))
 	var reasons: Dictionary = {}
 	for action in listed:
-		var reason := ActionTargetingScript.disable_reason(state, legion, action)
+		var reason := ActionTargetingScript.disable_reason(state, legion, action, not can_act)
 		if not reason.is_empty():
 			reasons[action.id] = reason
 	action_bar.set_actions(listed, selected, reasons)
@@ -251,10 +253,13 @@ func pass_current_legion() -> void:
 	if not can_accept_command():
 		return
 	if has_selected:
-		var tm: TurnManager = turn_manager_fn.call()
-		tm.wait_legion(selected_coords)
+		var state: BattleStateScript = battle_state_fn.call()
+		var legion: Legion = _legion_at(state, selected_coords) if state else null
+		if legion and bool(can_act_fn.call(legion)):
+			var tm: TurnManager = turn_manager_fn.call()
+			tm.wait_legion(selected_coords)
+			_sync_spent_visuals()
 		deselect()
-		_sync_spent_visuals()
 	cycle_legion_tab()
 
 func _on_action_bar_pressed(action: ActionDefinitionScript) -> void:
@@ -262,10 +267,9 @@ func _on_action_bar_pressed(action: ActionDefinitionScript) -> void:
 		return
 	var state: BattleStateScript = battle_state_fn.call()
 	var legion: Legion = _legion_at(state, selected_coords) if state else null
-	if legion:
-		AudioManager.play_unit_click(legion.unit_type)
-	else:
-		AudioManager.play_sfx("tile_click")
+	if legion == null or not bool(can_act_fn.call(legion)):
+		return
+	AudioManager.play_unit_click(legion.unit_type)
 	select_action(action)
 
 func _on_tile_clicked(coords: Vector2i) -> void:
@@ -290,6 +294,15 @@ func _play_click_sound_for_tile(coords: Vector2i) -> void:
 func _on_tile_right_clicked(coords: Vector2i) -> void:
 	if not battle_phase_fn.is_valid() or not bool(battle_phase_fn.call()):
 		return
+	if not can_accept_command():
+		return
+	var state: BattleStateScript = battle_state_fn.call()
+	if state == null:
+		return
+	var legion: Legion = _legion_at(state, coords)
+	if legion:
+		select_tile(coords)
+		return
 	_info_tile_coords = coords
 	_info_visible_for_tile = true
 	_inspect_fn.call(coords)
@@ -305,12 +318,6 @@ func _on_tile_hover_entered(coords: Vector2i) -> void:
 			if selected_visu and selected_visu.legion_visu and tile_visu:
 				var dir := (tile_visu.position - selected_visu.position).normalized()
 				selected_visu.legion_visu.update_direction(dir)
-	if not has_selected and _preview_inspect_fn.is_valid():
-		var state: BattleStateScript = battle_state_fn.call()
-		if state:
-			var legion: Legion = _legion_at(state, coords)
-			if legion:
-				_preview_inspect_fn.call(coords)
 
 func _on_tile_hover_exited(coords: Vector2i) -> void:
 	if coords in _overlay_coords:
@@ -321,9 +328,6 @@ func _on_tile_hover_exited(coords: Vector2i) -> void:
 		var selected_visu: TileVisu = tile_visu_fn.call(selected_coords)
 		if selected_visu and selected_visu.legion_visu:
 			selected_visu.legion_visu.juice_direct_reset()
-	elif not has_selected:
-		if _clear_preview_inspect_fn.is_valid():
-			_clear_preview_inspect_fn.call()
 
 func _dispatch_click(coords: Vector2i) -> void:
 	if _attack_choice_popup != null and is_instance_valid(_attack_choice_popup):
@@ -377,9 +381,9 @@ func _dispatch_click(coords: Vector2i) -> void:
 		return
 	var tile: Tile = state.tile_at(coords)
 	if tile and tile.has_legion():
-		deselect()
-		var legion: Legion = tile.legion
-		if bool(can_act_fn.call(legion)):
+		if has_selected and coords == selected_coords:
+			deselect()
+		else:
 			select_tile(coords)
 		return
 

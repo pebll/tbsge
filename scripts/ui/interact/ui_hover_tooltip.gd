@@ -38,7 +38,12 @@ func _present_internal(title: String, body: String, rows: Array, anchor: Control
 	else:
 		_body.visible = false
 		_stats_box.visible = true
-		UiStatIcons.populate_stat_vbox(_stats_box, rows, 22, 16)
+		UiStatIcons.populate_stat_vbox(
+			_stats_box,
+			rows,
+			UiStatIcons.TOOLTIP_ICON_PX,
+			UiStatIcons.TOOLTIP_FONT_SIZE
+		)
 	_panel.show()
 	show()
 	await get_tree().process_frame
@@ -58,7 +63,7 @@ func _build() -> void:
 	_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_panel.add_theme_stylebox_override(
 		"panel",
-		UiTheme.panel_stylebox(UiTheme.COLOR_PANEL, UiTheme.COLOR_BORDER, UiTheme.RADIUS, UiTheme.BORDER_THICK, 12)
+		UiTheme.panel_stylebox(UiTheme.COLOR_PANEL, UiTheme.COLOR_BORDER, UiTheme.RADIUS, UiTheme.BORDER_THICK, 14)
 	)
 	add_child(_panel)
 
@@ -68,17 +73,17 @@ func _build() -> void:
 
 	_title = Label.new()
 	_title.add_theme_color_override("font_color", UiTheme.COLOR_TEXT)
-	_title.add_theme_font_size_override("font_size", 20)
+	_title.add_theme_font_size_override("font_size", UiStatIcons.TOOLTIP_TITLE_FONT_SIZE)
 	vbox.add_child(_title)
 
 	_stats_box = VBoxContainer.new()
-	_stats_box.add_theme_constant_override("separation", 4)
+	_stats_box.add_theme_constant_override("separation", 6)
 	_stats_box.visible = false
 	vbox.add_child(_stats_box)
 
 	_body = Label.new()
 	_body.add_theme_color_override("font_color", UiTheme.COLOR_TEXT_MUTED)
-	_body.add_theme_font_size_override("font_size", 16)
+	_body.add_theme_font_size_override("font_size", 18)
 	_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_body.custom_minimum_size = Vector2(200, 0)
 	vbox.add_child(_body)

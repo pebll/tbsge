@@ -66,12 +66,14 @@ func show_legion(legion: Legion, sticky: bool = false) -> void:
 		return
 	if visible and _sticky and not sticky:
 		return
+	var prev_legion := _legion
 	var was_visible := visible
+	var legion_changed := prev_legion != legion
 	_legion = legion
 	_sticky = sticky
 	_render()
 	show()
-	if not was_visible:
+	if not was_visible or legion_changed:
 		UiTheme.juice_pop_in(self, UiTheme.INTERACT_ENTRY_DURATION)
 
 func is_showing_legion(legion: Legion) -> bool:
@@ -252,9 +254,10 @@ func _apply_team_chrome(team_id: String) -> void:
 	_apply_board_chrome(accent)
 
 func _apply_board_chrome(border: Color) -> void:
+	# Darker than unit tiles (COLOR_CARD) so pasted units read clearly on the board.
 	_board_panel.add_theme_stylebox_override(
 		"panel",
-		UiTheme.panel_stylebox(UiTheme.COLOR_PANEL, border, UiTheme.RADIUS, TEAM_BORDER, 0)
+		UiTheme.panel_stylebox(UiTheme.COLOR_PRESSED, border, UiTheme.RADIUS, TEAM_BORDER, 0)
 	)
 
 func _unit_tooltip_payload_for(u: Unit) -> Dictionary:
