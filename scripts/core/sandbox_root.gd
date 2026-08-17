@@ -141,6 +141,10 @@ func _on_battle_log_entry_added(entry: Dictionary) -> void:
 	if _action_log_panel:
 		_action_log_panel.receive_entry(entry)
 
+func _on_battle_log_live_tick(tick: Dictionary) -> void:
+	if _action_log_panel:
+		_action_log_panel.apply_live_tick(tick)
+
 func spawn_unit(coords: Vector2i) -> void:
 	var result := session.spawn_unit_at(coords)
 	if not result.get("ok", false):
@@ -291,6 +295,7 @@ func _setup_tile_info_ui() -> void:
 	_action_log_panel.set_tooltip_controller(_tooltip_controller)
 	_action_log_panel.enter_battle(session.action_log if session else null)
 	EventBus.battle_log_entry_added.connect(_on_battle_log_entry_added)
+	EventBus.battle_log_live_tick.connect(_on_battle_log_live_tick)
 
 	_pause_menu = PauseMenu.new()
 	tile_info_layer.add_child(_pause_menu)

@@ -25,11 +25,12 @@
 - In tests, force tiles to a deterministic walkable state (e.g. `terrain_type="GRASS"`, `walkable=true`).
 
 ### UI panel requirements + style
-- UI must be **scalable/adaptable**: render sections depending on tile contents (initially only legion info).
-- Style direction: **simple shapes**, **beige**, **rounded corners**, **thicker borders**, **large text**.
-- Panel is **fixed width** and **anchored to the right side**.
-- Final behavior: **right-click only** opens the panel; **hover does not trigger** it; panel hides on leaving the tile that opened it.
-- Legion units list: **no “Unit 1/2 …” labels**; show **unit image + health bar** per unit.
+- UI must be **scalable/adaptable**: render sections depending on context (draft tile panel vs battle legion strip).
+- Style direction: **simple shapes**, **beige**, **rounded corners**, **thicker borders**, **large text**. Shared chrome: `UiTheme`, `UiStatIcons` (see `.cursor/rules/ui-chrome.mdc`).
+- **Draft:** `TileInfoPanel` is **fixed width**, **anchored right**; **right-click** a tile to inspect; hides when leaving that tile.
+- **Battle:** bottom **LegionStrip** / `BattleExpectationBar` for inspect; click any legion on the map to select and inspect (sticky until deselect or another legion). Unit details via **hover tooltips** on strip cells (not a separate right panel).
+- Legion units list: **no “Unit 1/2 …” labels**; show **unit image + health bar** per unit (footprint-sized tiles on a 6×2 board).
+- Stat rows use icon + number (heart/sword/bow/shield), not text-only labels.
 
 ### Data-driven unit stats
 - Use Godot `Resource`-based unit definitions:

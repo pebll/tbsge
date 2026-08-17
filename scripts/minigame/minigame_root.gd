@@ -259,6 +259,7 @@ func _setup_ui() -> void:
 	_ui_layer.add_child(_action_log_panel)
 	_action_log_panel.set_tooltip_controller(_tooltip_controller)
 	EventBus.battle_log_entry_added.connect(_on_battle_log_entry_added)
+	EventBus.battle_log_live_tick.connect(_on_battle_log_live_tick)
 
 	_combat_fx_layer = CanvasLayer.new()
 	_combat_fx_layer.name = "CombatFX"
@@ -320,6 +321,10 @@ func _on_battle_started() -> void:
 func _on_battle_log_entry_added(entry: Dictionary) -> void:
 	if _action_log_panel and session and session.phase == MinigameSessionScript.Phase.BATTLE:
 		_action_log_panel.receive_entry(entry)
+
+func _on_battle_log_live_tick(tick: Dictionary) -> void:
+	if _action_log_panel and session and session.phase == MinigameSessionScript.Phase.BATTLE:
+		_action_log_panel.apply_live_tick(tick)
 
 func _on_legion_ap_changed(legion: Legion) -> void:
 	if presenter and session:

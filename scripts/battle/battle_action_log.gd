@@ -6,13 +6,17 @@ signal entry_added(entry: Dictionary)
 const MAX_ENTRIES := 80
 
 var entries: Array[Dictionary] = []
+var _seq: int = 0
 
 func clear() -> void:
 	entries.clear()
+	_seq = 0
 
 func append(entry: Dictionary) -> void:
 	if entry.is_empty():
 		return
+	_seq += 1
+	entry["log_seq"] = _seq
 	entries.append(entry)
 	while entries.size() > MAX_ENTRIES:
 		entries.pop_front()
