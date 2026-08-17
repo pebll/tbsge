@@ -461,7 +461,7 @@ func _apply_wipe_to_portrait(wrap: Control) -> void:
 
 func _add_entry_row(entry: Dictionary, animate: bool = false, live: bool = false) -> Dictionary:
 	if _list == null or entry.is_empty():
-		return
+		return {}
 	if String(entry.get("action_id", "")) in ["end_turn", "turn_start"]:
 		_add_turn_start_banner(entry, animate)
 		return {}
