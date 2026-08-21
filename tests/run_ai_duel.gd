@@ -83,4 +83,4 @@ func _print_help() -> void:
 	print("  --out-dir PATH Folder for matches.csv + legions.csv (default: data/ai_duel/run_<timestamp>)")
 	print("  --help         Show this help")
 	print("")
-	print("Known brains: cascade")
+	print("Known brains: cascade, utility")
