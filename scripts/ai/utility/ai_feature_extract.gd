@@ -42,6 +42,8 @@ static func extract(session, legion: Legion, ctx: AiContext, cand: AiCandidate) 
 		(focus_dist_before - focus_dist_after) / denom, -1.0, 1.0
 	)
 
+	_fill_threat(ctx, legion, stand, feats)
+
 	if action_id in ["melee_attack", "ranged_attack"]:
 		_fill_combat(session, legion, stand, target_coords, action_id, feats)
 	elif action_id in ["self_heal", "heal_ally"]:
@@ -67,6 +69,21 @@ static func _effective_action(cand: AiCandidate) -> String:
 	if not cand.followup_action_id.is_empty():
 		return cand.followup_action_id
 	return cand.action_id
+
+static func _fill_threat(ctx: AiContext, legion: Legion, stand: Vector2i, feats: Dictionary) -> void:
+	if ctx == null or ctx.threat == null or legion == null:
+		return
+	# Warm both hexes so frac normalization has a shared max.
+	var before := float(ctx.threat.threat_at(legion.tile_coords))
+	var after := float(ctx.threat.threat_at(stand))
+	var max_t := maxf(maxf(before, after), 1.0)
+	var threat_stand := clampf(after / max_t, 0.0, 1.0)
+	var threat_before := clampf(before / max_t, 0.0, 1.0)
+	feats[AiFeatureNames.THREAT_AT_STAND] = threat_stand
+	feats[AiFeatureNames.THREAT_RELIEF] = clampf(threat_before - threat_stand, -1.0, 1.0)
+	var hp_frac := _total_hp(legion) / _max_hp(legion)
+	var frailty := clampf(1.0 - hp_frac, 0.0, 1.0)
+	feats[AiFeatureNames.LOW_HP_EXPOSURE] = frailty * threat_stand
 
 static func _fill_combat(
 	session,

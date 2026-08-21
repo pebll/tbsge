@@ -10,6 +10,9 @@ const ENEMY_KILL_FRAC := "enemy_kill_frac"
 const OWN_DEATH_FRAC := "own_death_frac"
 const KILL_PROB := "kill_prob"
 const ENEMY_LOSS_SPREAD := "enemy_loss_spread"
+const THREAT_AT_STAND := "threat_at_stand"
+const THREAT_RELIEF := "threat_relief"
+const LOW_HP_EXPOSURE := "low_hp_exposure"
 const FOCUS_SUPPORT := "focus_support"
 const FOCUS_LOW_HP := "focus_low_hp"
 const HEAL_EFFICIENCY := "heal_efficiency"
@@ -34,6 +37,9 @@ static func all_names() -> Array[String]:
 		OWN_DEATH_FRAC,
 		KILL_PROB,
 		ENEMY_LOSS_SPREAD,
+		THREAT_AT_STAND,
+		THREAT_RELIEF,
+		LOW_HP_EXPOSURE,
 		FOCUS_SUPPORT,
 		FOCUS_LOW_HP,
 		HEAL_EFFICIENCY,

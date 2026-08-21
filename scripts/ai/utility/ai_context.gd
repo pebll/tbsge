@@ -6,6 +6,7 @@ extends RefCounted
 const HexPathfinder = preload("res://scripts/ai/hex_pathfinder.gd")
 const AiActionScorer = preload("res://scripts/ai/ai_action_scorer.gd")
 const MoveReachability = preload("res://scripts/battle/move_reachability.gd")
+const ThreatMapScript = preload("res://scripts/ai/threat/threat_map.gd")
 
 var session
 var legion: Legion
@@ -15,6 +16,7 @@ var allies: Array[Legion] = []
 var focus: Legion = null
 var map_radius_approx: float = 3.0
 var reach: Dictionary = {}
+var threat = null
 
 static func build(p_session, p_legion: Legion) -> AiContext:
 	var ctx := AiContext.new()
@@ -34,6 +36,7 @@ static func build(p_session, p_legion: Legion) -> AiContext:
 			ctx.enemies.append(L)
 	ctx.focus = _pick_focus(p_legion.tile_coords, ctx.enemies)
 	ctx.reach = MoveReachability.compute(p_session.battle_state(), p_legion)
+	ctx.threat = ThreatMapScript.build(p_session, p_legion.team_id)
 	return ctx
 
 static func _approx_map_radius(session) -> float:
