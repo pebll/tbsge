@@ -14,6 +14,7 @@ var profile: AiProfile
 ## When true (default for EA / duels), always argmax. Softmax uses profile.temperature.
 var force_argmax: bool = true
 var debug_enabled: bool = false
+var probe = null
 
 func _init(p_profile: AiProfile = null) -> void:
 	id = "utility"
@@ -55,6 +56,8 @@ func decide(session, legion: Legion) -> Dictionary:
 		chosen = _softmax_pick(scored, profile.temperature)
 
 	var best_cand: AiCandidate = chosen["cand"]
+	if probe != null:
+		probe.record(chosen.get("feats", {}), _probe_action_id(best_cand))
 	var cmd: Dictionary = best_cand.to_command()
 	cmd["score"] = float(chosen["score"])
 	if not String(cmd.get("reason", "")).is_empty():
@@ -65,6 +68,13 @@ func decide(session, legion: Legion) -> Dictionary:
 			% [legion.team_id, legion.tile_coords, cmd.get("action_id", "pass"), float(chosen["score"])]
 		)
 	return cmd
+
+func _probe_action_id(cand: AiCandidate) -> String:
+	if cand == null:
+		return "pass"
+	if not cand.followup_action_id.is_empty():
+		return cand.followup_action_id
+	return cand.action_id
 
 func sort_actionable(session, actionable: Array[Vector2i]) -> Array[Vector2i]:
 	if actionable.is_empty():
