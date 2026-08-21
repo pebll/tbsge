@@ -3,13 +3,13 @@ extends SceneTree
 ## Headless MAP-Elites evolve with checkpoint / continue / stop.
 ##
 ## Fresh:
-##   ./run_ai_evolve.sh --gens 50 --pop 12 --pairs 2 --run-name long1
+##   ./run_ai_evolve.sh --name long1 --gens 50 --pop 12 --pairs 2
 ## Continue:
-##   ./run_ai_evolve.sh --continue --run-dir res://data/ai/evolve/long1 --gens 50
+##   ./run_ai_evolve.sh --continue --name long1 --gens 50
 ## Status:
-##   ./run_ai_evolve.sh --status --run-dir res://data/ai/evolve/long1
+##   ./run_ai_evolve.sh --status --name long1
 ## Request stop (other terminal while a run is going):
-##   ./run_ai_evolve.sh --request-stop --run-dir res://data/ai/evolve/long1
+##   ./run_ai_evolve.sh --request-stop --name long1
 
 const AiArchiveStore = preload("res://scripts/ai/evolution/ai_archive_store.gd")
 
@@ -28,18 +28,22 @@ func _initialize() -> void:
 		quit(0)
 		return
 
+	var run_name := _resolve_run_name()
 	var run_dir := _parse_string("--run-dir", "")
-	var run_name := _parse_string("--run-name", "")
 	if run_dir.is_empty() and not run_name.is_empty():
 		run_dir = "%s/%s" % [AiArchiveStore.DEFAULT_ROOT, run_name]
-	if run_dir.is_empty() and (_has_flag("--continue") or _has_flag("--status") or _has_flag("--request-stop")):
-		print("ERROR: --run-dir or --run-name required for continue/status/request-stop")
+
+	var needs_named := (
+		_has_flag("--continue") or _has_flag("--status") or _has_flag("--request-stop")
+	)
+	if run_dir.is_empty() and needs_named:
+		print("ERROR: --name required for continue/status/request-stop")
 		quit(2)
 		return
 
 	if _has_flag("--request-stop"):
 		AiArchiveStore.request_stop(run_dir)
-		print("Wrote STOP file: %s" % AiArchiveStore.stop_path(run_dir))
+		print("Wrote STOP file for run '%s' (%s)" % [run_name, AiArchiveStore.stop_path(run_dir)])
 		quit(0)
 		return
 
@@ -60,20 +64,25 @@ func _initialize() -> void:
 	var checkpoint_every := _parse_int("--checkpoint-every", 1)
 	var continue_run := _has_flag("--continue")
 	var verbose := not _has_flag("--quiet")
-	var persist := _has_flag("--persist") or continue_run or not run_name.is_empty() or not run_dir.is_empty()
+	var persist := (
+		_has_flag("--persist")
+		or continue_run
+		or not run_name.is_empty()
+		or not run_dir.is_empty()
+	)
 
 	if persist and run_dir.is_empty():
 		run_dir = AiArchiveStore.make_run_dir()
+		run_name = run_dir.get_file()
 
 	print(
 		"MAP-Elites evolve: gens=%d pop=%d pairs=%d map=%d budget=%d seed=%d"
 		% [gens, pop, pairs, map_size, budget, seed]
 	)
 	if not run_dir.is_empty():
-		print("Run dir: %s%s" % [run_dir, " (continue)" if continue_run else ""])
-		print("Stop: touch %s  or  ./run_ai_evolve.sh --request-stop --run-dir %s" % [
-			AiArchiveStore.stop_path(run_dir), run_dir
-		])
+		var label := run_name if not run_name.is_empty() else run_dir
+		print("Run: %s%s → %s" % [label, " (continue)" if continue_run else "", run_dir])
+		print("Stop: ./run_ai_evolve.sh --request-stop --name %s" % label)
 
 	var batch: Dictionary = runner.run_session({
 		"gens": gens,
@@ -91,6 +100,13 @@ func _initialize() -> void:
 	})
 	runner.print_report(batch)
 	quit(0)
+
+## Prefer --name; accept --run-name as alias.
+func _resolve_run_name() -> String:
+	var name := _parse_string("--name", "")
+	if name.is_empty():
+		name = _parse_string("--run-name", "")
+	return name.strip_edges()
 
 func _parse_string(flag: String, default_value: String) -> String:
 	var args := OS.get_cmdline_user_args()
@@ -125,24 +141,24 @@ func _print_help() -> void:
 	print("MAP-Elites utility-weight evolve (headless)")
 	print("")
 	print("Usage:")
-	print("  ./run_ai_evolve.sh --gens 50 --pop 12 --pairs 2 --run-name long1")
-	print("  ./run_ai_evolve.sh --continue --run-dir res://data/ai/evolve/long1 --gens 50")
-	print("  ./run_ai_evolve.sh --status --run-dir res://data/ai/evolve/long1")
-	print("  ./run_ai_evolve.sh --request-stop --run-dir res://data/ai/evolve/long1")
+	print("  ./run_ai_evolve.sh --name long1 --gens 50 --pop 12 --pairs 2")
+	print("  ./run_ai_evolve.sh --continue --name long1 --gens 50")
+	print("  ./run_ai_evolve.sh --status --name long1")
+	print("  ./run_ai_evolve.sh --request-stop --name long1")
 	print("")
 	print("Options:")
+	print("  --name NAME           Run id under data/ai/evolve/NAME (preferred)")
 	print("  --gens N              Generations to run now (default %d)" % DEFAULT_GENS)
 	print("  --pop N               Offspring per generation (default %d)" % DEFAULT_POP)
 	print("  --pairs N             Mirrored pairs per fitness eval (default %d)" % DEFAULT_PAIRS)
 	print("  --arena-pairs N       Pairs for champion vs cascade/arena (default %d)" % DEFAULT_ARENA_PAIRS)
 	print("  --arena-opponents N   Archive elites in arena (default %d)" % DEFAULT_ARENA_OPPONENTS)
-	print("  --run-name NAME       Persist under data/ai/evolve/NAME")
-	print("  --run-dir PATH        Explicit run directory")
-	print("  --persist             Force creating a timestamped run dir")
-	print("  --continue            Resume from checkpoint in --run-dir")
+	print("  --continue            Resume from checkpoint for --name")
 	print("  --status              Print checkpoint metrics and exit")
 	print("  --request-stop        Write STOP so a running job exits after the current gen")
 	print("  --checkpoint-every N  Save every N gens (default 1)")
+	print("  --persist             Timestamped run dir if --name omitted")
+	print("  --run-dir PATH        Override path (optional; prefer --name)")
 	print("  --quiet               Less logging")
 	print("")
-	print("Fitness during search: vs cascade (0..2). Debug prints champion win%% vs cascade + arena.")
+	print("Fitness: rich score vs cascade. Debug prints champion win%% vs cascade + arena.")
