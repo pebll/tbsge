@@ -39,6 +39,16 @@ func mutate(rng: RandomNumberGenerator, sigma: float = 0.35, gene_chance: float 
 		child.weights[name] = clampf(base + rng.randfn() * sigma, -12.0, 12.0)
 	return child
 
+func to_dict() -> Dictionary:
+	return {"weights": weights.duplicate(true)}
+
+static func from_dict(data: Dictionary) -> AiGenome:
+	var g := AiGenome.new()
+	var w: Dictionary = data.get("weights", {})
+	for name in AiFeatureNames.all_names():
+		g.weights[name] = float(w.get(name, 0.0))
+	return g
+
 static func crossover(a: AiGenome, b: AiGenome, rng: RandomNumberGenerator) -> AiGenome:
 	var child := AiGenome.new()
 	for name in AiFeatureNames.all_names():

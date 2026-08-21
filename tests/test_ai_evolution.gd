@@ -5,6 +5,8 @@ const AiMapElitesArchiveScript = preload("res://scripts/ai/evolution/ai_map_elit
 const AiEvaluator = preload("res://scripts/ai/evolution/ai_evaluator.gd")
 const AiFeatureNames = preload("res://scripts/ai/utility/ai_feature_names.gd")
 const AiEvolveRunner = preload("res://scripts/ai/evolution/ai_evolve_runner.gd")
+const AiArchiveStore = preload("res://scripts/ai/evolution/ai_archive_store.gd")
+const AiArena = preload("res://scripts/ai/evolution/ai_arena.gd")
 
 func run(_tree: SceneTree) -> bool:
 	if not _test_genome_roundtrip():
@@ -16,6 +18,10 @@ func run(_tree: SceneTree) -> bool:
 	if not _test_evaluator_smoke():
 		return false
 	if not _test_evolve_one_generation_smoke():
+		return false
+	if not _test_checkpoint_roundtrip_and_continue():
+		return false
+	if not _test_stop_file():
 		return false
 	print("Success: MAP-Elites evolution tests")
 	return true
@@ -83,4 +89,69 @@ func _test_evolve_one_generation_smoke() -> bool:
 	if int(batch.get("evaluations", 0)) < 2:
 		push_error("Expected several evaluations")
 		return false
+	return true
+
+func _test_checkpoint_roundtrip_and_continue() -> bool:
+	var run_dir := "res://data/ai/evolve/_test_ckpt_%d" % Time.get_ticks_msec()
+	var batch1: Dictionary = AiEvolveRunner.run_session({
+		"gens": 1,
+		"pop": 2,
+		"pairs": 1,
+		"map_size": 3,
+		"budget": 75,
+		"seed": 11,
+		"verbose": false,
+		"run_dir": run_dir,
+		"continue_run": false,
+		"arena_pairs": 1,
+		"arena_opponents": 1,
+		"checkpoint_every": 1,
+	})
+	if not AiArchiveStore.has_checkpoint(run_dir):
+		push_error("Expected checkpoint after first session")
+		return false
+	if int(batch1.get("generations", 0)) != 1:
+		push_error("Expected 1 generation completed")
+		return false
+	var batch2: Dictionary = AiEvolveRunner.run_session({
+		"gens": 1,
+		"pop": 2,
+		"pairs": 1,
+		"map_size": 3,
+		"budget": 75,
+		"seed": 11,
+		"verbose": false,
+		"run_dir": run_dir,
+		"continue_run": true,
+		"arena_pairs": 1,
+		"arena_opponents": 1,
+		"checkpoint_every": 1,
+	})
+	if int(batch2.get("generations", 0)) != 2:
+		push_error("Continue should reach gen 2, got %s" % batch2.get("generations"))
+		return false
+	if not batch2.has("vs_cascade"):
+		push_error("Expected vs_cascade metric")
+		return false
+	# Cleanup test artifacts.
+	var abs_dir := ProjectSettings.globalize_path(run_dir)
+	for fname in ["checkpoint.json", "history.jsonl", "best_profile.json", "STOP"]:
+		var p := abs_dir.path_join(fname)
+		if FileAccess.file_exists(p):
+			DirAccess.remove_absolute(p)
+	DirAccess.remove_absolute(abs_dir)
+	return true
+
+func _test_stop_file() -> bool:
+	var run_dir := "res://data/ai/evolve/_test_stop_%d" % Time.get_ticks_msec()
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(run_dir))
+	AiArchiveStore.request_stop(run_dir)
+	if not AiArchiveStore.should_stop(run_dir):
+		push_error("STOP file should be detected")
+		return false
+	AiArchiveStore.clear_stop(run_dir)
+	if AiArchiveStore.should_stop(run_dir):
+		push_error("STOP file should be cleared")
+		return false
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(run_dir))
 	return true
