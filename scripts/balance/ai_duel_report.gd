@@ -8,6 +8,7 @@ const DEFAULT_OUT_ROOT := "res://data/ai_duel"
 
 static func write_csvs(out_dir: String, batch: Dictionary) -> Dictionary:
 	var paths := {}
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(out_dir))
 	var match_path := "%s/matches.csv" % out_dir
 	var legion_path := "%s/legions.csv" % out_dir
 	_write_matches_csv(match_path, batch.get("match_rows", []))
@@ -20,19 +21,39 @@ static func print_extended_report(batch: Dictionary, csv_paths: Dictionary = {})
 	print("")
 	print("=== AI vs AI Duel Report ===")
 	var games: int = int(batch.get("games", 0))
+	var pair_count: int = int(batch.get("pair_count", games))
 	var total_turns: int = int(batch.get("total_turns", 0))
 	var avg_turns := float(total_turns) / float(maxi(games, 1))
 	var elapsed_ms: int = int(batch.get("elapsed_ms", 0))
-	print("Games: %d | Map size: %d | Budget: %d | Wall time: %.2fs" % [
+	var brain_a := String(batch.get("brain_a", "cascade"))
+	var brain_b := String(batch.get("brain_b", "cascade"))
+	print("Brains: %s vs %s | Mirror: %s" % [
+		brain_a,
+		brain_b,
+		"yes" if bool(batch.get("mirror", false)) else "no",
+	])
+	print("Seeds: %d | Matches: %d | Map size: %d | Budget: %d | Wall time: %.2fs" % [
+		pair_count,
 		games,
 		int(batch.get("map_size", 0)),
 		int(batch.get("budget", 0)),
 		float(elapsed_ms) / 1000.0,
 	])
-	print("GREEN wins: %d (%d%%) | BLUE wins: %d (%d%%) | Draws: %d (%d%%)" % [
+	print("%s wins: %d (%d%%) | %s wins: %d (%d%%) | Draws: %d (%d%%)" % [
+		brain_a, int(batch.get("brain_a_wins", 0)), _pct(int(batch.get("brain_a_wins", 0)), games),
+		brain_b, int(batch.get("brain_b_wins", 0)), _pct(int(batch.get("brain_b_wins", 0)), games),
+		int(batch.get("draws", 0)), _pct(int(batch.get("draws", 0)), games),
+	])
+	if batch.has("brain_a_pair_score"):
+		var pair_score := float(batch.get("brain_a_pair_score", 0.0))
+		var max_per_pair := 2.0 if bool(batch.get("mirror", false)) else 1.0
+		print(
+			"Mirrored pair score (%s): %.3f / %.1f (win-rate equiv %.1f%%)"
+			% [brain_a, pair_score, max_per_pair, 100.0 * pair_score / max_per_pair]
+		)
+	print("Seat bias — GREEN wins: %d (%d%%) | BLUE wins: %d (%d%%)" % [
 		int(batch.get("green_wins", 0)), _pct(int(batch.get("green_wins", 0)), games),
 		int(batch.get("blue_wins", 0)), _pct(int(batch.get("blue_wins", 0)), games),
-		int(batch.get("draws", 0)), _pct(int(batch.get("draws", 0)), games),
 	])
 	print("Avg team turns: %.1f | Timeouts: %d" % [avg_turns, int(batch.get("timeouts", 0))])
 
@@ -144,7 +165,9 @@ static func _print_highlight(rows: Array, title: String, field: String, higher_i
 
 static func _write_matches_csv(path: String, rows: Array) -> void:
 	var headers := [
-		"game_id", "map_size", "budget", "map_seed", "combat_seed",
+		"game_id", "pair_index", "mirror_index", "a_is_green",
+		"brain_a", "brain_b", "green_brain", "blue_brain",
+		"map_size", "budget", "map_seed", "combat_seed",
 		"team_turns", "elapsed_ms", "winner", "timed_out",
 		"survivors_green", "survivors_blue",
 		"green_legions", "blue_legions",
@@ -154,6 +177,13 @@ static func _write_matches_csv(path: String, rows: Array) -> void:
 	for row in rows:
 		lines.append(_csv_line([
 			row.get("game_id", 0),
+			row.get("pair_index", 0),
+			row.get("mirror_index", 0),
+			row.get("a_is_green", true),
+			row.get("brain_a", ""),
+			row.get("brain_b", ""),
+			row.get("green_brain", ""),
+			row.get("blue_brain", ""),
 			row.get("map_size", 0),
 			row.get("budget", 0),
 			row.get("map_seed", 0),
