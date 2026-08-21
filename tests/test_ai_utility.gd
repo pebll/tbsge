@@ -25,6 +25,8 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_pass_penalty_beats_idle_pass_bias():
 		return false
+	if not _test_combat_features_include_kills():
+		return false
 	print("Success: Utility AI P1 tests")
 	return true
 
@@ -164,3 +166,31 @@ func _test_pass_penalty_beats_idle_pass_bias() -> bool:
 		push_error("Melee score %.2f should beat pass %.2f" % [best_combat, pass_score])
 		return false
 	return true
+
+func _test_combat_features_include_kills() -> bool:
+	var session := MinigameTestHelpersScript.prepare_session()
+	var started: Dictionary = _start_goblins(session)
+	var green: Legion = started["a"]
+	var blue: Legion = started["b"]
+	_teleport_legion(session, green, Vector2i(0, -1))
+	_teleport_legion(session, blue, Vector2i(1, -1))
+	# Soft target so kills are likely.
+	for u in blue.units:
+		u.current_health = 1
+	var ctx: AiContext = AiContextScript.build(session, green)
+	var CombatExpectation = preload("res://scripts/ai/expectation/combat_expectation.gd")
+	CombatExpectation.set_sim_count(6)
+	for cand in AiCandidateGen.generate(session, green, ctx):
+		if cand.action_id != "melee_attack":
+			continue
+		var feats: Dictionary = AiFeatureExtract.extract(session, green, ctx, cand)
+		if float(feats.get(AiFeatureNames.KILL_PROB, 0.0)) <= 0.0:
+			push_error("Expected kill_prob > 0 vs 1-HP stack")
+			return false
+		if float(feats.get(AiFeatureNames.ENEMY_KILL_FRAC, 0.0)) <= 0.0:
+			push_error("Expected enemy_kill_frac > 0 vs 1-HP stack")
+			return false
+		CombatExpectation.use_play_mode()
+		return true
+	push_error("No melee candidate found")
+	return false

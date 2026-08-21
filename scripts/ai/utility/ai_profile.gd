@@ -24,9 +24,13 @@ static func hand_v1() -> AiProfile:
 	p.display_name = "Hand-tuned v1"
 	p.temperature = 0.0
 	p.weights = {
-		AiFeatureNames.ENEMY_LOSS_FRAC: 6.0,
-		AiFeatureNames.OWN_LOSS_FRAC: -5.0,
-		AiFeatureNames.NET_HP_FRAC: 4.0,
+		AiFeatureNames.ENEMY_LOSS_FRAC: 5.0,
+		AiFeatureNames.OWN_LOSS_FRAC: -4.5,
+		AiFeatureNames.NET_HP_FRAC: 3.5,
+		AiFeatureNames.ENEMY_KILL_FRAC: 6.0,
+		AiFeatureNames.OWN_DEATH_FRAC: -5.5,
+		AiFeatureNames.KILL_PROB: 4.0,
+		AiFeatureNames.ENEMY_LOSS_SPREAD: -0.5,
 		AiFeatureNames.FOCUS_SUPPORT: 1.5,
 		AiFeatureNames.FOCUS_LOW_HP: 2.0,
 		AiFeatureNames.HEAL_EFFICIENCY: 3.0,

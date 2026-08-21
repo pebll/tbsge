@@ -6,6 +6,10 @@ extends RefCounted
 const ENEMY_LOSS_FRAC := "enemy_loss_frac"
 const OWN_LOSS_FRAC := "own_loss_frac"
 const NET_HP_FRAC := "net_hp_frac"
+const ENEMY_KILL_FRAC := "enemy_kill_frac"
+const OWN_DEATH_FRAC := "own_death_frac"
+const KILL_PROB := "kill_prob"
+const ENEMY_LOSS_SPREAD := "enemy_loss_spread"
 const FOCUS_SUPPORT := "focus_support"
 const FOCUS_LOW_HP := "focus_low_hp"
 const HEAL_EFFICIENCY := "heal_efficiency"
@@ -26,6 +30,10 @@ static func all_names() -> Array[String]:
 		ENEMY_LOSS_FRAC,
 		OWN_LOSS_FRAC,
 		NET_HP_FRAC,
+		ENEMY_KILL_FRAC,
+		OWN_DEATH_FRAC,
+		KILL_PROB,
+		ENEMY_LOSS_SPREAD,
 		FOCUS_SUPPORT,
 		FOCUS_LOW_HP,
 		HEAL_EFFICIENCY,

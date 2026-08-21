@@ -5,8 +5,7 @@ extends RefCounted
 
 const AiActionScorer = preload("res://scripts/ai/ai_action_scorer.gd")
 const AiFeatureNames = preload("res://scripts/ai/utility/ai_feature_names.gd")
-const HexPathfinder = preload("res://scripts/ai/hex_pathfinder.gd")
-const CombatResolver = preload("res://scripts/core/combat_resolver.gd")
+const CombatExpectation = preload("res://scripts/ai/expectation/combat_expectation.gd")
 const ActionParams = preload("res://scripts/actions/action_params.gd")
 
 static func extract(session, legion: Legion, ctx: AiContext, cand: AiCandidate) -> Dictionary:
@@ -80,20 +79,33 @@ static func _fill_combat(
 	var defender: Legion = session.get_legion_at(to_coords)
 	if defender == null:
 		return
-	var mode := CombatResolver.MODE_MELEE if action_id == "melee_attack" else CombatResolver.MODE_RANGED
-	var dist := 1 if mode == CombatResolver.MODE_MELEE else HexPathfinder.hex_distance(from_coords, to_coords)
-	# Temporarily stand at from_coords for scorer consistency when planning a move.
 	var restored := _push_coords(session, legion, from_coords)
-	var est: Dictionary = AiActionScorer._estimate_combat_damage(legion, defender, mode, dist)
+	var est: Dictionary = CombatExpectation.estimate_combat(
+		legion, defender, action_id, from_coords, to_coords
+	)
 	_pop_coords(session, legion, restored)
-	var enemy_loss := float(est.get("enemy_loss", 0.0))
-	var own_loss := float(est.get("own_loss", 0.0))
-	var def_hp := maxf(1.0, _total_hp(defender))
-	var own_hp := maxf(1.0, _total_hp(legion))
+
+	var def_hp := maxf(1.0, float(est.get("defender_hp", 1.0)))
+	var own_hp := maxf(1.0, float(est.get("attacker_hp", 1.0)))
+	var def_units := maxf(1.0, float(est.get("defender_units", 1)))
+	var atk_units := maxf(1.0, float(est.get("attacker_units", 1)))
+	var enemy_loss := float(est.get("enemy_loss_mean", 0.0))
+	var own_loss := float(est.get("own_loss_mean", 0.0))
+
 	feats[AiFeatureNames.ENEMY_LOSS_FRAC] = clampf(enemy_loss / def_hp, 0.0, 1.0)
 	feats[AiFeatureNames.OWN_LOSS_FRAC] = clampf(own_loss / own_hp, 0.0, 1.0)
 	feats[AiFeatureNames.NET_HP_FRAC] = clampf(
 		(enemy_loss / def_hp) - (own_loss / own_hp), -1.0, 1.0
+	)
+	feats[AiFeatureNames.ENEMY_KILL_FRAC] = clampf(
+		float(est.get("enemy_kills_mean", 0.0)) / def_units, 0.0, 1.0
+	)
+	feats[AiFeatureNames.OWN_DEATH_FRAC] = clampf(
+		float(est.get("own_deaths_mean", 0.0)) / atk_units, 0.0, 1.0
+	)
+	feats[AiFeatureNames.KILL_PROB] = clampf(float(est.get("kill_prob", 0.0)), 0.0, 1.0)
+	feats[AiFeatureNames.ENEMY_LOSS_SPREAD] = clampf(
+		float(est.get("enemy_loss_spread", 0.0)) / def_hp, 0.0, 1.0
 	)
 	feats[AiFeatureNames.FOCUS_SUPPORT] = 0.0 if AiActionScorer.is_frontline(defender) else 1.0
 	feats[AiFeatureNames.FOCUS_LOW_HP] = 1.0 - clampf(_total_hp(defender) / _max_hp(defender), 0.0, 1.0)

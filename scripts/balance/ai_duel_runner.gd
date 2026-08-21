@@ -8,6 +8,7 @@ const AiBrainRegistry = preload("res://scripts/ai/ai_brain_registry.gd")
 const AiDrafter = preload("res://scripts/ai/ai_drafter.gd")
 const AiDuelReport = preload("res://scripts/balance/ai_duel_report.gd")
 const AttackNearestEnemyBehavior = preload("res://scripts/ai/behaviors/attack_nearest_enemy.gd")
+const CombatExpectation = preload("res://scripts/ai/expectation/combat_expectation.gd")
 const CombatResolver = preload("res://scripts/core/combat_resolver.gd")
 const MapBuilderScript = preload("res://scripts/minigame/map_builder.gd")
 const MatchBattleStats = preload("res://scripts/battle/match_battle_stats.gd")
@@ -34,6 +35,8 @@ static func run_batch(
 
 	var brain_a: AiBrain = AiBrainRegistry.create(brain_a_id)
 	var brain_b: AiBrain = AiBrainRegistry.create(brain_b_id)
+	# Fitness / batch eval: cheap MC. In-game UtilityBrain uses play N.
+	CombatExpectation.use_train_mode()
 
 	var brain_a_wins := 0
 	var brain_b_wins := 0
@@ -156,6 +159,7 @@ static func run_batch(
 
 	AttackNearestEnemyBehavior.debug_enabled = prev_ai_debug
 	CombatResolver.quiet = prev_combat_quiet
+	CombatExpectation.use_play_mode()
 
 	var batch := {
 		"games": total_matches,
