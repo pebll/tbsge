@@ -22,7 +22,7 @@ func _initialize() -> void:
 	var map_size := _parse_int("--map-size", DEFAULT_MAP)
 	var budget := _parse_int("--budget", DEFAULT_BUDGET)
 	var seed := _parse_int("--seed", DEFAULT_SEED)
-	var verbose := _has_flag("--verbose") or true
+	var verbose := not _has_flag("--quiet")
 
 	var runner = load("res://scripts/ai/evolution/ai_evolve_runner.gd")
 	print(

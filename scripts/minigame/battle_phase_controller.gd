@@ -17,7 +17,7 @@ var deps: MinigamePhaseDeps
 var ai_running: bool = false
 var _lock: BattleInputLockScript = BattleInputLockScript.new()
 var battle_stats: MatchBattleStats = MatchBattleStats.new()
-var ai_brain: AiBrain = AiBrainRegistry.create("cascade")
+var ai_brain: AiBrain = AiBrainRegistry.create("utility")
 
 func _init(phase_deps: MinigamePhaseDeps) -> void:
 	deps = phase_deps

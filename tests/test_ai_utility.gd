@@ -13,6 +13,8 @@ const UtilityBrainScript = preload("res://scripts/ai/brains/utility_brain.gd")
 func run(_tree: SceneTree) -> bool:
 	if not _test_registry_utility():
 		return false
+	if not _test_battle_defaults_to_utility():
+		return false
 	if not _test_scorer_linear():
 		return false
 	if not _test_features_bounded():
@@ -37,6 +39,14 @@ func _test_registry_utility() -> bool:
 		return false
 	if brain.get_script() != UtilityBrainScript:
 		push_error("utility id should yield UtilityBrain")
+		return false
+	return true
+
+func _test_battle_defaults_to_utility() -> bool:
+	var BattlePhaseControllerScript = preload("res://scripts/minigame/battle_phase_controller.gd")
+	var ctrl = BattlePhaseControllerScript.new(null)
+	if ctrl.ai_brain == null or ctrl.ai_brain.id != "utility":
+		push_error("BattlePhaseController should default to utility brain")
 		return false
 	return true
 
