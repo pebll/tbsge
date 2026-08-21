@@ -217,7 +217,7 @@ static func print_status(run_dir: String) -> void:
 	var m: Dictionary = state.get("last_metrics", {})
 	print("=== Evolve status: %s ===" % run_dir)
 	print(
-		"Gen completed: %d | Evals: %d | Archive: %d | Best fitness: %.3f / 2.0"
+		"Gen completed: %d | Evals: %d | Archive: %d | Best fitness: %.3f"
 		% [
 			int(state.get("generations_completed", 0)),
 			int(state.get("evaluations", 0)),
@@ -242,7 +242,7 @@ static func print_report(batch: Dictionary) -> void:
 	if not String(batch.get("run_dir", "")).is_empty():
 		print("Run dir: %s" % batch.get("run_dir", ""))
 	print(
-		"Gens done: %d | Pop: %d | Evals: %d | Archive: %d | Best fitness: %.3f / 2.0"
+		"Gens done: %d | Pop: %d | Evals: %d | Archive: %d | Best fitness: %.3f"
 		% [
 			int(batch.get("generations", 0)),
 			int(batch.get("population", 0)),

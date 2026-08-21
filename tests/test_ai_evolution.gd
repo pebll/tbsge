@@ -70,9 +70,10 @@ func _test_archive_keeps_better() -> bool:
 func _test_evaluator_smoke() -> bool:
 	var g = AiGenomeScript.from_hand_v1()
 	var report: Dictionary = AiEvaluator.evaluate_genome(g, 1, 3, 75, 1)
-	var fitness := float(report.get("fitness", -1.0))
-	if fitness < 0.0 or fitness > 2.0:
-		push_error("Fitness out of range: %s" % fitness)
+	var fitness := float(report.get("fitness", -999.0))
+	# Rich scores: draws negative, wins can exceed 2.0 per mirrored pair.
+	if fitness < -3.0 or fitness > 5.0:
+		push_error("Fitness out of plausible range: %s" % fitness)
 		return false
 	var d: Dictionary = report.get("descriptor", {})
 	for key in ["aggression", "risk", "support_focus"]:

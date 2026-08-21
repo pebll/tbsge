@@ -17,6 +17,7 @@ const MinigameSessionScript = preload("res://scripts/minigame/minigame_session.g
 const MinigameRulesScript = preload("res://scripts/minigame/minigame_rules.gd")
 
 const MAX_TEAM_TURNS := 200
+const AiMatchScore = preload("res://scripts/ai/evolution/ai_match_score.gd")
 
 static func run_batch(
 	pair_count: int,
@@ -102,11 +103,12 @@ static func run_batch(
 
 			var winner_team := String(result.get("winner", ""))
 			var timed_out := bool(result.get("timed_out", false))
+			var stale_draw := bool(result.get("stale_draw", false))
 			if timed_out:
 				timeouts += 1
 
 			var brain_winner := ""
-			if timed_out or winner_team.is_empty():
+			if timed_out or stale_draw or winner_team.is_empty():
 				draws += 1
 				color_draws += 1
 				pair_a_points += 0.5
@@ -141,6 +143,8 @@ static func run_batch(
 				var tag := brain_winner
 				if timed_out:
 					tag = "TIMEOUT"
+				elif stale_draw:
+					tag = "STALE_DRAW"
 				print("  Pair %d mirror %d: %s (A %s) in %d turns [%dms]" % [
 					pair_i + 1,
 					mirror_i,
@@ -241,8 +245,14 @@ static func run_one(
 	var combat_rng := RandomNumberGenerator.new()
 	combat_rng.seed = combat_seed
 
+	var gold_start_green := AiMatchScore.team_living_gold(session, "GREEN")
+	var gold_start_blue := AiMatchScore.team_living_gold(session, "BLUE")
+
 	var team_turns := 0
 	var timed_out := false
+	var stale_draw := false
+	var stale_turns := 0
+	var damage_this_team_turn := false
 	while session.phase == MinigameSessionScript.Phase.BATTLE:
 		var active_team := session.turn_manager.active_team_id
 		var brain: AiBrain = green_brain if active_team == "GREEN" else blue_brain
@@ -252,6 +262,14 @@ static func run_one(
 			if not end_result.get("ok", false):
 				break
 			team_turns += 1
+			if damage_this_team_turn:
+				stale_turns = 0
+			else:
+				stale_turns += 1
+			damage_this_team_turn = false
+			if stale_turns >= AiMatchScore.STALE_TEAM_TURNS_FOR_DRAW:
+				stale_draw = true
+				break
 			if team_turns > MAX_TEAM_TURNS:
 				timed_out = true
 				break
@@ -277,6 +295,8 @@ static func run_one(
 					apply_cmd["rng_seed"] = combat_rng.randi()
 				var step: Dictionary = session.apply(apply_cmd)
 				tracker.record_apply(step)
+				if AiMatchScore.step_dealt_damage(step):
+					damage_this_team_turn = true
 				if not step.get("ok", false):
 					session.pass_legion_or_force_wait(coords)
 			_:
@@ -285,17 +305,26 @@ static func run_one(
 		if session.phase == MinigameSessionScript.Phase.ENDED:
 			break
 
-	var winner := session.winner if not timed_out else ""
+	var winner := ""
+	if not timed_out and not stale_draw:
+		winner = session.winner
 	var survivors_green := MinigameRulesScript.count_living_units(session.legions, "GREEN")
 	var survivors_blue := MinigameRulesScript.count_living_units(session.legions, "BLUE")
+	var gold_end_green := AiMatchScore.team_living_gold(session, "GREEN")
+	var gold_end_blue := AiMatchScore.team_living_gold(session, "BLUE")
 	var legion_rows := tracker.legion_rows_for_csv(game_index, winner)
 
 	return {
 		"winner": winner,
 		"team_turns": team_turns,
 		"timed_out": timed_out,
+		"stale_draw": stale_draw,
 		"survivors_green": survivors_green,
 		"survivors_blue": survivors_blue,
+		"gold_start_green": gold_start_green,
+		"gold_start_blue": gold_start_blue,
+		"gold_end_green": gold_end_green,
+		"gold_end_blue": gold_end_blue,
 		"legion_rows": legion_rows,
 		"match_row": {
 			"game_id": game_index + 1,
@@ -307,8 +336,13 @@ static func run_one(
 			"elapsed_ms": 0,
 			"winner": winner,
 			"timed_out": timed_out,
+			"stale_draw": stale_draw,
 			"survivors_green": survivors_green,
 			"survivors_blue": survivors_blue,
+			"gold_start_green": gold_start_green,
+			"gold_start_blue": gold_start_blue,
+			"gold_end_green": gold_end_green,
+			"gold_end_blue": gold_end_blue,
 			"green_legions": _legion_count_for_team(session, "GREEN"),
 			"blue_legions": _legion_count_for_team(session, "BLUE"),
 			"green_draft": _draft_summary(session, "GREEN"),
@@ -323,8 +357,13 @@ static func _empty_result(game_index: int, map_size: int, budget: int) -> Dictio
 		"winner": "",
 		"team_turns": 0,
 		"timed_out": false,
+		"stale_draw": false,
 		"survivors_green": 0,
 		"survivors_blue": 0,
+		"gold_start_green": 0.0,
+		"gold_start_blue": 0.0,
+		"gold_end_green": 0.0,
+		"gold_end_blue": 0.0,
 		"legion_rows": [],
 		"match_row": {
 			"game_id": game_index + 1,
@@ -336,8 +375,13 @@ static func _empty_result(game_index: int, map_size: int, budget: int) -> Dictio
 			"elapsed_ms": 0,
 			"winner": "",
 			"timed_out": false,
+			"stale_draw": false,
 			"survivors_green": 0,
 			"survivors_blue": 0,
+			"gold_start_green": 0.0,
+			"gold_start_blue": 0.0,
+			"gold_end_green": 0.0,
+			"gold_end_blue": 0.0,
 			"green_legions": 0,
 			"blue_legions": 0,
 			"green_draft": "",

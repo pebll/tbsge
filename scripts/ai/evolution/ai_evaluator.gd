@@ -1,10 +1,11 @@
 class_name AiEvaluator
 extends RefCounted
 
-## Fitness = mirrored pair score vs cascade baseline (argmax utility). EA uses train MC N.
+## Fitness = mirrored rich match scores vs opponent (argmax utility). EA uses train MC N.
 
 const AiBehaviorProbeScript = preload("res://scripts/ai/evolution/ai_behavior_probe.gd")
 const AiDuelRunner = preload("res://scripts/balance/ai_duel_runner.gd")
+const AiMatchScore = preload("res://scripts/ai/evolution/ai_match_score.gd")
 const CascadeBrainScript = preload("res://scripts/ai/brains/cascade_brain.gd")
 const CombatExpectation = preload("res://scripts/ai/expectation/combat_expectation.gd")
 const UtilityBrainScript = preload("res://scripts/ai/brains/utility_brain.gd")
@@ -59,14 +60,18 @@ static func _evaluate_vs_brain(
 	utility.probe = probe
 
 	var pair_points := 0.0
+	var outcome_sum := 0.0
 	for i in range(pair_count):
 		var game_index := seed_offset * 1000 + i
 		var r1: Dictionary = AiDuelRunner.run_one(game_index, map_size, budget, utility, opponent)
 		var r2: Dictionary = AiDuelRunner.run_one(game_index, map_size, budget, opponent, utility)
-		pair_points += _brain_points(r1, true)
-		pair_points += _brain_points(r2, false)
+		pair_points += AiMatchScore.score_for_side(r1, true)
+		pair_points += AiMatchScore.score_for_side(r2, false)
+		outcome_sum += AiMatchScore.outcome_rate(r1, true)
+		outcome_sum += AiMatchScore.outcome_rate(r2, false)
 
 	var fitness := pair_points / float(maxi(pair_count, 1))
+	var win_rate := outcome_sum / float(maxi(pair_count * 2, 1))
 	var descriptor := {}
 	if probe != null:
 		descriptor = probe.descriptor()
@@ -76,18 +81,5 @@ static func _evaluate_vs_brain(
 		"descriptor": descriptor,
 		"pair_points": pair_points,
 		"pair_count": pair_count,
-		"win_rate": fitness / 2.0,
+		"win_rate": win_rate,
 	}
-
-## Points for the genome side of one match (1 win, 0.5 draw, 0 loss).
-static func _brain_points(result: Dictionary, genome_is_green: bool) -> float:
-	if bool(result.get("timed_out", false)):
-		return 0.5
-	var winner := String(result.get("winner", ""))
-	if winner.is_empty():
-		return 0.5
-	if winner == "GREEN":
-		return 1.0 if genome_is_green else 0.0
-	if winner == "BLUE":
-		return 0.0 if genome_is_green else 1.0
-	return 0.5
