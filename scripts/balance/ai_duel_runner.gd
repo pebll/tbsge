@@ -10,6 +10,9 @@ const AiDuelReport = preload("res://scripts/balance/ai_duel_report.gd")
 const AttackNearestEnemyBehavior = preload("res://scripts/ai/behaviors/attack_nearest_enemy.gd")
 const CombatExpectation = preload("res://scripts/ai/expectation/combat_expectation.gd")
 const CombatResolver = preload("res://scripts/core/combat_resolver.gd")
+const DraftScenarioScript = preload("res://scripts/ai/curriculum/draft_scenario.gd")
+const AiDuelTraceScript = preload("res://scripts/ai/evolution/ai_duel_trace.gd")
+const AiBrainCommand = preload("res://scripts/ai/ai_brain_command.gd")
 const MapBuilderScript = preload("res://scripts/minigame/map_builder.gd")
 const MatchBattleStats = preload("res://scripts/battle/match_battle_stats.gd")
 const MinigameConfigScript = preload("res://scripts/minigame/minigame_config.gd")
@@ -205,7 +208,35 @@ static func run_one(
 	map_size: int,
 	budget: int,
 	green_brain: AiBrain = null,
-	blue_brain: AiBrain = null
+	blue_brain: AiBrain = null,
+	draft_scenario: DraftScenarioScript = null,
+	stale_idle_turns: int = 0
+) -> Dictionary:
+	# Headless evolve/duel always silences combat hit spam + AI debug.
+	var prev_quiet := CombatResolver.quiet
+	var prev_ai_debug := AttackNearestEnemyBehavior.debug_enabled
+	var prev_expect_log: bool = GameSettings.battle_expectation_log_timing
+	CombatResolver.quiet = true
+	AttackNearestEnemyBehavior.debug_enabled = false
+	GameSettings.battle_expectation_log_timing = false
+
+	var result: Dictionary = _run_one_impl(
+		game_index, map_size, budget, green_brain, blue_brain, draft_scenario, stale_idle_turns
+	)
+
+	CombatResolver.quiet = prev_quiet
+	AttackNearestEnemyBehavior.debug_enabled = prev_ai_debug
+	GameSettings.battle_expectation_log_timing = prev_expect_log
+	return result
+
+static func _run_one_impl(
+	game_index: int,
+	map_size: int,
+	budget: int,
+	green_brain: AiBrain = null,
+	blue_brain: AiBrain = null,
+	draft_scenario: DraftScenarioScript = null,
+	stale_idle_turns: int = 0
 ) -> Dictionary:
 	if green_brain == null:
 		green_brain = AiBrainRegistry.create("cascade")
@@ -231,14 +262,27 @@ static func run_one(
 	var rng := RandomNumberGenerator.new()
 	rng.seed = map_seed
 
-	for team_id in config.team_ids:
-		for cmd in AiDrafter.build_draft_commands(session, team_id, rng):
-			var r: Dictionary = session.apply(cmd)
-			if not r.get("ok", false):
-				return empty
+	var draft_err := DraftScenarioScript.apply_drafts(session, config.team_ids, rng, draft_scenario)
+	if not draft_err.is_empty():
+		AiDuelTraceScript.draft_fail(draft_err, game_index)
+		var failed: Dictionary = empty.duplicate(true)
+		failed["fail_reason"] = draft_err
+		failed["draft_failed"] = true
+		failed["game_index"] = game_index
+		AiDuelTraceScript.match_end(failed, green_brain.id, blue_brain.id)
+		return failed
 
 	if session.phase != MinigameSessionScript.Phase.BATTLE:
-		return empty
+		var phase_err := "Expected battle phase after draft, got phase %d" % int(session.phase)
+		AiDuelTraceScript.draft_fail(phase_err, game_index)
+		var failed: Dictionary = empty.duplicate(true)
+		failed["fail_reason"] = phase_err
+		failed["draft_failed"] = true
+		failed["game_index"] = game_index
+		AiDuelTraceScript.match_end(failed, green_brain.id, blue_brain.id)
+		return failed
+
+	AiDuelTraceScript.reset_game()
 
 	var tracker := MatchBattleStats.new()
 	tracker.begin(session)
@@ -267,7 +311,10 @@ static func run_one(
 			else:
 				stale_turns += 1
 			damage_this_team_turn = false
-			if stale_turns >= AiMatchScore.STALE_TEAM_TURNS_FOR_DRAW:
+			if (
+				team_turns >= AiMatchScore.STALE_MIN_TEAM_TURNS
+				and stale_turns >= _stale_idle_limit(stale_idle_turns)
+			):
 				stale_draw = true
 				break
 			if team_turns > MAX_TEAM_TURNS:
@@ -282,25 +329,11 @@ static func run_one(
 			continue
 
 		var cmd: Dictionary = brain.decide(session, legion)
-		match String(cmd.get("type", "")):
-			"use_action":
-				var apply_cmd := {
-					"type": "use_action",
-					"action_id": String(cmd.get("action_id", "")),
-					"from": cmd.get("from", coords),
-					"to": cmd.get("to", coords),
-					"skip_action_log": true,
-				}
-				if apply_cmd["action_id"] in ["melee_attack", "ranged_attack"]:
-					apply_cmd["rng_seed"] = combat_rng.randi()
-				var step: Dictionary = session.apply(apply_cmd)
-				tracker.record_apply(step)
-				if AiMatchScore.step_dealt_damage(step):
-					damage_this_team_turn = true
-				if not step.get("ok", false):
-					session.pass_legion_or_force_wait(coords)
-			_:
-				session.pass_legion_or_force_wait(coords)
+		var applied: Dictionary = AiBrainCommand.apply(
+			session, cmd, coords, legion, combat_rng, tracker
+		)
+		if bool(applied.get("damage", false)):
+			damage_this_team_turn = true
 
 		if session.phase == MinigameSessionScript.Phase.ENDED:
 			break
@@ -314,7 +347,7 @@ static func run_one(
 	var gold_end_blue := AiMatchScore.team_living_gold(session, "BLUE")
 	var legion_rows := tracker.legion_rows_for_csv(game_index, winner)
 
-	return {
+	var out := {
 		"winner": winner,
 		"team_turns": team_turns,
 		"timed_out": timed_out,
@@ -326,6 +359,9 @@ static func run_one(
 		"gold_end_green": gold_end_green,
 		"gold_end_blue": gold_end_blue,
 		"legion_rows": legion_rows,
+		"game_index": game_index,
+		"draft_failed": false,
+		"fail_reason": "",
 		"match_row": {
 			"game_id": game_index + 1,
 			"map_size": map_size,
@@ -351,6 +387,8 @@ static func run_one(
 			"blue_brain": blue_brain.id,
 		},
 	}
+	AiDuelTraceScript.match_end(out, green_brain.id, blue_brain.id)
+	return out
 
 static func _empty_result(game_index: int, map_size: int, budget: int) -> Dictionary:
 	return {
@@ -411,3 +449,8 @@ static func _legion_count_for_team(session: MinigameSessionScript, team_id: Stri
 	if draft == null:
 		return 0
 	return draft.placements.size()
+
+static func _stale_idle_limit(override_turns: int) -> int:
+	if override_turns > 0:
+		return override_turns
+	return AiMatchScore.STALE_TEAM_TURNS_FOR_DRAW

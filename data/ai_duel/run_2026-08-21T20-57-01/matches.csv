@@ -1,0 +1,17 @@
+game_id,pair_index,mirror_index,a_is_green,brain_a,brain_b,green_brain,blue_brain,map_size,budget,map_seed,combat_seed,team_turns,elapsed_ms,winner,timed_out,survivors_green,survivors_blue,green_legions,blue_legions,green_draft,blue_draft
+1,1,0,true,utility,cascade,utility,cascade,3,75,42,56967,12,361,GREEN,false,9,0,3,4,GARGOYLE:6;GOLEM:3;SPIDER:1,ARCHER:4;GARGOYLE:1;GOBLIN:1;SCORPION_RIDER:5
+2,1,1,false,utility,cascade,cascade,utility,3,75,42,56967,42,491,GREEN,false,2,0,3,4,GARGOYLE:6;GOLEM:3;SPIDER:1,ARCHER:4;GARGOYLE:1;GOBLIN:1;SCORPION_RIDER:5
+3,2,0,true,utility,cascade,utility,cascade,3,75,7961,49588,14,153,GREEN,false,6,0,2,2,MAGE:7;SPIDER:8,SPIDER:25
+4,2,1,false,utility,cascade,cascade,utility,3,75,7961,49588,16,209,GREEN,false,5,0,2,2,MAGE:7;SPIDER:8,SPIDER:25
+5,3,0,true,utility,cascade,utility,cascade,3,75,15880,57509,17,252,GREEN,false,3,0,3,3,GARGOYLE:1;GOBLIN:12;GOLEM:3,GOLEM:4;SCORPION_RIDER:4;SPIDER:1
+6,3,1,false,utility,cascade,cascade,utility,3,75,15880,57509,19,370,BLUE,false,0,4,3,3,GARGOYLE:1;GOBLIN:12;GOLEM:3,GOLEM:4;SCORPION_RIDER:4;SPIDER:1
+7,4,0,true,utility,cascade,utility,cascade,3,75,23799,33370,5,195,BLUE,false,0,15,3,3,ARCHER:7;ASSASSIN:4;SPIDER:1,ARCHER:7;GOBLIN:10;SPIDER:1
+8,4,1,false,utility,cascade,cascade,utility,3,75,23799,33370,5,206,BLUE,false,0,11,3,3,ARCHER:7;ASSASSIN:4;SPIDER:1,ARCHER:7;GOBLIN:10;SPIDER:1
+9,5,0,true,utility,cascade,utility,cascade,3,75,31718,42315,12,178,GREEN,false,12,0,3,3,ARCHER:6;GOBLIN:12;SPIDER:1,MAGE:7;SPIDER:8
+10,5,1,false,utility,cascade,cascade,utility,3,75,31718,42315,6,139,GREEN,false,18,0,3,3,ARCHER:6;GOBLIN:12;SPIDER:1,MAGE:7;SPIDER:8
+11,6,0,true,utility,cascade,utility,cascade,3,75,39637,17528,11,339,BLUE,false,0,1,3,3,ASSASSIN:5;GARGOYLE:5;SPIDER:1,ASSASSIN:3;SCORPION_RIDER:6;SPIDER:2
+12,6,1,false,utility,cascade,cascade,utility,3,75,39637,17528,14,219,GREEN,false,1,0,3,3,ASSASSIN:5;GARGOYLE:5;SPIDER:1,ASSASSIN:3;SCORPION_RIDER:6;SPIDER:2
+13,7,0,true,utility,cascade,utility,cascade,3,75,47556,26473,9,220,BLUE,false,0,14,3,3,ARCHER:2;GARGOYLE:5;SPIDER:9,ARCHER:6;GOBLIN:12;SPIDER:1
+14,7,1,false,utility,cascade,cascade,utility,3,75,47556,26473,9,202,BLUE,false,0,13,3,3,ARCHER:2;GARGOYLE:5;SPIDER:9,ARCHER:6;GOBLIN:12;SPIDER:1
+15,8,0,true,utility,cascade,utility,cascade,3,75,55475,1566,7,229,BLUE,false,0,9,3,4,ASSASSIN:10;SPIDER:1,GARGOYLE:9;SCORPION_RIDER:1;SPIDER:1
+16,8,1,false,utility,cascade,cascade,utility,3,75,55475,1566,5,172,BLUE,false,0,10,3,4,ASSASSIN:10;SPIDER:1,GARGOYLE:9;SCORPION_RIDER:1;SPIDER:1

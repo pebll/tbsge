@@ -8,6 +8,7 @@ const AiContextScript = preload("res://scripts/ai/utility/ai_context.gd")
 const AiFeatureExtract = preload("res://scripts/ai/utility/ai_feature_extract.gd")
 const AiUtilityScorer = preload("res://scripts/ai/utility/ai_utility_scorer.gd")
 const AiProfileScript = preload("res://scripts/ai/utility/ai_profile.gd")
+const AiDuelTraceScript = preload("res://scripts/ai/evolution/ai_duel_trace.gd")
 const CombatExpectation = preload("res://scripts/ai/expectation/combat_expectation.gd")
 
 var profile: AiProfile
@@ -56,6 +57,15 @@ func decide(session, legion: Legion) -> Dictionary:
 		chosen = _softmax_pick(scored, profile.temperature)
 
 	var best_cand: AiCandidate = chosen["cand"]
+	if AiDuelTraceScript.enabled and AiDuelTraceScript.log_utility:
+		var trace_cmd: Dictionary = best_cand.to_command()
+		trace_cmd["score"] = float(chosen["score"])
+		var top3: Array = []
+		for j in range(mini(3, scored.size())):
+			top3.append(scored[j])
+		AiDuelTraceScript.utility_decision(
+			legion.team_id, legion.tile_coords, trace_cmd, top3, legion
+		)
 	if probe != null:
 		probe.record(chosen.get("feats", {}), _probe_action_id(best_cand))
 	var cmd: Dictionary = best_cand.to_command()

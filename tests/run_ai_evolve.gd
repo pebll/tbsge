@@ -1,9 +1,9 @@
 extends SceneTree
 
-## Headless MAP-Elites evolve with checkpoint / continue / stop.
+## Headless GA evolve with checkpoint / continue / stop.
 ##
 ## Fresh:
-##   ./run_ai_evolve.sh --name long1 --gens 50 --pop 12 --pairs 2
+##   ./run_ai_evolve.sh --name long1 --gens 50 --pop 12 --pairs 4
 ## Continue:
 ##   ./run_ai_evolve.sh --continue --name long1 --gens 50
 ## Status:
@@ -14,13 +14,15 @@ extends SceneTree
 const AiArchiveStore = preload("res://scripts/ai/evolution/ai_archive_store.gd")
 
 const DEFAULT_GENS := 10
-const DEFAULT_POP := 8
-const DEFAULT_PAIRS := 2
+const DEFAULT_POP := 16
+const DEFAULT_PAIRS := 4
 const DEFAULT_MAP := 3
 const DEFAULT_BUDGET := 75
 const DEFAULT_SEED := 42
 const DEFAULT_ARENA_PAIRS := 2
 const DEFAULT_ARENA_OPPONENTS := 3
+const DEFAULT_ARENA_EVERY := 10
+const DEFAULT_ELITES := 6
 
 func _initialize() -> void:
 	if _wants_help():
@@ -34,7 +36,10 @@ func _initialize() -> void:
 		run_dir = "%s/%s" % [AiArchiveStore.DEFAULT_ROOT, run_name]
 
 	var needs_named := (
-		_has_flag("--continue") or _has_flag("--status") or _has_flag("--request-stop")
+		_has_flag("--continue")
+		or _has_flag("--status")
+		or _has_flag("--request-stop")
+		or _has_flag("--balance")
 	)
 	if run_dir.is_empty() and needs_named:
 		print("ERROR: --name required for continue/status/request-stop")
@@ -52,18 +57,30 @@ func _initialize() -> void:
 		runner.print_status(run_dir)
 		quit(0)
 		return
+	if _has_flag("--balance"):
+		runner.print_balance(run_dir)
+		quit(0)
+		return
 
 	var gens := _parse_int("--gens", DEFAULT_GENS)
 	var pop := _parse_int("--pop", DEFAULT_POP)
+	var elites := _parse_int("--elites", DEFAULT_ELITES)
 	var pairs := _parse_int("--pairs", DEFAULT_PAIRS)
 	var map_size := _parse_int("--map-size", DEFAULT_MAP)
 	var budget := _parse_int("--budget", DEFAULT_BUDGET)
 	var seed := _parse_int("--seed", DEFAULT_SEED)
 	var arena_pairs := _parse_int("--arena-pairs", DEFAULT_ARENA_PAIRS)
 	var arena_opponents := _parse_int("--arena-opponents", DEFAULT_ARENA_OPPONENTS)
+	var arena_every := _parse_int("--arena-every", DEFAULT_ARENA_EVERY)
+	var promote_every := _parse_int("--promote-every", 5)
 	var checkpoint_every := _parse_int("--checkpoint-every", 1)
 	var continue_run := _has_flag("--continue")
 	var verbose := not _has_flag("--quiet")
+	var legacy_teacher := _has_flag("--legacy-teacher")
+	var no_promote := _has_flag("--no-promote")
+	var force_stage := _parse_string("--stage", "")
+	var debug_duel := _has_flag("--debug-duel")
+	var curriculum_enabled := not _has_flag("--no-curriculum")
 	var persist := (
 		_has_flag("--persist")
 		or continue_run
@@ -75,9 +92,11 @@ func _initialize() -> void:
 		run_dir = AiArchiveStore.make_run_dir()
 		run_name = run_dir.get_file()
 
+	elites = mini(elites, pop)
+
 	print(
-		"MAP-Elites evolve: gens=%d pop=%d pairs=%d map=%d budget=%d seed=%d"
-		% [gens, pop, pairs, map_size, budget, seed]
+		"GA evolve: gens=%d pop=%d elites=%d pairs=%d map=%d budget=%d seed=%d arena_every=%d curriculum=%s"
+		% [gens, pop, elites, pairs, map_size, budget, seed, arena_every, "on" if curriculum_enabled and not legacy_teacher else "off"]
 	)
 	if not run_dir.is_empty():
 		var label := run_name if not run_name.is_empty() else run_dir
@@ -87,6 +106,7 @@ func _initialize() -> void:
 	var batch: Dictionary = runner.run_session({
 		"gens": gens,
 		"pop": pop,
+		"elites": elites,
 		"pairs": pairs,
 		"map_size": map_size,
 		"budget": budget,
@@ -96,7 +116,14 @@ func _initialize() -> void:
 		"continue_run": continue_run,
 		"arena_pairs": arena_pairs,
 		"arena_opponents": arena_opponents,
+		"arena_every": arena_every,
+		"promote_every": promote_every,
 		"checkpoint_every": checkpoint_every,
+		"curriculum": curriculum_enabled,
+		"legacy_teacher": legacy_teacher,
+		"no_promote": no_promote,
+		"force_stage": force_stage,
+		"debug_duel": debug_duel,
 	})
 	runner.print_report(batch)
 	quit(0)
@@ -138,27 +165,37 @@ func _wants_help() -> bool:
 	return _has_flag("--help") or _has_flag("-h")
 
 func _print_help() -> void:
-	print("MAP-Elites utility-weight evolve (headless)")
+	print("GA utility-weight evolve (headless)")
 	print("")
 	print("Usage:")
-	print("  ./run_ai_evolve.sh --name long1 --gens 50 --pop 12 --pairs 2")
+	print("  ./run_ai_evolve.sh --name long1 --gens 50 --pop 12 --pairs 4")
 	print("  ./run_ai_evolve.sh --continue --name long1 --gens 50")
 	print("  ./run_ai_evolve.sh --status --name long1")
+	print("  ./run_ai_evolve.sh --balance --name long1")
 	print("  ./run_ai_evolve.sh --request-stop --name long1")
 	print("")
 	print("Options:")
 	print("  --name NAME           Run id under data/ai/evolve/NAME (preferred)")
 	print("  --gens N              Generations to run now (default %d)" % DEFAULT_GENS)
-	print("  --pop N               Offspring per generation (default %d)" % DEFAULT_POP)
+	print("  --pop N               Population size (default %d)" % DEFAULT_POP)
+	print("  --elites N            Elite re-eval slots per gen (default %d, capped at pop)" % DEFAULT_ELITES)
 	print("  --pairs N             Mirrored pairs per fitness eval (default %d)" % DEFAULT_PAIRS)
-	print("  --arena-pairs N       Pairs for champion vs cascade/arena (default %d)" % DEFAULT_ARENA_PAIRS)
-	print("  --arena-opponents N   Archive elites in arena (default %d)" % DEFAULT_ARENA_OPPONENTS)
-	print("  --continue            Resume from checkpoint for --name")
+	print("  --arena-pairs N       Pairs for champion vs cascade/pop (default %d)" % DEFAULT_ARENA_PAIRS)
+	print("  --arena-opponents N   Pop members in arena (default %d)" % DEFAULT_ARENA_OPPONENTS)
+	print("  --arena-every N       Run arena every N gens (default %d)" % DEFAULT_ARENA_EVERY)
+	print("  --promote-every N     Curriculum promotion check every N gens (default 5)")
+	print("  --continue            Resume from checkpoint for --name (migrates old MAP runs)")
 	print("  --status              Print checkpoint metrics and exit")
+	print("  --balance             Print unit/balance report from saved EA games")
 	print("  --request-stop        Write STOP so a running job exits after the current gen")
 	print("  --checkpoint-every N  Save every N gens (default 1)")
+	print("  --no-curriculum       Use legacy cascade teacher instead of staged bots")
+	print("  --legacy-teacher      Alias for --no-curriculum")
+	print("  --stage ID            Force curriculum stage (e.g. pass_mirror, cascade_random)")
+	print("  --no-promote          Stay on current stage (debug / ablation)")
+	print("  --debug-duel          Trace draft failures + utility top-3 scores per legion act")
 	print("  --persist             Timestamped run dir if --name omitted")
 	print("  --run-dir PATH        Override path (optional; prefer --name)")
 	print("  --quiet               Less logging")
 	print("")
-	print("Fitness: rich score vs cascade. Debug prints champion win%% vs cascade + arena.")
+	print("Algo: generational GA (elite re-eval + tournament). Every 10 gens: interim summary.")

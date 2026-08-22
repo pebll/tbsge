@@ -5,7 +5,7 @@ const AiMatchScore = preload("res://scripts/ai/evolution/ai_match_score.gd")
 func run(_tree: SceneTree) -> bool:
 	if not _test_win_prefers_fast_and_rich():
 		return false
-	if not _test_draw_is_negative_and_scales_with_value():
+	if not _test_draw_better_than_loss_and_gold_diff():
 		return false
 	if not _test_loss_is_zero():
 		return false
@@ -41,28 +41,37 @@ func _test_win_prefers_fast_and_rich() -> bool:
 		return false
 	return true
 
-func _test_draw_is_negative_and_scales_with_value() -> bool:
-	var low := {
+func _test_draw_better_than_loss_and_gold_diff() -> bool:
+	var behind := {
 		"winner": "",
 		"stale_draw": true,
 		"timed_out": false,
-		"team_turns": 5,
+		"team_turns": 12,
 		"gold_start_green": 100.0,
 		"gold_start_blue": 100.0,
 		"gold_end_green": 20.0,
-		"gold_end_blue": 20.0,
+		"gold_end_blue": 80.0,
 	}
-	var high := low.duplicate(true)
-	high["gold_end_green"] = 100.0
-	var s_low := AiMatchScore.score_for_side(low, true)
-	var s_high := AiMatchScore.score_for_side(high, true)
-	if s_low >= 0.0 or s_high >= 0.0:
-		push_error("Draw scores must be negative")
+	var ahead := behind.duplicate(true)
+	ahead["gold_end_green"] = 80.0
+	ahead["gold_end_blue"] = 20.0
+	var s_behind := AiMatchScore.score_for_side(behind, true)
+	var s_ahead := AiMatchScore.score_for_side(ahead, true)
+	if s_behind <= AiMatchScore.LOSS_SCORE or s_ahead <= AiMatchScore.LOSS_SCORE:
+		push_error("Draw should beat loss (got behind=%.3f ahead=%.3f)" % [s_behind, s_ahead])
 		return false
-	if s_high >= s_low:
+	if s_ahead <= s_behind:
 		push_error(
-			"More remaining gold on draw should be worse (%.3f vs %.3f)" % [s_high, s_low]
+			"Gold advantage on draw should score higher (%.3f vs %.3f)" % [s_ahead, s_behind]
 		)
+		return false
+	var expected_even := AiMatchScore.DRAW_BASE
+	var even := behind.duplicate(true)
+	even["gold_end_green"] = 50.0
+	even["gold_end_blue"] = 50.0
+	var s_even := AiMatchScore.score_for_side(even, true)
+	if not is_equal_approx(s_even, expected_even):
+		push_error("Even draw should be DRAW_BASE (%.3f got %.3f)" % [expected_even, s_even])
 		return false
 	return true
 

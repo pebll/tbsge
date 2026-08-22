@@ -8,6 +8,7 @@ const BattleInputLockScript = preload("res://scripts/battle/battle_input_lock.gd
 const BattleHostWiringScript = preload("res://scripts/battle/battle_host_wiring.gd")
 const BattleActionLogFormatterScript = preload("res://scripts/battle/battle_action_log_formatter.gd")
 const MatchBattleStats = preload("res://scripts/battle/match_battle_stats.gd")
+const AiBrainCommand = preload("res://scripts/ai/ai_brain_command.gd")
 
 const AI_LEGION_DELAY := 0.5
 
@@ -328,6 +329,11 @@ func _run_ai_turn_async() -> void:
 						int(cmd.get("rng_seed", randi()))
 					)
 					ok = step.get("ok", false)
+				if ok and AiBrainCommand.has_followup(cmd):
+					var follow: Dictionary = AiBrainCommand.apply_followup_if_any(
+						deps.session, cmd, legion, randi()
+					)
+					ok = ok and bool(follow.get("ok", true))
 				if not ok:
 					if AttackNearestEnemyBehavior.debug_enabled:
 						print("[AI] action failed for %s @ %s, passing legion" % [legion.team_id, coords])

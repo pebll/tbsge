@@ -63,13 +63,48 @@ static func print_extended_report(batch: Dictionary, csv_paths: Dictionary = {})
 		for key in csv_paths.keys():
 			print("  %s: %s" % [key, csv_paths[key]])
 
-	var unit_stats: Array = _aggregate_unit_stats(batch.get("legion_rows", []))
+	var unit_stats: Array = aggregate_unit_stats(batch.get("legion_rows", []))
 	if unit_stats.is_empty():
 		print("")
 		print("(No legion-level stats — no completed battles.)")
 		return
 
-	var min_apps := maxi(1, int(round(float(games) * 0.05)))
+	_print_unit_table(unit_stats)
+	print_unit_highlights(batch)
+
+## Public: unit table + highlights for evolve balance logs.
+static func print_unit_stats_section(batch: Dictionary) -> void:
+	var unit_stats: Array = aggregate_unit_stats(batch.get("legion_rows", []))
+	if unit_stats.is_empty():
+		print("")
+		print("(No legion-level stats — no completed battles.)")
+		return
+	_print_unit_table(unit_stats)
+	print_unit_highlights(batch)
+
+static func print_unit_highlights(batch: Dictionary, min_apps_override: int = -1) -> void:
+	var games: int = int(batch.get("games", 0))
+	var unit_stats: Array = aggregate_unit_stats(batch.get("legion_rows", []))
+	if unit_stats.is_empty():
+		return
+	var min_apps := min_apps_override
+	if min_apps < 0:
+		min_apps = maxi(1, int(round(float(maxi(games, 1)) * 0.05)))
+	var filtered: Array = []
+	for row in unit_stats:
+		if int(row["appearances"]) >= min_apps:
+			filtered.append(row)
+	print("")
+	print("--- Highlights (min %d appearances) ---" % min_apps)
+	if filtered.is_empty():
+		filtered = unit_stats
+	_print_highlight(filtered, "Highest team win rate", "team_win_rate", true)
+	_print_highlight(filtered, "Lowest team win rate", "team_win_rate", false)
+	_print_highlight(filtered, "Most avg damage dealt", "avg_damage_dealt", true)
+	_print_highlight(filtered, "Most avg damage taken", "avg_damage_received", true)
+	_print_highlight(filtered, "Best survival", "avg_survival", true)
+
+static func _print_unit_table(unit_stats: Array) -> void:
 	print("")
 	print("--- Unit type stats (per legion appearance; relative to pick rate) ---")
 	print(_pad_row(["Unit", "Apps", "Team win%", "Dmg dealt", "Dmg taken", "Survival%"], [16, 6, 10, 10, 10, 10]))
@@ -83,28 +118,7 @@ static func print_extended_report(batch: Dictionary, csv_paths: Dictionary = {})
 			"%.1f" % float(row["avg_survival"] * 100.0),
 		], [16, 6, 10, 10, 10, 10]))
 
-	var filtered: Array = []
-	for row in unit_stats:
-		if int(row["appearances"]) >= min_apps:
-			filtered.append(row)
-
-	print("")
-	print("--- Highlights (min %d appearances) ---" % min_apps)
-	if filtered.is_empty():
-		filtered = unit_stats
-	_print_highlight(filtered, "Highest team win rate", "team_win_rate", true)
-	_print_highlight(filtered, "Lowest team win rate", "team_win_rate", false)
-	_print_highlight(filtered, "Most avg damage dealt", "avg_damage_dealt", true)
-	_print_highlight(filtered, "Most avg damage taken", "avg_damage_received", true)
-	_print_highlight(filtered, "Best survival", "avg_survival", true)
-
-static func make_run_dir(root: String = DEFAULT_OUT_ROOT) -> String:
-	var stamp := Time.get_datetime_string_from_system().replace(":", "-")
-	var dir := "%s/run_%s" % [root, stamp]
-	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(dir))
-	return dir
-
-static func _aggregate_unit_stats(legion_rows: Array) -> Array:
+static func aggregate_unit_stats(legion_rows: Array) -> Array:
 	var by_type: Dictionary = {}
 	for row in legion_rows:
 		var unit_type := String(row.get("unit_type", ""))
@@ -145,6 +159,12 @@ static func _aggregate_unit_stats(legion_rows: Array) -> Array:
 		return String(a["unit_type"]) < String(b["unit_type"])
 	)
 	return out
+
+static func make_run_dir(root: String = DEFAULT_OUT_ROOT) -> String:
+	var stamp := Time.get_datetime_string_from_system().replace(":", "-")
+	var dir := "%s/run_%s" % [root, stamp]
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(dir))
+	return dir
 
 static func _print_highlight(rows: Array, title: String, field: String, higher_is_better: bool) -> void:
 	if rows.is_empty():

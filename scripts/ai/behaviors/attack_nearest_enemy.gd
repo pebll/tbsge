@@ -22,7 +22,14 @@ const FLANK_MIN_PATH_IMPROVEMENT := 1.0
 const FLANK_OPPORTUNITY_TAX := 2.5
 
 static func decide(session: MatchSessionScript, legion: Legion) -> Dictionary:
-	var cmd := _decide_internal(session, legion)
+	var cmd := _decide_internal(session, legion, false)
+	if debug_enabled:
+		_log_decision(legion, cmd)
+	return cmd
+
+## Curriculum greedy bot: attack/move/teleport only — never heal.
+static func decide_combat_only(session: MatchSessionScript, legion: Legion) -> Dictionary:
+	var cmd := _decide_internal(session, legion, true)
 	if debug_enabled:
 		_log_decision(legion, cmd)
 	return cmd
@@ -333,7 +340,7 @@ static func _still_threatens_from(
 	tile_new.legion = prev_new
 	return still
 
-static func _decide_internal(session: MatchSessionScript, legion: Legion) -> Dictionary:
+static func _decide_internal(session: MatchSessionScript, legion: Legion, combat_only: bool = false) -> Dictionary:
 	if legion == null:
 		return _cmd_pass(legion, "no legion")
 	if legion.units.is_empty():
@@ -357,9 +364,10 @@ static func _decide_internal(session: MatchSessionScript, legion: Legion) -> Dic
 		return combat
 
 	# 3) Critical heal only (low stack / dying unit) — before walking away from a crisis.
-	var critical_heal := _best_justified_heal(session, legion, enemies, true)
-	if not critical_heal.is_empty():
-		return critical_heal
+	if not combat_only:
+		var critical_heal := _best_justified_heal(session, legion, enemies, true)
+		if not critical_heal.is_empty():
+			return critical_heal
 
 	# 4) Teleport only as an engage: needs leftover AP to strike after blink.
 	if legion.current_ap >= 2:
@@ -390,9 +398,10 @@ static func _decide_internal(session: MatchSessionScript, legion: Legion) -> Dic
 			}
 
 	# 6) Far-from-combat heal (chip OK only when not near the fight).
-	var safe_heal := _best_justified_heal(session, legion, enemies, false)
-	if not safe_heal.is_empty():
-		return safe_heal
+	if not combat_only:
+		var safe_heal := _best_justified_heal(session, legion, enemies, false)
+		if not safe_heal.is_empty():
+			return safe_heal
 
 	if not legion.can_afford(1):
 		return _cmd_pass(legion, "cannot afford move")

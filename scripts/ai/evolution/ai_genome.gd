@@ -36,8 +36,25 @@ func mutate(rng: RandomNumberGenerator, sigma: float = 0.35, gene_chance: float 
 		if rng.randf() > gene_chance:
 			continue
 		var base := float(child.weights.get(name, 0.0))
-		child.weights[name] = clampf(base + rng.randfn() * sigma, -12.0, 12.0)
-	return child
+		var lo := -20.0 if name == AiFeatureNames.PASS_PENALTY else -12.0
+		child.weights[name] = clampf(base + rng.randfn() * sigma, lo, 12.0)
+	return child.reinforce_engage()
+
+## Keep evolving genomes from drifting into pure stall/pass policies.
+func reinforce_engage() -> AiGenome:
+	weights[AiFeatureNames.PASS_PENALTY] = minf(
+		float(weights.get(AiFeatureNames.PASS_PENALTY, 0.0)), -14.0
+	)
+	weights[AiFeatureNames.CLOSER_TO_FOCUS] = maxf(
+		float(weights.get(AiFeatureNames.CLOSER_TO_FOCUS, 0.0)), 6.0
+	)
+	weights[AiFeatureNames.ENABLES_ATTACK] = maxf(
+		float(weights.get(AiFeatureNames.ENABLES_ATTACK, 0.0)), 4.5
+	)
+	weights[AiFeatureNames.IS_COMBAT] = maxf(
+		float(weights.get(AiFeatureNames.IS_COMBAT, 0.0)), 2.5
+	)
+	return self
 
 func to_dict() -> Dictionary:
 	return {"weights": weights.duplicate(true)}
@@ -54,4 +71,4 @@ static func crossover(a: AiGenome, b: AiGenome, rng: RandomNumberGenerator) -> A
 	for name in AiFeatureNames.all_names():
 		var pick_a := rng.randf() < 0.5
 		child.weights[name] = float((a.weights if pick_a else b.weights).get(name, 0.0))
-	return child
+	return child.reinforce_engage()

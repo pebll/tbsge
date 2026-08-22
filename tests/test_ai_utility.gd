@@ -9,6 +9,7 @@ const AiProfileScript = preload("res://scripts/ai/utility/ai_profile.gd")
 const AiUtilityScorer = preload("res://scripts/ai/utility/ai_utility_scorer.gd")
 const MinigameTestHelpersScript = preload("res://tests/minigame_test_helpers.gd")
 const UtilityBrainScript = preload("res://scripts/ai/brains/utility_brain.gd")
+const AiBrainCommand = preload("res://scripts/ai/ai_brain_command.gd")
 
 func run(_tree: SceneTree) -> bool:
 	if not _test_registry_utility():
@@ -24,6 +25,10 @@ func run(_tree: SceneTree) -> bool:
 	if not _test_moves_when_far():
 		return false
 	if not _test_candidates_include_move_attack_plan():
+		return false
+	if not _test_move_attack_plan_includes_followup():
+		return false
+	if not _test_plan_followthrough_deals_damage():
 		return false
 	if not _test_pass_penalty_beats_idle_pass_bias():
 		return false
@@ -150,6 +155,56 @@ func _test_candidates_include_move_attack_plan() -> bool:
 			break
 	if not found_plan:
 		push_error("Expected move-then-melee plan candidate")
+		return false
+	return true
+
+func _test_move_attack_plan_includes_followup() -> bool:
+	var session := MinigameTestHelpersScript.prepare_session()
+	var started: Dictionary = _start_goblins(session)
+	var green: Legion = started["a"]
+	var blue: Legion = started["b"]
+	_teleport_legion(session, green, Vector2i(0, -2))
+	_teleport_legion(session, blue, Vector2i(1, -1))
+	green.max_ap = 2
+	green.current_ap = 2
+	var ctx: AiContext = AiContextScript.build(session, green)
+	for cand in AiCandidateGen.generate(session, green, ctx):
+		if cand.action_id == "move" and cand.followup_action_id == "melee_attack":
+			var cmd: Dictionary = cand.to_command()
+			if String(cmd.get("followup_action_id", "")) != "melee_attack":
+				push_error("Plan command should carry followup_action_id")
+				return false
+			if not cmd.has("path"):
+				push_error("Plan command should include move path")
+				return false
+			return true
+	push_error("Expected move-then-melee plan candidate")
+	return false
+
+func _test_plan_followthrough_deals_damage() -> bool:
+	var session := MinigameTestHelpersScript.prepare_session()
+	var started: Dictionary = _start_goblins(session)
+	var green: Legion = started["a"]
+	var blue: Legion = started["b"]
+	_teleport_legion(session, green, Vector2i(0, -2))
+	_teleport_legion(session, blue, Vector2i(1, -1))
+	green.max_ap = 2
+	green.current_ap = 2
+	var brain: AiBrain = AiBrainRegistry.create("utility")
+	var cmd: Dictionary = brain.decide(session, green)
+	if not AiBrainCommand.has_followup(cmd):
+		push_error("Expected move+attack plan command, got %s" % cmd)
+		return false
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1
+	var applied: Dictionary = AiBrainCommand.apply(
+		session, cmd, green.tile_coords, green, rng, null
+	)
+	if not bool(applied.get("ok", false)):
+		push_error("Plan follow-through apply failed")
+		return false
+	if not bool(applied.get("damage", false)):
+		push_error("Plan follow-through should deal damage in one activation")
 		return false
 	return true
 

@@ -28,6 +28,9 @@ func to_command() -> Dictionary:
 	}
 	if action_id == "move" and path.size() >= 2:
 		cmd["path"] = path
+	if not followup_action_id.is_empty():
+		cmd["followup_action_id"] = followup_action_id
+		cmd["followup_to"] = followup_to
 	return cmd
 
 func stand_coords() -> Vector2i:

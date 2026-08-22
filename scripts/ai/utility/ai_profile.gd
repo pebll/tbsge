@@ -39,16 +39,16 @@ static func hand_v1() -> AiProfile:
 		AiFeatureNames.HEAL_EFFICIENCY: 3.0,
 		AiFeatureNames.HEAL_URGENCY: 4.0,
 		# Engage hard: closing / enabling fights must beat idle wandering.
-		AiFeatureNames.CLOSER_TO_FOCUS: 8.0,
-		AiFeatureNames.ENABLES_ATTACK: 5.5,
-		AiFeatureNames.IS_COMBAT: 2.5,
+		AiFeatureNames.CLOSER_TO_FOCUS: 10.0,
+		AiFeatureNames.ENABLES_ATTACK: 7.5,
+		AiFeatureNames.IS_COMBAT: 4.0,
 		AiFeatureNames.IS_HEAL: 0.2,
-		AiFeatureNames.IS_MOVE: 1.2,
-		AiFeatureNames.IS_TELEPORT: 1.0,
+		AiFeatureNames.IS_MOVE: 0.8,
+		AiFeatureNames.IS_TELEPORT: 1.2,
 		AiFeatureNames.IS_PASS: 0.0,
 		AiFeatureNames.IS_TERMINAL: 0.0,
-		AiFeatureNames.LEFTOVER_AP_FRAC: 0.5,
-		AiFeatureNames.PASS_PENALTY: -12.0,
+		AiFeatureNames.LEFTOVER_AP_FRAC: 0.4,
+		AiFeatureNames.PASS_PENALTY: -18.0,
 	}
 	return p
 

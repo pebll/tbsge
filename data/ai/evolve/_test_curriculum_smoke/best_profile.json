@@ -1,0 +1,32 @@
+{
+	"fitness": 0.2,
+	"id": "evolved_best",
+	"vs_arena": 1.41191385135135,
+	"vs_cascade": 0.5,
+	"weights": {
+		"closer_to_focus": 10.0,
+		"enables_attack": 7.5,
+		"enemy_kill_frac": 6.0,
+		"enemy_loss_frac": 5.0,
+		"enemy_loss_spread": -0.5,
+		"focus_low_hp": 2.0,
+		"focus_support": 1.5,
+		"heal_efficiency": 3.0,
+		"heal_urgency": 4.0,
+		"is_combat": 4.0,
+		"is_heal": 0.2,
+		"is_move": 0.8,
+		"is_pass": 0.0,
+		"is_teleport": 1.2,
+		"is_terminal": 0.0,
+		"kill_prob": 4.0,
+		"leftover_ap_frac": 0.4,
+		"low_hp_exposure": -4.0,
+		"net_hp_frac": 3.5,
+		"own_death_frac": -5.5,
+		"own_loss_frac": -4.5,
+		"pass_penalty": -18.0,
+		"threat_at_stand": -3.0,
+		"threat_relief": 2.5
+	}
+}

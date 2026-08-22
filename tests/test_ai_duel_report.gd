@@ -35,7 +35,7 @@ func _test_aggregate_relative() -> bool:
 			"end_units": 2,
 		},
 	]
-	var stats: Array = AiDuelReport._aggregate_unit_stats(legion_rows)
+	var stats: Array = AiDuelReport.aggregate_unit_stats(legion_rows)
 	if stats.size() != 2:
 		push_error("Expected 2 unit types in aggregate")
 		return false
