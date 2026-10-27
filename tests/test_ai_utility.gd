@@ -34,6 +34,10 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_combat_features_include_kills():
 		return false
+	if not _test_brain_init_keeps_train_mode():
+		return false
+	if not _test_pass_earns_no_leftover_ap():
+		return false
 	print("Success: Utility AI P1 tests")
 	return true
 
@@ -258,4 +262,35 @@ func _test_combat_features_include_kills() -> bool:
 		CombatExpectation.use_play_mode()
 		return true
 	push_error("No melee candidate found")
+	return false
+
+func _test_brain_init_keeps_train_mode() -> bool:
+	var CombatExpectation = preload("res://scripts/ai/expectation/combat_expectation.gd")
+	CombatExpectation.use_train_mode()
+	var brain = UtilityBrainScript.new()
+	var count: int = CombatExpectation.get_sim_count()
+	CombatExpectation.use_play_mode()
+	if brain == null or count != CombatExpectation.TRAIN_SIM_COUNT:
+		push_error("UtilityBrain._init must not reset sim count (got %s)" % count)
+		return false
+	return true
+
+func _test_pass_earns_no_leftover_ap() -> bool:
+	var session := MinigameTestHelpersScript.prepare_session()
+	var started: Dictionary = _start_goblins(session)
+	var green: Legion = started["a"]
+	var blue: Legion = started["b"]
+	_teleport_legion(session, green, Vector2i(0, -2))
+	_teleport_legion(session, blue, Vector2i(2, -2))
+	green.refresh_ap()
+	var ctx: AiContext = AiContextScript.build(session, green)
+	for cand in AiCandidateGen.generate(session, green, ctx):
+		if cand.action_id != "pass":
+			continue
+		var feats: Dictionary = AiFeatureExtract.extract(session, green, ctx, cand)
+		if float(feats[AiFeatureNames.LEFTOVER_AP_FRAC]) != 0.0:
+			push_error("Pass must not earn leftover AP credit")
+			return false
+		return true
+	push_error("No pass candidate found")
 	return false

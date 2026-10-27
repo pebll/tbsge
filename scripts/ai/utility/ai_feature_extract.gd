@@ -33,7 +33,10 @@ static func extract(session, legion: Legion, ctx: AiContext, cand: AiCandidate) 
 	var ap_after := maxi(0, legion.current_ap - move_cost - (1 if action_id != "move" and action_id != "pass" else 0))
 	if action_id == "move":
 		ap_after = maxi(0, legion.current_ap - move_cost)
-	feats[AiFeatureNames.LEFTOVER_AP_FRAC] = float(ap_after) / float(maxi(1, legion.max_ap))
+	# Passing must not be rewarded for the AP it wastes.
+	feats[AiFeatureNames.LEFTOVER_AP_FRAC] = (
+		0.0 if action_id == "pass" else float(ap_after) / float(maxi(1, legion.max_ap))
+	)
 
 	var focus_dist_before := ctx.dist_to_focus(legion.tile_coords)
 	var focus_dist_after := ctx.dist_to_focus(stand)
@@ -73,12 +76,8 @@ static func _effective_action(cand: AiCandidate) -> String:
 static func _fill_threat(ctx: AiContext, legion: Legion, stand: Vector2i, feats: Dictionary) -> void:
 	if ctx == null or ctx.threat == null or legion == null:
 		return
-	# Warm both hexes so frac normalization has a shared max.
-	var before := float(ctx.threat.threat_at(legion.tile_coords))
-	var after := float(ctx.threat.threat_at(stand))
-	var max_t := maxf(maxf(before, after), 1.0)
-	var threat_stand := clampf(after / max_t, 0.0, 1.0)
-	var threat_before := clampf(before / max_t, 0.0, 1.0)
+	var threat_before: float = ctx.threat.threat_frac(legion.tile_coords)
+	var threat_stand: float = ctx.threat.threat_frac(stand)
 	feats[AiFeatureNames.THREAT_AT_STAND] = threat_stand
 	feats[AiFeatureNames.THREAT_RELIEF] = clampf(threat_before - threat_stand, -1.0, 1.0)
 	var hp_frac := _total_hp(legion) / _max_hp(legion)

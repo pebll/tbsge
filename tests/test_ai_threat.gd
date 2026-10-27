@@ -19,6 +19,12 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_utility_prefers_safer_hex_when_fragile():
 		return false
+	if not _test_enemy_counts_once_per_hex():
+		return false
+	if not _test_threat_scales_with_enemy_hp():
+		return false
+	if not _test_threat_at_stand_shares_scale():
+		return false
 	print("Success: Threat map / safety features")
 	return true
 
@@ -116,5 +122,70 @@ func _test_utility_prefers_safer_hex_when_fragile() -> bool:
 			"Fragile unit should prefer safer move (%.2f) over staying to fight (%.2f)"
 			% [best_move_score, stay_combat_score]
 		)
+		return false
+	return true
+
+func _test_enemy_counts_once_per_hex() -> bool:
+	var session := MinigameTestHelpersScript.prepare_session()
+	var started: Dictionary = MinigameTestHelpersScript.start_two_legion_battle(session)
+	var green: Legion = started["a"]
+	var blue: Legion = started["b"]
+	_teleport_legion(session, blue, Vector2i(0, 0))
+	blue.max_ap = 3
+	blue.current_ap = 3
+	var map = ThreatMapScript.build(session, green.team_id)
+	var melee := float(ThreatMapScript._legion_melee_power(blue))
+	# (2,0) is adjacent to many open stands of one enemy; it must not exceed one strike.
+	var t := float(map.threat_at(Vector2i(2, 0)))
+	if t > melee + 0.001:
+		push_error("One enemy must count once per hex (%s > %s)" % [t, melee])
+		return false
+	if t <= 0.0:
+		push_error("Walk-then-strike hex should still be threatened")
+		return false
+	return true
+
+func _test_threat_scales_with_enemy_hp() -> bool:
+	var session := MinigameTestHelpersScript.prepare_session()
+	var started: Dictionary = MinigameTestHelpersScript.start_two_legion_battle(session)
+	var green: Legion = started["a"]
+	var blue: Legion = started["b"]
+	_teleport_legion(session, blue, Vector2i(0, 0))
+	var full := float(ThreatMapScript.build(session, green.team_id).threat_at(Vector2i(1, 0)))
+	for u in blue.units:
+		u.current_health = maxi(1, int(u.max_health / 2))
+	var hurt := float(ThreatMapScript.build(session, green.team_id).threat_at(Vector2i(1, 0)))
+	if hurt >= full:
+		push_error("Wounded enemy should threaten less (%s vs %s)" % [hurt, full])
+		return false
+	return true
+
+func _test_threat_at_stand_shares_scale() -> bool:
+	var session := MinigameTestHelpersScript.prepare_session()
+	var started: Dictionary = MinigameTestHelpersScript.start_two_legion_battle(session)
+	var green: Legion = started["a"]
+	var blue: Legion = started["b"]
+	_teleport_legion(session, blue, Vector2i(0, 0))
+	_teleport_legion(session, green, Vector2i(3, -3))
+	blue.max_ap = 1
+	blue.current_ap = 1
+	green.max_ap = 3
+	green.current_ap = 3
+	var ctx = AiContextScript.build(session, green)
+	var near_val := -1.0  # stand adjacent to blue now (full strike)
+	var mid_val := -1.0  # stand reachable only after a walk (discounted)
+	for cand in AiCandidateGen.generate(session, green, ctx):
+		if cand.action_id != "move" or not cand.followup_action_id.is_empty():
+			continue
+		var feats: Dictionary = AiFeatureExtract.extract(session, green, ctx, cand)
+		if cand.stand_coords() == Vector2i(1, -1):
+			near_val = float(feats[AiFeatureNames.THREAT_AT_STAND])
+		elif cand.stand_coords() == Vector2i(2, -2):
+			mid_val = float(feats[AiFeatureNames.THREAT_AT_STAND])
+	if near_val < 0.0 or mid_val < 0.0:
+		push_error("Expected both stand candidates")
+		return false
+	if not (near_val > mid_val and mid_val > 0.0):
+		push_error("Stands with different raw threat must differ (%s vs %s)" % [near_val, mid_val])
 		return false
 	return true

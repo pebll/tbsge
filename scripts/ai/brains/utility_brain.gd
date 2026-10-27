@@ -9,7 +9,6 @@ const AiFeatureExtract = preload("res://scripts/ai/utility/ai_feature_extract.gd
 const AiUtilityScorer = preload("res://scripts/ai/utility/ai_utility_scorer.gd")
 const AiProfileScript = preload("res://scripts/ai/utility/ai_profile.gd")
 const AiDuelTraceScript = preload("res://scripts/ai/evolution/ai_duel_trace.gd")
-const CombatExpectation = preload("res://scripts/ai/expectation/combat_expectation.gd")
 
 var profile: AiProfile
 ## When true (default for EA / duels), always argmax. Softmax uses profile.temperature.
@@ -21,7 +20,6 @@ func _init(p_profile: AiProfile = null) -> void:
 	id = "utility"
 	display_name = "Utility"
 	profile = p_profile if p_profile != null else AiProfileScript.hand_v1()
-	CombatExpectation.use_play_mode()
 
 func decide(session, legion: Legion) -> Dictionary:
 	if legion == null:
