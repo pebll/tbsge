@@ -41,8 +41,11 @@ static func extract(session, legion: Legion, ctx: AiContext, cand: AiCandidate) 
 	var focus_dist_before := ctx.dist_to_focus(legion.tile_coords)
 	var focus_dist_after := ctx.dist_to_focus(stand)
 	var denom := maxf(1.0, ctx.map_radius_approx)
+	var progress := focus_dist_before - focus_dist_after
+	if cand.action_id == "move":
+		progress += _displaced_ally_progress(session, legion, ctx, cand.path)
 	feats[AiFeatureNames.CLOSER_TO_FOCUS] = clampf(
-		(focus_dist_before - focus_dist_after) / denom, -1.0, 1.0
+		progress / denom, -1.0, 1.0
 	)
 
 	_fill_threat(ctx, legion, stand, feats)
@@ -67,6 +70,17 @@ static func extract(session, legion: Legion, ctx: AiContext, cand: AiCandidate) 
 			feats[AiFeatureNames.IS_TERMINAL] = 1.0
 
 	return feats
+
+## Moving onto an ally swaps it into the previous path tile; count its (usually negative)
+## progress so shuffling allies in a corridor is not mistaken for advancing.
+static func _displaced_ally_progress(session, legion: Legion, ctx: AiContext, path: Array) -> float:
+	var total := 0.0
+	for i in range(1, path.size()):
+		var occupant: Legion = session.get_legion_at(path[i])
+		if occupant == null or occupant == legion or occupant.team_id != legion.team_id:
+			continue
+		total += ctx.dist_to_focus(path[i]) - ctx.dist_to_focus(path[i - 1])
+	return total
 
 static func _effective_action(cand: AiCandidate) -> String:
 	if not cand.followup_action_id.is_empty():

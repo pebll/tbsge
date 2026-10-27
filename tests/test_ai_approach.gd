@@ -18,6 +18,8 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_unreachable_focus_falls_back():
 		return false
+	if not _test_swap_counts_displaced_ally():
+		return false
 	print("Success: Terrain-aware approach distance")
 	return true
 
@@ -122,5 +124,51 @@ func _test_unreachable_focus_falls_back() -> bool:
 	var ctx: AiContext = AiContextScript.build(session, green)
 	if ctx.focus != blues[1]:
 		push_error("Focus should fall back to the reachable enemy")
+		return false
+	return true
+
+## Swapping onto an ally ahead pushes that ally back: no net team progress.
+func _test_swap_counts_displaced_ally() -> bool:
+	var session := MinigameTestHelpersScript.prepare_session()
+	var team_a := MinigameTestHelpersScript.team_a(session)
+	var team_b := MinigameTestHelpersScript.team_b(session)
+	var slots_a: Array = session.get_deploy_slots(team_a)
+	var slots_b: Array = session.get_deploy_slots(team_b)
+	session.apply({"type": "draft_set_legion", "team": team_a, "coords": slots_a[0], "unit_type": "GOBLIN", "unit_count": 2})
+	session.apply({"type": "draft_set_legion", "team": team_a, "coords": slots_a[1], "unit_type": "GOBLIN", "unit_count": 2})
+	session.apply({"type": "draft_ready", "team": team_a})
+	session.apply({"type": "draft_set_legion", "team": team_b, "coords": slots_b[0], "unit_type": "GOBLIN", "unit_count": 2})
+	session.apply({"type": "draft_ready", "team": team_b})
+	var greens: Array[Legion] = []
+	var blue: Legion = null
+	for L in session.legions:
+		if L.team_id == team_a:
+			greens.append(L)
+		elif L.team_id == team_b:
+			blue = L
+	if greens.size() != 2 or blue == null:
+		push_error("Expected two green legions and one blue")
+		return false
+	var mover: Legion = greens[0]
+	var ally: Legion = greens[1]
+	_teleport_legion(session, mover, Vector2i(0, 0))
+	_teleport_legion(session, ally, Vector2i(0, -1))
+	_teleport_legion(session, blue, Vector2i(0, -3))
+	mover.max_ap = 1
+	mover.current_ap = 1
+	var ctx: AiContext = AiContextScript.build(session, mover)
+	if ctx.focus != blue:
+		push_error("Focus should be the only enemy")
+		return false
+	var swap_val := INF
+	for cand in AiCandidateGen.generate(session, mover, ctx):
+		if cand.action_id == "move" and cand.followup_action_id.is_empty() and cand.stand_coords() == Vector2i(0, -1):
+			var feats: Dictionary = AiFeatureExtract.extract(session, mover, ctx, cand)
+			swap_val = float(feats[AiFeatureNames.CLOSER_TO_FOCUS])
+	if swap_val == INF:
+		push_error("Expected a swap move candidate onto the ally")
+		return false
+	if not is_zero_approx(swap_val):
+		push_error("Swap onto an ally ahead must be net-zero progress, got %s" % swap_val)
 		return false
 	return true
