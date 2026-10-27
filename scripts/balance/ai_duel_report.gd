@@ -51,6 +51,8 @@ static func print_extended_report(batch: Dictionary, csv_paths: Dictionary = {})
 			"Mirrored pair score (%s): %.3f / %.1f (win-rate equiv %.1f%%)"
 			% [brain_a, pair_score, max_per_pair, 100.0 * pair_score / max_per_pair]
 		)
+		var ci := wilson_interval(score_points(batch), games)
+		print("Score 95%% CI (%s, draw=0.5): [%.1f%%, %.1f%%]" % [brain_a, 100.0 * ci.x, 100.0 * ci.y])
 	print("Seat bias — GREEN wins: %d (%d%%) | BLUE wins: %d (%d%%)" % [
 		int(batch.get("green_wins", 0)), _pct(int(batch.get("green_wins", 0)), games),
 		int(batch.get("blue_wins", 0)), _pct(int(batch.get("blue_wins", 0)), games),
@@ -159,6 +161,21 @@ static func aggregate_unit_stats(legion_rows: Array) -> Array:
 		return String(a["unit_type"]) < String(b["unit_type"])
 	)
 	return out
+
+## Brain A match points: win = 1, draw = 0.5.
+static func score_points(batch: Dictionary) -> float:
+	return float(batch.get("brain_a_wins", 0)) + 0.5 * float(batch.get("draws", 0))
+
+## Wilson score interval for a binomial proportion; z=1.96 is 95%.
+static func wilson_interval(successes: float, n: int, z: float = 1.96) -> Vector2:
+	if n <= 0:
+		return Vector2(0.0, 1.0)
+	var p := successes / float(n)
+	var z2 := z * z
+	var denom := 1.0 + z2 / float(n)
+	var center := (p + z2 / (2.0 * float(n))) / denom
+	var half := z * sqrt(p * (1.0 - p) / float(n) + z2 / (4.0 * float(n) * float(n))) / denom
+	return Vector2(clampf(center - half, 0.0, 1.0), clampf(center + half, 0.0, 1.0))
 
 static func make_run_dir(root: String = DEFAULT_OUT_ROOT) -> String:
 	var stamp := Time.get_datetime_string_from_system().replace(":", "-")

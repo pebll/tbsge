@@ -11,6 +11,8 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_batch_mirror_counts():
 		return false
+	if not _test_batch_seed_offset():
+		return false
 	print("Success: AI duel harness (brains + mirror)")
 	return true
 
@@ -63,5 +65,23 @@ func _test_batch_mirror_counts() -> bool:
 	# Equal brains: average points per pair in [0, 2]; self-play should land near 1.
 	if score < 0.0 or score > 2.0:
 		push_error("Pair score out of range: %s" % score)
+		return false
+	return true
+
+## Held-out benchmarks shift game indices so they never reuse training maps.
+func _test_batch_seed_offset() -> bool:
+	var base: Dictionary = AiDuelRunner.run_batch(
+		1, 3, 75, false, "", "cascade", "cascade", false
+	)
+	var shifted: Dictionary = AiDuelRunner.run_batch(
+		1, 3, 75, false, "", "cascade", "cascade", false, 1000
+	)
+	var base_seed := int(base["match_rows"][0].get("map_seed", -1))
+	var shifted_seed := int(shifted["match_rows"][0].get("map_seed", -1))
+	if base_seed == shifted_seed:
+		push_error("seed_offset should change map seeds (both %d)" % base_seed)
+		return false
+	if shifted_seed != 1000 * 7919 + 42:
+		push_error("seed_offset 1000 should map to game index 1000, got seed %d" % shifted_seed)
 		return false
 	return true

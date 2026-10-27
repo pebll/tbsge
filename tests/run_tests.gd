@@ -61,6 +61,11 @@ func _run_test_script(path: String) -> void:
 		_fail_count += 1
 		push_error("FAILED to load test script: %s" % path)
 		return
+	# A script with a parse error still loads but cannot be instantiated.
+	if script is Script and not script.can_instantiate():
+		_fail_count += 1
+		push_error("FAILED to compile test script: %s" % path)
+		return
 
 	var inst = script.new()
 	if inst == null:

@@ -5,6 +5,8 @@ const AiDuelReport = preload("res://scripts/balance/ai_duel_report.gd")
 func run(_tree: SceneTree) -> bool:
 	if not _test_aggregate_relative():
 		return false
+	if not _test_wilson_interval():
+		return false
 	print("Success: AI duel report aggregation")
 	return true
 
@@ -54,5 +56,21 @@ func _test_aggregate_relative() -> bool:
 		return false
 	if not is_equal_approx(float(goblin["avg_damage_dealt"]), 8.0):
 		push_error("Expected avg 8 damage dealt for GOBLIN")
+		return false
+	return true
+
+func _test_wilson_interval() -> bool:
+	var ci: Vector2 = AiDuelReport.wilson_interval(60.0, 100)
+	# Reference values for p=0.6, n=100, z=1.96: [0.502, 0.691].
+	if absf(ci.x - 0.502) > 0.002 or absf(ci.y - 0.691) > 0.002:
+		push_error("Wilson CI for 60/100 expected ~[0.502, 0.691], got %s" % ci)
+		return false
+	var empty: Vector2 = AiDuelReport.wilson_interval(0.0, 0)
+	if empty != Vector2(0.0, 1.0):
+		push_error("Wilson CI with n=0 should be [0, 1], got %s" % empty)
+		return false
+	var all_wins: Vector2 = AiDuelReport.wilson_interval(20.0, 20)
+	if all_wins.y < 0.999 or all_wins.x < 0.8 or all_wins.x > 0.9:
+		push_error("Wilson CI for 20/20 expected lower ~0.84, got %s" % all_wins)
 		return false
 	return true

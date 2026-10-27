@@ -30,7 +30,9 @@ static func run_batch(
 	out_dir: String = "",
 	brain_a_id: String = "cascade",
 	brain_b_id: String = "cascade",
-	mirror: bool = true
+	mirror: bool = true,
+	seed_offset: int = 0,
+	play_sims: bool = false
 ) -> Dictionary:
 	var prev_ai_debug := AttackNearestEnemyBehavior.debug_enabled
 	var prev_combat_quiet := CombatResolver.quiet
@@ -39,8 +41,11 @@ static func run_batch(
 
 	var brain_a: AiBrain = AiBrainRegistry.create(brain_a_id)
 	var brain_b: AiBrain = AiBrainRegistry.create(brain_b_id)
-	# Fitness / batch eval: cheap MC. In-game UtilityBrain uses play N.
-	CombatExpectation.use_train_mode()
+	# Fitness / batch eval: cheap MC. Benchmarks pass play_sims to measure the shipped N.
+	if play_sims:
+		CombatExpectation.use_play_mode()
+	else:
+		CombatExpectation.use_train_mode()
 
 	var brain_a_wins := 0
 	var brain_b_wins := 0
@@ -75,7 +80,7 @@ static func run_batch(
 			var blue_brain: AiBrain = brain_b if a_is_green else brain_a
 			var t0 := Time.get_ticks_msec()
 			var result: Dictionary = run_one(
-				pair_i, map_size, budget, green_brain, blue_brain
+				seed_offset + pair_i, map_size, budget, green_brain, blue_brain
 			)
 			result["elapsed_ms"] = Time.get_ticks_msec() - t0
 			result["pair_index"] = pair_i
@@ -172,6 +177,8 @@ static func run_batch(
 		"games": total_matches,
 		"pair_count": pair_count,
 		"mirror": mirror,
+		"seed_offset": seed_offset,
+		"play_sims": play_sims,
 		"map_size": map_size,
 		"budget": budget,
 		"brain_a": brain_a.id,
