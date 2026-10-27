@@ -7,7 +7,8 @@
 #   PAIRS      mirrored seed pairs per opponent (default: 100 -> 200 matches)
 #   OPPONENTS  default: curriculum_pass curriculum_greedy cascade
 #
-# Gate: vs pass >=95% wins and <5% draws; vs greedy/cascade CI lower bound > 50%.
+# Gate: vs pass >=95% wins and <5% draws; vs greedy/cascade the decisive-pair win CI
+# (paired sign test; split 1-1 pairs are decided by the draft) has a lower bound > 50%.
 set -eu
 
 ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
@@ -28,5 +29,5 @@ for opp in $OPPONENTS; do
   ./run_ai_duel.sh --games "$PAIRS" --brain-a "$BRAIN" --brain-b "$opp" \
     --seed-offset "$SEED_OFFSET" --play-sims \
     --out-dir "data/ai_duel/bench_${BRAIN}_vs_${opp}" 2>&1 \
-    | grep -E "wins:|pair score|CI|turns" || true
+    | grep -E "wins:|pair score|CI|Decisive|turns" || true
 done

@@ -53,6 +53,13 @@ static func print_extended_report(batch: Dictionary, csv_paths: Dictionary = {})
 		)
 		var ci := wilson_interval(score_points(batch), games)
 		print("Score 95%% CI (%s, draw=0.5): [%.1f%%, %.1f%%]" % [brain_a, 100.0 * ci.x, 100.0 * ci.y])
+		if bool(batch.get("mirror", false)):
+			var d := decisive_pairs(batch)
+			var n_dec := int(d["wins"]) + int(d["losses"])
+			var dci := wilson_interval(float(d["wins"]), n_dec)
+			print("Decisive pairs (%s W-L): %d-%d, %d split | decisive win 95%% CI: [%.1f%%, %.1f%%]" % [
+				brain_a, int(d["wins"]), int(d["losses"]), int(d["split"]), 100.0 * dci.x, 100.0 * dci.y,
+			])
 	print("Seat bias — GREEN wins: %d (%d%%) | BLUE wins: %d (%d%%)" % [
 		int(batch.get("green_wins", 0)), _pct(int(batch.get("green_wins", 0)), games),
 		int(batch.get("blue_wins", 0)), _pct(int(batch.get("blue_wins", 0)), games),
@@ -161,6 +168,22 @@ static func aggregate_unit_stats(legion_rows: Array) -> Array:
 		return String(a["unit_type"]) < String(b["unit_type"])
 	)
 	return out
+
+## Paired sign test input: a mirrored pair is won by whoever scored more than 1 point of 2.
+## Split pairs (1-1) mean the draft, not the brain, decided both games.
+static func decisive_pairs(batch: Dictionary) -> Dictionary:
+	var wins := 0
+	var losses := 0
+	var split := 0
+	for row in batch.get("pair_rows", []):
+		var points := float(row.get("brain_a_points", 1.0))
+		if points > 1.0 + 0.001:
+			wins += 1
+		elif points < 1.0 - 0.001:
+			losses += 1
+		else:
+			split += 1
+	return {"wins": wins, "losses": losses, "split": split}
 
 ## Brain A match points: win = 1, draw = 0.5.
 static func score_points(batch: Dictionary) -> float:
