@@ -10,6 +10,8 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_higher_n_reduces_spread_tendency():
 		return false
+	if not _test_wipe_prob():
+		return false
 	print("Success: Combat expectation MC tests")
 	return true
 
@@ -79,5 +81,41 @@ func _test_higher_n_reduces_spread_tendency() -> bool:
 		return false
 	if float(high.get("enemy_loss_mean", 0.0)) <= 0.0:
 		push_error("High-N estimate should deal damage")
+		return false
+	return true
+
+func _test_wipe_prob() -> bool:
+	var session := MinigameTestHelpersScript.prepare_session()
+	var started: Dictionary = MinigameTestHelpersScript.start_two_legion_battle(session)
+	var green: Legion = started["a"]
+	var blue: Legion = started["b"]
+	_teleport_legion(session, green, Vector2i(0, -1))
+	_teleport_legion(session, blue, Vector2i(1, -1))
+	CombatExpectation.set_sim_count(6)
+	# Guaranteed wipe: a lone 1-HP defender.
+	blue.units.resize(1)
+	blue.units[0].current_health = 1
+	var sure: Dictionary = CombatExpectation.estimate_combat(
+		green, blue, "melee_attack", green.tile_coords, blue.tile_coords
+	)
+	if not sure.has("wipe_prob") or float(sure["wipe_prob"]) < 0.99:
+		push_error("Expected wipe_prob ~1 vs lone 1-HP unit, got %s" % sure.get("wipe_prob"))
+		CombatExpectation.use_play_mode()
+		return false
+	# Impossible wipe: huge defender stack with several units.
+	for i in range(3):
+		blue.units.append(Unit.new("GOBLIN"))
+	for u in blue.units:
+		u.max_health = 9999.0
+		u.current_health = 9999.0
+	var never: Dictionary = CombatExpectation.estimate_combat(
+		green, blue, "melee_attack", green.tile_coords, blue.tile_coords
+	)
+	CombatExpectation.use_play_mode()
+	if not never.has("wipe_prob") or float(never["wipe_prob"]) != 0.0:
+		push_error("Expected wipe_prob 0 vs huge stack, got %s" % never.get("wipe_prob"))
+		return false
+	if float(CombatExpectation.estimate_combat(null, null, "melee_attack", Vector2i.ZERO, Vector2i.ZERO).get("wipe_prob", -1.0)) != 0.0:
+		push_error("Empty estimate should carry wipe_prob 0")
 		return false
 	return true

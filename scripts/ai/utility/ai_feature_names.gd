@@ -9,6 +9,10 @@ const NET_HP_FRAC := "net_hp_frac"
 const ENEMY_KILL_FRAC := "enemy_kill_frac"
 const OWN_DEATH_FRAC := "own_death_frac"
 const KILL_PROB := "kill_prob"
+## P(defender legion has no living units after the combat).
+const WIPE_PROB := "wipe_prob"
+## Expected gold destroyed minus gold lost, over a fixed team scale.
+const TRADE_VALUE := "trade_value"
 const ENEMY_LOSS_SPREAD := "enemy_loss_spread"
 const THREAT_AT_STAND := "threat_at_stand"
 const THREAT_RELIEF := "threat_relief"
@@ -36,6 +40,8 @@ static func all_names() -> Array[String]:
 		ENEMY_KILL_FRAC,
 		OWN_DEATH_FRAC,
 		KILL_PROB,
+		WIPE_PROB,
+		TRADE_VALUE,
 		ENEMY_LOSS_SPREAD,
 		THREAT_AT_STAND,
 		THREAT_RELIEF,

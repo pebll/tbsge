@@ -10,6 +10,8 @@ const AiArchiveStore = preload("res://scripts/ai/evolution/ai_archive_store.gd")
 func run(_tree: SceneTree) -> bool:
 	if not _test_genome_roundtrip():
 		return false
+	if not _test_old_profile_missing_new_features_defaults_zero():
+		return false
 	if not _test_mutate_changes_some_weights():
 		return false
 	if not _test_ga_population_basics():
@@ -42,6 +44,31 @@ func _test_genome_roundtrip() -> bool:
 	var p = g.to_profile("t")
 	if not is_equal_approx(p.weight_for(AiFeatureNames.PASS_PENALTY), g.weights[AiFeatureNames.PASS_PENALTY]):
 		push_error("Profile roundtrip mismatch")
+		return false
+	return true
+
+func _test_old_profile_missing_new_features_defaults_zero() -> bool:
+	var names := AiFeatureNames.all_names()
+	if not names.has("trade_value") or not names.has("wipe_prob"):
+		push_error("Genome names must include trade_value / wipe_prob")
+		return false
+	var old := {"weights": {"pass_penalty": -10.0, "enemy_loss_frac": 2.0}}
+	var g = AiGenomeScript.from_dict(old)
+	if not g.weights.has("trade_value") or float(g.weights["trade_value"]) != 0.0 or float(g.weights["wipe_prob"]) != 0.0:
+		push_error("Old checkpoints must default new weights to 0")
+		return false
+	var p = g.to_profile("old")
+	if p.weight_for("wipe_prob") != 0.0 or p.weight_for("trade_value") != 0.0:
+		push_error("Profile weight_for must default to 0")
+		return false
+	var bare := AiProfile.new()
+	bare.weights = {"enemy_loss_frac": 1.0}
+	if bare.weight_for("trade_value") != 0.0:
+		push_error("Missing profile key must read as 0")
+		return false
+	var hand = AiGenomeScript.from_hand_v1()
+	if float(hand.weights["trade_value"]) != 6.0 or float(hand.weights["wipe_prob"]) != 3.0:
+		push_error("from_hand_v1 must carry the new weights")
 		return false
 	return true
 

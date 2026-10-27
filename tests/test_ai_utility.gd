@@ -38,6 +38,20 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_pass_earns_no_leftover_ap():
 		return false
+	if not _test_trade_value_orders_by_absolute_gold():
+		return false
+	if not _test_trade_value_negative_when_counter_gold_higher():
+		return false
+	if not _test_trade_and_wipe_features_present():
+		return false
+	if not _test_hand_v1_trade_wipe_weights():
+		return false
+	if not _test_decide_cache_matches_fresh_brain():
+		return false
+	if not _test_cache_invalidated_on_board_change():
+		return false
+	if not _test_estimate_memo_within_pass():
+		return false
 	print("Success: Utility AI P1 tests")
 	return true
 
@@ -294,3 +308,162 @@ func _test_pass_earns_no_leftover_ap() -> bool:
 		return true
 	push_error("No pass candidate found")
 	return false
+
+func _goblin_stack(count: int, team: String) -> Legion:
+	return Legion.new("GOBLIN", count, Vector2i.ZERO, team)
+
+func _half_loss_est(defender: Legion, own: Legion, own_frac: float) -> Dictionary:
+	var def_hp := 0.0
+	for u in defender.units:
+		def_hp += u.max_health
+	var own_hp := 0.0
+	for u in own.units:
+		own_hp += u.max_health
+	return {"enemy_loss_mean": def_hp * 0.5, "own_loss_mean": own_hp * own_frac}
+
+func _test_trade_value_orders_by_absolute_gold() -> bool:
+	var atk := _goblin_stack(3, "GREEN")
+	var small_def := _goblin_stack(2, "BLUE")
+	var big_def := _goblin_stack(6, "BLUE")
+	var scale := 30.0
+	# Same fraction of the defender stack lost, same own fraction lost.
+	var tv_small: float = AiFeatureExtract.trade_value(_half_loss_est(small_def, atk, 0.1), atk, small_def, scale)
+	var tv_big: float = AiFeatureExtract.trade_value(_half_loss_est(big_def, atk, 0.1), atk, big_def, scale)
+	if tv_big <= tv_small:
+		push_error("Bigger absolute trade should score higher: %s vs %s" % [tv_big, tv_small])
+		return false
+	if tv_small < -1.0 or tv_big > 1.0:
+		push_error("trade_value must be clamped to [-1,1]")
+		return false
+	if AiFeatureExtract.trade_value(_half_loss_est(big_def, atk, 0.1), atk, big_def, 0.001) > 1.0:
+		push_error("trade_value must clamp")
+		return false
+	return true
+
+func _test_trade_value_negative_when_counter_gold_higher() -> bool:
+	var atk := _goblin_stack(6, "GREEN")
+	var def := _goblin_stack(2, "BLUE")
+	# Defender loses 25%% of a cheap small stack; we lose 50%% of a big stack.
+	var est := {"enemy_loss_mean": 4.0, "own_loss_mean": 24.0}
+	var tv: float = AiFeatureExtract.trade_value(est, atk, def, 30.0)
+	if tv >= 0.0:
+		push_error("Expected negative trade value, got %s" % tv)
+		return false
+	return true
+
+func _test_trade_and_wipe_features_present() -> bool:
+	var session := MinigameTestHelpersScript.prepare_session()
+	var started: Dictionary = _start_goblins(session)
+	var green: Legion = started["a"]
+	var blue: Legion = started["b"]
+	_teleport_legion(session, green, Vector2i(0, -1))
+	_teleport_legion(session, blue, Vector2i(1, -1))
+	blue.units.resize(1)
+	blue.units[0].current_health = 1
+	if not (AiFeatureNames.all_names().has("trade_value") and AiFeatureNames.all_names().has("wipe_prob")):
+		push_error("trade_value / wipe_prob must be in all_names()")
+		return false
+	var ctx: AiContext = AiContextScript.build(session, green)
+	for cand in AiCandidateGen.generate(session, green, ctx):
+		if cand.action_id != "melee_attack":
+			continue
+		var feats: Dictionary = AiFeatureExtract.extract(session, green, ctx, cand)
+		if float(feats["wipe_prob"]) < 0.99:
+			push_error("Expected wipe_prob ~1 vs lone 1-HP unit, got %s" % feats["wipe_prob"])
+			return false
+		if float(feats["trade_value"]) <= 0.0:
+			push_error("Expected positive trade_value on a free kill, got %s" % feats["trade_value"])
+			return false
+		return true
+	push_error("No melee candidate found")
+	return false
+
+func _test_hand_v1_trade_wipe_weights() -> bool:
+	var p: AiProfile = AiProfileScript.hand_v1()
+	if not is_equal_approx(p.weight_for("trade_value"), 6.0) or not is_equal_approx(p.weight_for("wipe_prob"), 3.0):
+		push_error("hand_v1 must weight trade_value=6 wipe_prob=3")
+		return false
+	return true
+
+func _adjacent_pair() -> Dictionary:
+	var session := MinigameTestHelpersScript.prepare_session()
+	var started: Dictionary = _start_goblins(session)
+	var green: Legion = started["a"]
+	var blue: Legion = started["b"]
+	_teleport_legion(session, green, Vector2i(0, -2))
+	_teleport_legion(session, blue, Vector2i(1, -1))
+	green.max_ap = 2
+	green.current_ap = 2
+	return {"session": session, "green": green, "blue": blue}
+
+func _test_decide_cache_matches_fresh_brain() -> bool:
+	var w := _adjacent_pair()
+	var session = w["session"]
+	var green: Legion = w["green"]
+	var cached = UtilityBrainScript.new()
+	var order: Array[Vector2i] = cached.sort_actionable(session, [green.tile_coords] as Array[Vector2i])
+	if order.size() != 1:
+		push_error("sort_actionable should keep the legion")
+		return false
+	var cmd_cached: Dictionary = cached.decide(session, green)
+	if cached.cache_hits != 1:
+		push_error("decide should reuse the sorted candidate (hits=%d)" % cached.cache_hits)
+		return false
+	var fresh = UtilityBrainScript.new()
+	var cmd_fresh: Dictionary = fresh.decide(session, green)
+	if fresh.cache_hits != 0 or str(cmd_cached) != str(cmd_fresh):
+		push_error("Cached decide differs from fresh: %s vs %s" % [cmd_cached, cmd_fresh])
+		return false
+	return true
+
+func _test_cache_invalidated_on_board_change() -> bool:
+	var w := _adjacent_pair()
+	var session = w["session"]
+	var green: Legion = w["green"]
+	var blue: Legion = w["blue"]
+	var cached = UtilityBrainScript.new()
+	cached.sort_actionable(session, [green.tile_coords] as Array[Vector2i])
+	blue.units[0].current_health = 1.0
+	var cmd_cached: Dictionary = cached.decide(session, green)
+	if cached.cache_hits != 0:
+		push_error("Changed board must not hit the cache")
+		return false
+	var cmd_fresh: Dictionary = UtilityBrainScript.new().decide(session, green)
+	if str(cmd_cached) != str(cmd_fresh):
+		push_error("Recomputed decide differs from fresh")
+		return false
+	return true
+
+func _test_estimate_memo_within_pass() -> bool:
+	var CombatExpectation = preload("res://scripts/ai/expectation/combat_expectation.gd")
+	var session := MinigameTestHelpersScript.prepare_session()
+	var started: Dictionary = _start_goblins(session)
+	var green: Legion = started["a"]
+	var blue: Legion = started["b"]
+	_teleport_legion(session, green, Vector2i(0, -1))
+	_teleport_legion(session, blue, Vector2i(1, -1))
+	var ctx: AiContext = AiContextScript.build(session, green)
+	var cand: AiCandidate = null
+	for c in AiCandidateGen.generate(session, green, ctx):
+		if c.action_id == "melee_attack":
+			cand = c
+			break
+	if cand == null:
+		push_error("No melee candidate found")
+		return false
+	AiFeatureExtract.begin_pass()
+	var before: int = CombatExpectation.estimate_calls
+	var f1: Dictionary = AiFeatureExtract.extract(session, green, ctx, cand)
+	var f2: Dictionary = AiFeatureExtract.extract(session, green, ctx, cand)
+	var used: int = CombatExpectation.estimate_calls - before
+	AiFeatureExtract.end_pass()
+	if used != 1 or str(f1) != str(f2):
+		push_error("Memo should simulate once per (stand,target) in a pass (calls=%d)" % used)
+		return false
+	before = CombatExpectation.estimate_calls
+	AiFeatureExtract.extract(session, green, ctx, cand)
+	AiFeatureExtract.extract(session, green, ctx, cand)
+	if CombatExpectation.estimate_calls - before != 2:
+		push_error("Outside a pass nothing must be memoized")
+		return false
+	return true

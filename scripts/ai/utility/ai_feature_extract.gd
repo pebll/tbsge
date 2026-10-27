@@ -6,7 +6,57 @@ extends RefCounted
 const AiActionScorer = preload("res://scripts/ai/ai_action_scorer.gd")
 const AiFeatureNames = preload("res://scripts/ai/utility/ai_feature_names.gd")
 const CombatExpectation = preload("res://scripts/ai/expectation/combat_expectation.gd")
+const AiMatchScore = preload("res://scripts/ai/evolution/ai_match_score.gd")
+const MinigameRulesScript = preload("res://scripts/minigame/minigame_rules.gd")
 const ActionParams = preload("res://scripts/actions/action_params.gd")
+
+## Combat-estimate memo, active only between begin_pass() and end_pass(). Within one pass the
+## board is read-only, so (attacker, defender, action, from, to) fully determines the estimate.
+static var _est_memo: Dictionary = {}
+static var _memo_active: bool = false
+
+static func begin_pass() -> void:
+	_est_memo = {}
+	_memo_active = true
+
+static func end_pass() -> void:
+	_est_memo = {}
+	_memo_active = false
+
+static func _estimate(
+	attacker: Legion, defender: Legion, action_id: String, from_coords: Vector2i, to_coords: Vector2i
+) -> Dictionary:
+	if not _memo_active:
+		return CombatExpectation.estimate_combat(attacker, defender, action_id, from_coords, to_coords)
+	var key := "%d|%d|%s|%s|%s|%d" % [
+		attacker.get_instance_id(), defender.get_instance_id(), action_id,
+		from_coords, to_coords, CombatExpectation.get_sim_count(),
+	]
+	if _est_memo.has(key):
+		return _est_memo[key]
+	var est: Dictionary = CombatExpectation.estimate_combat(attacker, defender, action_id, from_coords, to_coords)
+	_est_memo[key] = est
+	return est
+
+## Expected gold destroyed minus gold lost, divided by a fixed team scale, in [-1, 1].
+## Gold per HP of a legion = legion_cost(unit_type, units.size()) / total max HP of its units,
+## i.e. its purchase price spread evenly over its hit points (cost is price * unit count).
+static func trade_value(est: Dictionary, attacker: Legion, defender: Legion, scale: float) -> float:
+	var gained := float(est.get("enemy_loss_mean", 0.0)) * _gold_per_hp(defender)
+	var lost := float(est.get("own_loss_mean", 0.0)) * _gold_per_hp(attacker)
+	return clampf((gained - lost) / maxf(1.0, scale), -1.0, 1.0)
+
+static func _gold_per_hp(legion: Legion) -> float:
+	if legion == null or legion.units.is_empty():
+		return 0.0
+	return float(MinigameRulesScript.legion_cost(legion.unit_type, legion.units.size())) / _max_hp(legion)
+
+## Average living gold of the two teams in the fight; the same for every candidate in a decision.
+static func _trade_scale(session, attacker: Legion, defender: Legion) -> float:
+	return 0.5 * (
+		AiMatchScore.team_living_gold(session, attacker.team_id)
+		+ AiMatchScore.team_living_gold(session, defender.team_id)
+	)
 
 static func extract(session, legion: Legion, ctx: AiContext, cand: AiCandidate) -> Dictionary:
 	var feats: Dictionary = {}
@@ -110,9 +160,7 @@ static func _fill_combat(
 	if defender == null:
 		return
 	var restored := _push_coords(session, legion, from_coords)
-	var est: Dictionary = CombatExpectation.estimate_combat(
-		legion, defender, action_id, from_coords, to_coords
-	)
+	var est: Dictionary = _estimate(legion, defender, action_id, from_coords, to_coords)
 	_pop_coords(session, legion, restored)
 
 	var def_hp := maxf(1.0, float(est.get("defender_hp", 1.0)))
@@ -134,6 +182,10 @@ static func _fill_combat(
 		float(est.get("own_deaths_mean", 0.0)) / atk_units, 0.0, 1.0
 	)
 	feats[AiFeatureNames.KILL_PROB] = clampf(float(est.get("kill_prob", 0.0)), 0.0, 1.0)
+	feats[AiFeatureNames.WIPE_PROB] = clampf(float(est.get("wipe_prob", 0.0)), 0.0, 1.0)
+	feats[AiFeatureNames.TRADE_VALUE] = trade_value(
+		est, legion, defender, _trade_scale(session, legion, defender)
+	)
 	feats[AiFeatureNames.ENEMY_LOSS_SPREAD] = clampf(
 		float(est.get("enemy_loss_spread", 0.0)) / def_hp, 0.0, 1.0
 	)

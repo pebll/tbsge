@@ -14,6 +14,8 @@ const TRAIN_SIM_COUNT := 2
 const PLAY_SIM_COUNT := 12
 
 static var _active_sim_count: int = PLAY_SIM_COUNT
+## Monte Carlo estimates actually simulated (diagnostics / cache tests).
+static var estimate_calls: int = 0
 
 static func set_sim_count(n: int) -> void:
 	_active_sim_count = maxi(1, n)
@@ -41,6 +43,7 @@ static func estimate_combat(
 	if action_id != "melee_attack" and action_id != "ranged_attack":
 		return empty
 
+	estimate_calls += 1
 	var n := get_sim_count() if sim_count < 0 else maxi(1, sim_count)
 	var mode := CombatResolver.MODE_MELEE if action_id == "melee_attack" else CombatResolver.MODE_RANGED
 	var distance := 1 if mode == CombatResolver.MODE_MELEE else HexPathfinder.hex_distance(from_coords, to_coords)
@@ -50,6 +53,7 @@ static func estimate_combat(
 	var enemy_kill_samples: Array[float] = []
 	var own_kill_samples: Array[float] = []
 	var kill_hits := 0
+	var wipe_hits := 0
 
 	var prev_quiet := CombatResolver.quiet
 	CombatResolver.quiet = true
@@ -77,6 +81,8 @@ static func estimate_combat(
 		own_kill_samples.append(own_kills)
 		if enemy_kills >= 1.0:
 			kill_hits += 1
+		if sim_d.units.is_empty():
+			wipe_hits += 1
 	CombatResolver.quiet = prev_quiet
 
 	var mean_enemy := _mean(enemy_loss_samples)
@@ -91,6 +97,7 @@ static func estimate_combat(
 		"enemy_kills_mean": mean_ek,
 		"own_deaths_mean": mean_ok,
 		"kill_prob": float(kill_hits) / float(n),
+		"wipe_prob": float(wipe_hits) / float(n),
 		"enemy_loss_spread": spread,
 		"sim_count": n,
 		"defender_hp": def_hp0,
@@ -106,6 +113,7 @@ static func _empty() -> Dictionary:
 		"enemy_kills_mean": 0.0,
 		"own_deaths_mean": 0.0,
 		"kill_prob": 0.0,
+		"wipe_prob": 0.0,
 		"enemy_loss_spread": 0.0,
 		"sim_count": 0,
 		"defender_hp": 1.0,

@@ -30,6 +30,8 @@ static func hand_v1() -> AiProfile:
 		AiFeatureNames.ENEMY_KILL_FRAC: 6.0,
 		AiFeatureNames.OWN_DEATH_FRAC: -5.5,
 		AiFeatureNames.KILL_PROB: 4.0,
+		AiFeatureNames.WIPE_PROB: 3.0,
+		AiFeatureNames.TRADE_VALUE: 6.0,
 		AiFeatureNames.ENEMY_LOSS_SPREAD: -0.5,
 		AiFeatureNames.THREAT_AT_STAND: -3.0,
 		AiFeatureNames.THREAT_RELIEF: 2.5,
