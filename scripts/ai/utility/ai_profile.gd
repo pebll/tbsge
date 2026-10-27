@@ -54,6 +54,22 @@ static func hand_v1() -> AiProfile:
 	}
 	return p
 
+## Load a profile JSON ({"id", "weights", optional "temperature"}; evolve best_profile.json
+## format). Returns null when the file is missing or malformed.
+static func load_json(path: String) -> AiProfile:
+	if not FileAccess.file_exists(path):
+		return null
+	var data = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if typeof(data) != TYPE_DICTIONARY or typeof(data.get("weights")) != TYPE_DICTIONARY:
+		return null
+	var p := AiProfile.new()
+	p.id = String(data.get("id", path.get_file().get_basename()))
+	p.display_name = p.id
+	p.temperature = float(data.get("temperature", 0.0))
+	for key in data["weights"].keys():
+		p.weights[String(key)] = float(data["weights"][key])
+	return p
+
 func duplicate_profile() -> AiProfile:
 	var p := AiProfile.new()
 	p.id = id

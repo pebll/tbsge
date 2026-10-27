@@ -13,6 +13,8 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_batch_seed_offset():
 		return false
+	if not _test_registry_loads_profile_file():
+		return false
 	print("Success: AI duel harness (brains + mirror)")
 	return true
 
@@ -83,5 +85,29 @@ func _test_batch_seed_offset() -> bool:
 		return false
 	if shifted_seed != 1000 * 7919 + 42:
 		push_error("seed_offset 1000 should map to game index 1000, got seed %d" % shifted_seed)
+		return false
+	return true
+
+## "utility:<path>" builds a utility brain from a saved profile JSON (evolve output format).
+func _test_registry_loads_profile_file() -> bool:
+	var path := "user://test_profile_loader.json"
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	f.store_string(JSON.stringify({"id": "evolved_best", "weights": {"trade_value": 7.25, "pass_penalty": -15.0}}))
+	f.close()
+	var brain: AiBrain = AiBrainRegistry.create("utility:" + path)
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	if brain == null or brain.id != "utility":
+		push_error("utility:<path> should yield a utility brain")
+		return false
+	var w: float = brain.profile.weight_for("trade_value")
+	if not is_equal_approx(w, 7.25):
+		push_error("Profile weights should load from file, got trade_value=%s" % w)
+		return false
+	if not AiBrainRegistry.is_known("utility:" + path):
+		push_error("utility:<path> ids should count as known")
+		return false
+	var missing: AiBrain = AiBrainRegistry.create("utility:user://does_not_exist.json")
+	if missing == null or missing.id != "utility":
+		push_error("Missing profile file should fall back to a utility brain")
 		return false
 	return true
