@@ -14,6 +14,8 @@ const AiMatchScore = preload("res://scripts/ai/evolution/ai_match_score.gd")
 const AiDuelRunner = preload("res://scripts/balance/ai_duel_runner.gd")
 const CurriculumTrackerScript = preload("res://scripts/ai/curriculum/curriculum_tracker.gd")
 const AiDuelTraceScript = preload("res://scripts/ai/evolution/ai_duel_trace.gd")
+const AiEvalParallel = preload("res://scripts/ai/evolution/ai_eval_parallel.gd")
+const AiEvolveHistory = preload("res://scripts/ai/evolution/ai_evolve_history.gd")
 
 const PROMOTE_EVERY_DEFAULT := 5
 
@@ -65,6 +67,8 @@ static func run_session(opts: Dictionary) -> Dictionary:
 	var no_promote := bool(opts.get("no_promote", false))
 	var force_stage := String(opts.get("force_stage", ""))
 	var debug_duel := bool(opts.get("debug_duel", false))
+	var cores := maxi(1, int(opts.get("cores", 1)))
+	cores = mini(cores, maxi(1, OS.get_processor_count()))
 
 	if debug_duel:
 		AiDuelTraceScript.enabled = true
@@ -94,6 +98,7 @@ static func run_session(opts: Dictionary) -> Dictionary:
 		"arena_every": arena_every,
 		"promote_every": promote_every,
 		"curriculum": curriculum_enabled and not legacy_teacher,
+		"cores": cores,
 	}
 
 	var use_curriculum := curriculum_enabled and not legacy_teacher
@@ -117,24 +122,36 @@ static func run_session(opts: Dictionary) -> Dictionary:
 			curriculum.promotions_blocked = true
 		rng.state = int(loaded.get("rng_state", seed))
 		var loaded_cfg: Dictionary = loaded.get("config", {})
-		population_size = int(loaded_cfg.get("pop", population_size))
+		var overrides: Dictionary = opts.get("cli_overrides", {})
+		population_size = int(overrides.get("pop", loaded_cfg.get("pop", population_size)))
 		elite_count = _resolve_elite_count(
 			population_size,
-			int(opts.get("elites", loaded_cfg.get("elites", elite_count)))
+			int(overrides.get("elites", loaded_cfg.get("elites", elite_count)))
 		)
-		pairs_per_eval = int(loaded_cfg.get("pairs", pairs_per_eval))
-		map_size = int(loaded_cfg.get("map_size", map_size))
-		budget = int(loaded_cfg.get("budget", budget))
-		arena_pairs = int(loaded_cfg.get("arena_pairs", arena_pairs))
-		arena_opponents = int(loaded_cfg.get("arena_opponents", arena_opponents))
-		arena_every = maxi(1, int(opts.get("arena_every", loaded_cfg.get("arena_every", arena_every))))
-		promote_every = maxi(1, int(loaded_cfg.get("promote_every", promote_every)))
+		pairs_per_eval = int(overrides.get("pairs", loaded_cfg.get("pairs", pairs_per_eval)))
+		map_size = int(overrides.get("map_size", loaded_cfg.get("map_size", map_size)))
+		budget = int(overrides.get("budget", loaded_cfg.get("budget", budget)))
+		arena_pairs = int(overrides.get("arena_pairs", loaded_cfg.get("arena_pairs", arena_pairs)))
+		arena_opponents = int(
+			overrides.get("arena_opponents", loaded_cfg.get("arena_opponents", arena_opponents))
+		)
+		arena_every = maxi(1, int(overrides.get("arena_every", loaded_cfg.get("arena_every", arena_every))))
+		promote_every = maxi(1, int(overrides.get("promote_every", loaded_cfg.get("promote_every", promote_every))))
 		config = loaded_cfg
 		config["algo"] = "ga"
+		config["pop"] = population_size
+		config["pairs"] = pairs_per_eval
+		config["map_size"] = map_size
+		config["budget"] = budget
+		config["arena_pairs"] = arena_pairs
+		config["arena_opponents"] = arena_opponents
 		config["arena_every"] = arena_every
 		config["promote_every"] = promote_every
 		config["elites"] = elite_count
 		config["curriculum"] = use_curriculum
+		cores = maxi(1, int(overrides.get("cores", loaded_cfg.get("cores", cores))))
+		cores = mini(cores, maxi(1, OS.get_processor_count()))
+		config["cores"] = cores
 		use_curriculum = bool(loaded_cfg.get("curriculum", use_curriculum))
 		if rolling_outcomes.is_empty() and int(match_stats_total.get("games", 0)) > 0:
 			AiEvaluator.append_rolling_outcomes(rolling_outcomes, match_stats_total)
@@ -145,17 +162,22 @@ static func run_session(opts: Dictionary) -> Dictionary:
 		evals += _ensure_population_evaluated(
 			pop, population_size, rng, teacher_on, pairs_per_eval, map_size, budget, seed,
 			match_stats_total, rolling_outcomes, balance_log, verbose,
-			use_curriculum, curriculum
+			use_curriculum, curriculum, cores
 		)
 		teacher_on = AiEvaluator.next_teacher_state(teacher_on, rolling_outcomes)
 		if verbose:
 			var stage: Dictionary = AiCurriculumScript.stage_at(curriculum.stage_index)
+			var override_note := ""
+			if not overrides.is_empty():
+				override_note = " | overrides: %s" % ", ".join(overrides.keys())
 			print(
-				"[evolve] CONTINUE %s | gen %d | best %.3f | %s"
+				"[evolve] CONTINUE %s | gen %d | best %.3f | pairs=%d%s | %s"
 				% [
 					run_dir,
 					generations_completed,
 					pop.best_fitness(),
+					pairs_per_eval,
+					override_note,
 					AiCurriculumScript.promotion_progress(stage, curriculum, _champ_member_desc(pop))
 					if use_curriculum
 					else "teacher=%s draw=%.0f%%"
@@ -168,16 +190,23 @@ static func run_session(opts: Dictionary) -> Dictionary:
 		if not run_dir.is_empty():
 			DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(run_dir))
 			AiArchiveStore.clear_stop(run_dir)
+		var seed_jobs: Array = []
 		for i in range(population_size):
 			var g: AiGenome = AiGenomeScript.from_hand_v1()
 			if i > 0:
 				g = g.mutate(rng, 0.5, 0.5)
-			var t0 := Time.get_ticks_msec()
-			var report: Dictionary = _evaluate_member(
-				g, pop, rng, teacher_on, pairs_per_eval, map_size, budget, seed + i,
-				use_curriculum, curriculum
+			seed_jobs.append(
+				_make_eval_job(
+					g, {}, seed + i, seed, pop, rng, teacher_on, pairs_per_eval, map_size, budget,
+					use_curriculum, curriculum, true
+				)
 			)
-			var eval_ms: int = Time.get_ticks_msec() - t0
+		var seed_results: Array = AiEvalParallel.run_jobs(seed_jobs, cores)
+		for i in range(population_size):
+			var g: AiGenome = seed_jobs[i]["genome"]
+			var result: Dictionary = seed_results[i]
+			var report: Dictionary = result.get("report", {})
+			var eval_ms: int = int(result.get("eval_ms", 0))
 			AiEvaluator.merge_match_stats(match_stats_total, report.get("match_stats", {}))
 			AiEvaluator.append_rolling_outcomes(rolling_outcomes, report.get("match_stats", {}))
 			teacher_on = AiEvaluator.next_teacher_state(teacher_on, rolling_outcomes)
@@ -211,7 +240,9 @@ static func run_session(opts: Dictionary) -> Dictionary:
 				run_dir, pop, generations_completed, evals, rng, config, last_metrics, gens,
 				match_stats_total, rolling_outcomes, teacher_on, curriculum
 			)
-			AiArchiveStore.append_history(run_dir, _history_metrics(last_metrics))
+			AiArchiveStore.append_history(
+				run_dir, _history_row(last_metrics, pop, curriculum, use_curriculum)
+			)
 
 	var target_gen := generations_completed + gens
 	while generations_completed < target_gen:
@@ -238,15 +269,36 @@ static func run_session(opts: Dictionary) -> Dictionary:
 		if elite_n > 0:
 			elite_worst_before = float(pop.members[elite_n - 1].get("fitness", -INF))
 			elite_best_before = float(pop.members[0].get("fitness", -INF))
+		var elite_jobs: Array = []
 		for e in range(elite_n):
 			var em: Dictionary = pop.members[e]
 			var elite_genome: AiGenome = em["genome"]
-			var t_elite := Time.get_ticks_msec()
-			var elite_report: Dictionary = _evaluate_member(
-				elite_genome, pop, rng, teacher_on, elite_pairs, map_size, budget,
-				seed + 5000 + gen_idx * 100 + e, use_curriculum, curriculum, false
+			var rehearsal_idx := AiEvaluator.elite_rehearsal_stage_index(curriculum, e, elite_pairs)
+			elite_jobs.append(
+				_make_eval_job(
+					elite_genome,
+					(em.get("descriptor", {}) as Dictionary).duplicate(true),
+					seed + 5000 + gen_idx * 100 + e,
+					seed,
+					pop,
+					rng,
+					teacher_on,
+					elite_pairs,
+					map_size,
+					budget,
+					use_curriculum,
+					curriculum,
+					false,
+					rehearsal_idx
+				)
 			)
-			var elite_ms: int = Time.get_ticks_msec() - t_elite
+		var elite_results: Array = AiEvalParallel.run_jobs(elite_jobs, cores) if elite_n > 0 else []
+		for e in range(elite_n):
+			var em: Dictionary = pop.members[e]
+			var elite_genome: AiGenome = em["genome"]
+			var result: Dictionary = elite_results[e]
+			var elite_report: Dictionary = result.get("report", {})
+			var elite_ms: int = int(result.get("eval_ms", 0))
 			AiEvaluator.merge_match_stats(match_stats_total, elite_report.get("match_stats", {}))
 			AiEvaluator.append_rolling_outcomes(rolling_outcomes, elite_report.get("match_stats", {}))
 			teacher_on = AiEvaluator.next_teacher_state(teacher_on, rolling_outcomes)
@@ -282,7 +334,8 @@ static func run_session(opts: Dictionary) -> Dictionary:
 		var child_evals := 0
 		var child_beat_worst := 0
 		var child_beat_best := 0
-		while next_pop.size() < population_size:
+		var child_specs: Array = []
+		while next_pop.size() + child_specs.size() < population_size:
 			if not run_dir.is_empty() and AiArchiveStore.should_stop(run_dir):
 				stopped = true
 				break
@@ -293,12 +346,39 @@ static func run_session(opts: Dictionary) -> Dictionary:
 				child = AiGenomeScript.crossover(parent, parent2, rng).mutate(rng)
 			else:
 				child = parent.mutate(rng)
-			var t_eval := Time.get_ticks_msec()
-			var report: Dictionary = _evaluate_member(
-				child, pop, rng, teacher_on, pairs_per_eval, map_size, budget,
-				seed + 10000 + gen_idx * 100 + child_i, use_curriculum, curriculum
+			child_specs.append({
+				"genome": child,
+				"seed_offset": seed + 10000 + gen_idx * 100 + child_i,
+				"index": child_i,
+			})
+			child_i += 1
+
+		var child_jobs: Array = []
+		for spec in child_specs:
+			child_jobs.append(
+				_make_eval_job(
+					spec["genome"],
+					{},
+					int(spec["seed_offset"]),
+					seed,
+					pop,
+					rng,
+					teacher_on,
+					pairs_per_eval,
+					map_size,
+					budget,
+					use_curriculum,
+					curriculum,
+					true
+				)
 			)
-			var eval_ms: int = Time.get_ticks_msec() - t_eval
+		var child_results: Array = AiEvalParallel.run_jobs(child_jobs, cores)
+		for i in range(child_specs.size()):
+			var spec: Dictionary = child_specs[i]
+			var result: Dictionary = child_results[i]
+			var report: Dictionary = result.get("report", {})
+			var eval_ms: int = int(result.get("eval_ms", 0))
+			var child: AiGenome = spec["genome"]
 			AiEvaluator.merge_match_stats(match_stats_total, report.get("match_stats", {}))
 			AiEvaluator.append_rolling_outcomes(rolling_outcomes, report.get("match_stats", {}))
 			teacher_on = AiEvaluator.next_teacher_state(teacher_on, rolling_outcomes)
@@ -316,10 +396,9 @@ static func run_session(opts: Dictionary) -> Dictionary:
 				gen_best_after = child_fit
 			if verbose:
 				_log_fitness_eval(
-					"child", child_i, report, eval_ms, teacher_on, use_curriculum, child_fit,
+					"child", int(spec["index"]), report, eval_ms, teacher_on, use_curriculum, child_fit,
 					child_desc, elite_worst_after, elite_best_after
 				)
-			child_i += 1
 
 		if verbose and child_evals > 0:
 			next_pop.sort_desc()
@@ -369,7 +448,10 @@ static func run_session(opts: Dictionary) -> Dictionary:
 				run_dir, pop, generations_completed, evals, rng, config, last_metrics, target_gen,
 				match_stats_total, rolling_outcomes, teacher_on, curriculum
 			)
-			AiArchiveStore.append_history(run_dir, _history_metrics(last_metrics))
+			balance_log.save(run_dir)
+			AiArchiveStore.append_history(
+				run_dir, _history_row(last_metrics, pop, curriculum, use_curriculum)
+			)
 
 	if not run_dir.is_empty():
 		balance_log.save(run_dir)
@@ -421,6 +503,9 @@ static func print_status(run_dir: String) -> void:
 			float(state.get("best_fitness", 0.0)),
 		]
 	)
+	var cfg: Dictionary = state.get("config", {})
+	if int(cfg.get("cores", 1)) > 1:
+		print("Parallel eval cores: %d" % int(cfg.get("cores", 1)))
 	print(
 		"vs stage/cascade: %.1f%% win | vs pop fitness: %.3f | opponents: %d"
 		% [
@@ -532,6 +617,49 @@ static func _evaluate_member(
 	return AiEvaluator.evaluate_for_evolve_with_confirm(
 		genome, pop_for_confirm, rng, teacher_on, pairs_per_eval, map_size, budget, seed_offset
 	)
+
+static func _confirm_threshold(pop) -> float:
+	if pop == null or pop.size() == 0:
+		return NAN
+	return pop.best_fitness() - 0.05
+
+static func _make_eval_job(
+	genome: AiGenome,
+	_descriptor: Dictionary,
+	seed_offset: int,
+	base_seed: int,
+	pop,
+	rng: RandomNumberGenerator,
+	teacher_on: bool,
+	pairs_per_eval: int,
+	map_size: int,
+	budget: int,
+	use_curriculum: bool,
+	curriculum: CurriculumTrackerScript,
+	allow_confirm: bool,
+	rehearsal_stage_index: int = -1
+) -> Dictionary:
+	var job := {
+		"genome": genome.duplicate_genome(),
+		"rng_seed": base_seed + seed_offset * 9973,
+		"seed_offset": seed_offset,
+		"pairs": pairs_per_eval,
+		"map_size": map_size,
+		"budget": budget,
+		"use_curriculum": use_curriculum,
+		"collect_probe": allow_confirm and use_curriculum,
+		"rehearsal_stage_index": rehearsal_stage_index,
+	}
+	if use_curriculum:
+		job["curriculum"] = curriculum.to_dict()
+	else:
+		job["teacher_on"] = teacher_on
+		if not teacher_on and pop != null and pop.size() >= 2:
+			if rng.randf() < AiEvaluator.POST_TEACHER_ELITE_FRAC:
+				job["forced_opponent"] = pop.random_genome(rng, true)
+	if allow_confirm and pop != null and pop.size() > 0:
+		job["confirm_min_fitness"] = _confirm_threshold(pop)
+	return job
 
 static func _apply_force_stage(curriculum: CurriculumTrackerScript, force_stage: String) -> void:
 	if force_stage.is_empty():
@@ -703,22 +831,42 @@ static func _ensure_population_evaluated(
 	balance_log,
 	verbose: bool,
 	use_curriculum: bool = false,
-	curriculum: CurriculumTrackerScript = null
+	curriculum: CurriculumTrackerScript = null,
+	cores: int = 1
 ) -> int:
 	var added := 0
 	# Pad size.
 	while pop.size() < population_size:
 		var g: AiGenome = pop.best_genome().mutate(rng, 0.5, 0.5)
 		pop.add_member(g, -INF, {})
+	var migrate_jobs: Array = []
+	var migrate_indices: Array = []
 	for i in range(pop.members.size()):
 		var m: Dictionary = pop.members[i]
 		if float(m.get("fitness", -INF)) > -1.0e8:
 			continue
-		var g2: AiGenome = m["genome"]
-		var report: Dictionary = _evaluate_member(
-			g2, pop, rng, teacher_on, pairs_per_eval, map_size, budget, seed + 90000 + i,
-			use_curriculum, curriculum
+		migrate_indices.append(i)
+		migrate_jobs.append(
+			_make_eval_job(
+				m["genome"],
+				(m.get("descriptor", {}) as Dictionary).duplicate(true),
+				seed + 90000 + i,
+				seed,
+				pop,
+				rng,
+				teacher_on,
+				pairs_per_eval,
+				map_size,
+				budget,
+				use_curriculum,
+				curriculum,
+				true
+			)
 		)
+	var migrate_results: Array = AiEvalParallel.run_jobs(migrate_jobs, cores)
+	for j in range(migrate_indices.size()):
+		var i: int = int(migrate_indices[j])
+		var report: Dictionary = migrate_results[j].get("report", {})
 		AiEvaluator.merge_match_stats(match_stats_total, report.get("match_stats", {}))
 		AiEvaluator.append_rolling_outcomes(rolling_outcomes, report.get("match_stats", {}))
 		balance_log.ingest_report(report)
@@ -978,7 +1126,25 @@ static func _history_metrics(metrics: Dictionary) -> Dictionary:
 	var slim: Dictionary = metrics.duplicate(true)
 	slim.erase("match_rows")
 	slim.erase("legion_rows")
+	slim.erase("best_weights")
 	return slim
+
+static func _history_row(
+	metrics: Dictionary,
+	pop,
+	curriculum: CurriculumTrackerScript,
+	use_curriculum: bool
+) -> Dictionary:
+	var row: Dictionary = _history_metrics(metrics)
+	if use_curriculum and curriculum != null:
+		row["curriculum_stage"] = AiCurriculumScript.stage_at(curriculum.stage_index).get("id", "")
+	var desc: Dictionary = _champ_member_desc(pop)
+	if not desc.is_empty():
+		row["champ_cum_wr"] = AiGaPopulationScript.cumulative_win_rate(desc)
+		row["champ_cum_games"] = AiGaPopulationScript.eval_cum_games(desc)
+	if pop != null and pop.size() > 0:
+		row["best_weights"] = (pop.best_genome().weights as Dictionary).duplicate(true)
+	return row
 
 static func _measure_and_log(
 	pop,
@@ -1008,6 +1174,8 @@ static func _measure_and_log(
 		skipped["match_rows"] = []
 		skipped["legion_rows"] = []
 		skipped["time"] = Time.get_datetime_string_from_system()
+		if use_curriculum and curriculum != null:
+			skipped["curriculum_stage"] = AiCurriculumScript.stage_at(curriculum.stage_index).get("id", "")
 		if verbose:
 			if use_curriculum:
 				var next_arena := ((gen / maxi(1, arena_every)) + 1) * arena_every

@@ -28,6 +28,10 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_checkpoint_roundtrip_and_continue():
 		return false
+	if not _test_continue_pairs_override():
+		return false
+	if not _test_history_stage_inference():
+		return false
 	if not _test_stop_file():
 		return false
 	print("Success: GA evolution tests")
@@ -264,6 +268,62 @@ func _test_checkpoint_roundtrip_and_continue() -> bool:
 				DirAccess.remove_absolute(p2)
 		DirAccess.remove_absolute(bal)
 	DirAccess.remove_absolute(abs_dir)
+	return true
+
+func _test_continue_pairs_override() -> bool:
+	var run_dir := "res://data/ai/evolve/_test_pairs_ov_%d" % Time.get_ticks_msec()
+	AiEvolveRunner.run_session({
+		"gens": 1,
+		"pop": 2,
+		"pairs": 1,
+		"verbose": false,
+		"run_dir": run_dir,
+		"continue_run": false,
+		"arena_pairs": 1,
+		"arena_opponents": 1,
+	})
+	var state := AiArchiveStore.load_checkpoint(run_dir)
+	if int(state.get("config", {}).get("pairs", 0)) != 1:
+		push_error("Checkpoint should store pairs=1")
+		return false
+	AiEvolveRunner.run_session({
+		"gens": 0,
+		"pop": 2,
+		"pairs": 4,
+		"verbose": false,
+		"run_dir": run_dir,
+		"continue_run": true,
+		"cli_overrides": {"pairs": 4},
+	})
+	state = AiArchiveStore.load_checkpoint(run_dir)
+	if int(state.get("config", {}).get("pairs", 0)) != 4:
+		push_error(
+			"Continue pairs override should persist pairs=4, got %d"
+			% int(state.get("config", {}).get("pairs", 0))
+		)
+		return false
+	var abs_dir := ProjectSettings.globalize_path(run_dir)
+	if DirAccess.dir_exists_absolute(abs_dir):
+		DirAccess.remove_absolute(abs_dir)
+	return true
+
+func _test_history_stage_inference() -> bool:
+	const AiEvolveHistory = preload("res://scripts/ai/evolution/ai_evolve_history.gd")
+	var checkpoint := {
+		"curriculum": {
+			"history": [
+				{"stage": "pass_mirror", "promoted_at_gen": 10},
+				{"stage": "pass_random", "promoted_at_gen": 20},
+			]
+		}
+	}
+	var timeline: Array = AiEvolveHistory.promotion_timeline(checkpoint)
+	if String(AiEvolveHistory.stage_at_gen(0, timeline)) != "pass_mirror":
+		return false
+	if String(AiEvolveHistory.stage_at_gen(15, timeline)) != "pass_random":
+		return false
+	if String(AiEvolveHistory.stage_at_gen(25, timeline)) != "heal_mirror":
+		return false
 	return true
 
 func _test_stop_file() -> bool:

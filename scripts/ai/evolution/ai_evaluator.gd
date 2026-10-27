@@ -46,7 +46,8 @@ static func evaluate_for_evolve(
 	pair_count: int = 2,
 	map_size: int = 3,
 	budget: int = 75,
-	seed_offset: int = 0
+	seed_offset: int = 0,
+	forced_opponent = null
 ) -> Dictionary:
 	if teacher_on or population == null or population.size() < 2:
 		var report: Dictionary = evaluate_vs_cascade(
@@ -55,6 +56,13 @@ static func evaluate_for_evolve(
 		report["opponent"] = "cascade"
 		report["teacher"] = true
 		return report
+	if forced_opponent != null:
+		var vs_forced: Dictionary = evaluate_vs_genome(
+			genome, forced_opponent, pair_count, map_size, budget, seed_offset, true
+		)
+		vs_forced["opponent"] = "pop"
+		vs_forced["teacher"] = false
+		return vs_forced
 	if rng.randf() < POST_TEACHER_ELITE_FRAC:
 		var opp: AiGenome = population.random_genome(rng, true)
 		var vs: Dictionary = evaluate_vs_genome(
@@ -77,16 +85,24 @@ static func evaluate_for_evolve_with_confirm(
 	pair_count: int = 2,
 	map_size: int = 3,
 	budget: int = 75,
-	seed_offset: int = 0
+	seed_offset: int = 0,
+	confirm_min_fitness: float = NAN,
+	forced_opponent = null
 ) -> Dictionary:
 	var scout: Dictionary = evaluate_for_evolve(
-		genome, population, rng, teacher_on, pair_count, map_size, budget, seed_offset
+		genome,
+		population,
+		rng,
+		teacher_on,
+		pair_count,
+		map_size,
+		budget,
+		seed_offset,
+		forced_opponent
 	)
 	scout["confirmed"] = false
-	if population == null:
-		return scout
 	var fit := float(scout.get("fitness", -INF))
-	if not population.would_confirm(fit):
+	if not _should_confirm(fit, population, confirm_min_fitness):
 		return scout
 	var confirm_pairs := maxi(CONFIRM_PAIRS, pair_count)
 	if confirm_pairs <= pair_count:
@@ -100,9 +116,21 @@ static func evaluate_for_evolve_with_confirm(
 		confirm_pairs,
 		map_size,
 		budget,
-		seed_offset + 7771
+		seed_offset + 7771,
+		forced_opponent
 	)
 	return merge_scout_confirm_reports(scout, confirm)
+
+static func _should_confirm(
+	scout_fitness: float,
+	population,
+	confirm_min_fitness: float
+) -> bool:
+	if population != null:
+		return population.would_confirm(scout_fitness)
+	if not is_nan(confirm_min_fitness):
+		return scout_fitness >= confirm_min_fitness
+	return false
 
 ## Curriculum fitness: current stage + rehearsal pairs on failed retention stages.
 static func evaluate_for_curriculum(
@@ -159,6 +187,54 @@ static func evaluate_for_curriculum(
 		)
 		reports.append(rep)
 	return merge_curriculum_eval_reports(reports, tracker.stage_index)
+
+## Elite re-eval with pair_count 1: odd-index elites replay a failed retention stage instead.
+static func elite_rehearsal_stage_index(
+	tracker: CurriculumTrackerScript,
+	elite_index: int,
+	pair_count: int
+) -> int:
+	if tracker == null or pair_count > 1:
+		return -1
+	var failed: Array[int] = tracker.rehearsal_stages_worst_first()
+	if failed.is_empty() or elite_index % 2 == 0:
+		return -1
+	return int(failed[(elite_index / 2) % failed.size()])
+
+## Rehearsal-only batch: counts toward fitness, not promotion cum.
+static func evaluate_for_curriculum_rehearsal_substitute(
+	genome: AiGenome,
+	tracker: CurriculumTrackerScript,
+	rehearsal_stage_index: int,
+	rng: RandomNumberGenerator,
+	pair_count: int = 1,
+	map_size: int = 3,
+	budget: int = 75,
+	seed_offset: int = 0
+) -> Dictionary:
+	var rep: Dictionary = evaluate_for_curriculum_stage(
+		genome,
+		tracker,
+		rehearsal_stage_index,
+		rng,
+		pair_count,
+		map_size,
+		budget,
+		seed_offset + 12000 + rehearsal_stage_index * 41,
+		false
+	)
+	var out: Dictionary = rep.duplicate(true)
+	out["promotion_trainee_wins"] = 0
+	out["promotion_trainee_losses"] = 0
+	out["promotion_trainee_draws"] = 0
+	out["promotion_trainee_stale_draws"] = 0
+	out["promotion_trainee_timeouts"] = 0
+	out["promotion_trainee_other_draws"] = 0
+	out["promotion_trainee_draft_failures"] = 0
+	var rehearsal_id := String(rep.get("curriculum_stage", ""))
+	out["rehearsal_stages"] = PackedStringArray([rehearsal_id])
+	out["curriculum_stage"] = String(AiCurriculumScript.stage_at(tracker.stage_index).get("id", ""))
+	return out
 
 static func evaluate_for_curriculum_stage(
 	genome: AiGenome,
@@ -402,16 +478,16 @@ static func evaluate_for_curriculum_with_confirm(
 	pair_count: int = 2,
 	map_size: int = 3,
 	budget: int = 75,
-	seed_offset: int = 0
+	seed_offset: int = 0,
+	confirm_min_fitness: float = NAN,
+	collect_probe: bool = false
 ) -> Dictionary:
 	var scout: Dictionary = evaluate_for_curriculum(
-		genome, tracker, rng, pair_count, map_size, budget, seed_offset, population != null
+		genome, tracker, rng, pair_count, map_size, budget, seed_offset, collect_probe
 	)
 	scout["confirmed"] = false
-	if population == null:
-		return scout
 	var fit := float(scout.get("fitness", -INF))
-	if not population.would_confirm(fit):
+	if not _should_confirm(fit, population, confirm_min_fitness):
 		return scout
 	var confirm_pairs := maxi(CONFIRM_PAIRS, pair_count)
 	if confirm_pairs <= pair_count:
@@ -766,6 +842,7 @@ static func _absorb_duel_result(
 	mr["game_id"] = local_game
 	mr["green_brain"] = green_brain_id
 	mr["blue_brain"] = blue_brain_id
+	mr["stale_draw"] = bool(result.get("stale_draw", false))
 	if not curriculum_stage_id.is_empty():
 		mr["curriculum_stage"] = curriculum_stage_id
 	if not draft_mode_id.is_empty():

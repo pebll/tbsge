@@ -23,6 +23,7 @@ const DEFAULT_ARENA_PAIRS := 2
 const DEFAULT_ARENA_OPPONENTS := 3
 const DEFAULT_ARENA_EVERY := 10
 const DEFAULT_ELITES := 6
+const DEFAULT_CORES := 2
 
 func _initialize() -> void:
 	if _wants_help():
@@ -61,6 +62,24 @@ func _initialize() -> void:
 		runner.print_balance(run_dir)
 		quit(0)
 		return
+	if _has_flag("--plot"):
+		var plot_last := _parse_int("--last", 0)
+		var plot_out := _parse_string("--plot-out", "")
+		var AiEvolveHistoryScript = load("res://scripts/ai/evolution/ai_evolve_history.gd")
+		if run_dir.is_empty():
+			print("ERROR: --name required for --plot")
+			quit(2)
+			return
+		var plot_result: Dictionary = AiEvolveHistoryScript.plot_run(run_dir, plot_last, plot_out)
+		if bool(plot_result.get("ok", false)):
+			print("Plot: %s" % plot_result.get("png", ""))
+			print("CSV:  %s" % plot_result.get("csv", ""))
+		else:
+			print("Plot failed: %s" % plot_result.get("error", "?"))
+			if plot_result.has("csv"):
+				print("CSV:  %s" % plot_result.get("csv"))
+		quit(0 if plot_result.get("ok", false) else 1)
+		return
 
 	var gens := _parse_int("--gens", DEFAULT_GENS)
 	var pop := _parse_int("--pop", DEFAULT_POP)
@@ -74,6 +93,8 @@ func _initialize() -> void:
 	var arena_every := _parse_int("--arena-every", DEFAULT_ARENA_EVERY)
 	var promote_every := _parse_int("--promote-every", 5)
 	var checkpoint_every := _parse_int("--checkpoint-every", 1)
+	var cores := _parse_int("--cores", DEFAULT_CORES)
+	cores = mini(cores, maxi(1, OS.get_processor_count()))
 	var continue_run := _has_flag("--continue")
 	var verbose := not _has_flag("--quiet")
 	var legacy_teacher := _has_flag("--legacy-teacher")
@@ -94,9 +115,34 @@ func _initialize() -> void:
 
 	elites = mini(elites, pop)
 
+	var cli_overrides := _cli_overrides_for_continue(continue_run, {
+		"pairs": pairs,
+		"pop": pop,
+		"elites": elites,
+		"map_size": map_size,
+		"budget": budget,
+		"arena_pairs": arena_pairs,
+		"arena_opponents": arena_opponents,
+		"arena_every": arena_every,
+		"promote_every": promote_every,
+		"cores": cores,
+	})
+	if continue_run and AiArchiveStore.has_checkpoint(run_dir):
+		var ckpt: Dictionary = AiArchiveStore.load_checkpoint(run_dir)
+		var ckpt_cfg: Dictionary = ckpt.get("config", {})
+		if not cli_overrides.has("pairs"):
+			pairs = int(ckpt_cfg.get("pairs", pairs))
+		if not cli_overrides.has("pop"):
+			pop = int(ckpt_cfg.get("pop", pop))
+		if not cli_overrides.has("elites"):
+			elites = int(ckpt_cfg.get("elites", elites))
+		if not cli_overrides.has("cores"):
+			cores = int(ckpt_cfg.get("cores", cores))
+		elites = mini(elites, pop)
+
 	print(
-		"GA evolve: gens=%d pop=%d elites=%d pairs=%d map=%d budget=%d seed=%d arena_every=%d curriculum=%s"
-		% [gens, pop, elites, pairs, map_size, budget, seed, arena_every, "on" if curriculum_enabled and not legacy_teacher else "off"]
+		"GA evolve: gens=%d pop=%d elites=%d pairs=%d map=%d budget=%d seed=%d arena_every=%d cores=%d curriculum=%s"
+		% [gens, pop, elites, pairs, map_size, budget, seed, arena_every, cores, "on" if curriculum_enabled and not legacy_teacher else "off"]
 	)
 	if not run_dir.is_empty():
 		var label := run_name if not run_name.is_empty() else run_dir
@@ -124,6 +170,8 @@ func _initialize() -> void:
 		"no_promote": no_promote,
 		"force_stage": force_stage,
 		"debug_duel": debug_duel,
+		"cores": cores,
+		"cli_overrides": cli_overrides,
 	})
 	runner.print_report(batch)
 	quit(0)
@@ -161,6 +209,35 @@ func _has_flag(flag: String) -> bool:
 			return true
 	return false
 
+func _has_option(flag: String) -> bool:
+	for arg in OS.get_cmdline_user_args():
+		var s := String(arg)
+		if s == flag or s.begins_with(flag + "="):
+			return true
+	return false
+
+## On --continue, only keys present on the CLI replace checkpoint config.
+func _cli_overrides_for_continue(continue_run: bool, values: Dictionary) -> Dictionary:
+	if not continue_run:
+		return {}
+	var flags := {
+		"pairs": "--pairs",
+		"pop": "--pop",
+		"elites": "--elites",
+		"map_size": "--map-size",
+		"budget": "--budget",
+		"arena_pairs": "--arena-pairs",
+		"arena_opponents": "--arena-opponents",
+		"arena_every": "--arena-every",
+		"promote_every": "--promote-every",
+		"cores": "--cores",
+	}
+	var out := {}
+	for key in flags:
+		if _has_option(flags[key]):
+			out[key] = values[key]
+	return out
+
 func _wants_help() -> bool:
 	return _has_flag("--help") or _has_flag("-h")
 
@@ -180,13 +257,18 @@ func _print_help() -> void:
 	print("  --pop N               Population size (default %d)" % DEFAULT_POP)
 	print("  --elites N            Elite re-eval slots per gen (default %d, capped at pop)" % DEFAULT_ELITES)
 	print("  --pairs N             Mirrored pairs per fitness eval (default %d)" % DEFAULT_PAIRS)
+	print("  --cores N             Parallel eval worker threads (default %d)" % DEFAULT_CORES)
 	print("  --arena-pairs N       Pairs for champion vs cascade/pop (default %d)" % DEFAULT_ARENA_PAIRS)
 	print("  --arena-opponents N   Pop members in arena (default %d)" % DEFAULT_ARENA_OPPONENTS)
 	print("  --arena-every N       Run arena every N gens (default %d)" % DEFAULT_ARENA_EVERY)
 	print("  --promote-every N     Curriculum promotion check every N gens (default 5)")
 	print("  --continue            Resume from checkpoint for --name (migrates old MAP runs)")
+	print("                        Omit --pairs/--pop/etc. to keep checkpoint values; pass them to override")
 	print("  --status              Print checkpoint metrics and exit")
 	print("  --balance             Print unit/balance report from saved EA games")
+	print("  --plot                Plot fitness / win rate from history.jsonl (needs --name)")
+	print("  --last N              With --plot: only last N generations (default: all)")
+	print("  --plot-out PATH       With --plot: output PNG path (default RUN/plots/evolve_history.png)")
 	print("  --request-stop        Write STOP so a running job exits after the current gen")
 	print("  --checkpoint-every N  Save every N gens (default 1)")
 	print("  --no-curriculum       Use legacy cascade teacher instead of staged bots")

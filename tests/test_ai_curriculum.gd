@@ -34,9 +34,13 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_promotion_cum_excludes_rehearsal():
 		return false
+	if not _test_elite_rehearsal_alternate():
+		return false
 	if not _test_curriculum_draw_scoring():
 		return false
 	if not _test_curriculum_evolve_smoke():
+		return false
+	if not _test_parallel_cores_smoke():
 		return false
 	print("Success: curriculum tests")
 	return true
@@ -278,6 +282,31 @@ func _test_promotion_cum_excludes_rehearsal() -> bool:
 		return false
 	return true
 
+func _test_elite_rehearsal_alternate() -> bool:
+	var tracker := CurriculumTrackerScript.new()
+	tracker.stage_index = 3
+	tracker.set_last_promote_audit({
+		"retention": {
+			"stages": [
+				{"stage_index": 2, "stage_id": "heal_mirror", "win_rate": 0.58, "passed": false},
+				{"stage_index": 1, "stage_id": "pass_random", "win_rate": 0.72, "passed": false},
+			],
+		},
+	})
+	if AiEvaluator.elite_rehearsal_stage_index(tracker, 0, 1) != -1:
+		push_error("Even elite index should stay on current stage when pairs=1")
+		return false
+	if AiEvaluator.elite_rehearsal_stage_index(tracker, 1, 1) != 2:
+		push_error("Odd elite 1 should rehearse worst failed stage (heal_mirror)")
+		return false
+	if AiEvaluator.elite_rehearsal_stage_index(tracker, 3, 1) != 1:
+		push_error("Odd elite 3 should rotate to second failed stage")
+		return false
+	if AiEvaluator.elite_rehearsal_stage_index(tracker, 1, 2) != -1:
+		push_error("Elites with pairs>1 should use normal mixed rehearsal")
+		return false
+	return true
+
 func _test_curriculum_draw_scoring() -> bool:
 	const CurriculumScoreScript = preload("res://scripts/ai/curriculum/curriculum_score.gd")
 	var stale := {
@@ -296,6 +325,28 @@ func _test_curriculum_draw_scoring() -> bool:
 	bloody["gold_end_blue"] = 5.0
 	if not is_equal_approx(CurriculumScoreScript.simple_draw_score(bloody, true), 0.45):
 		push_error("Low-army draw should score near 0.5")
+		return false
+	return true
+
+func _test_parallel_cores_smoke() -> bool:
+	var batch: Dictionary = AiEvolveRunner.run_session({
+		"gens": 1,
+		"pop": 4,
+		"pairs": 1,
+		"map_size": 3,
+		"budget": 75,
+		"seed": 77,
+		"verbose": false,
+		"run_dir": "",
+		"continue_run": false,
+		"arena_pairs": 1,
+		"arena_opponents": 1,
+		"curriculum": true,
+		"no_promote": true,
+		"cores": 2,
+	})
+	if int(batch.get("evaluations", 0)) < 4:
+		push_error("Parallel cores=2 evolve should evaluate pop members")
 		return false
 	return true
 
