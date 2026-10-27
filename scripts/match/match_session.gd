@@ -14,6 +14,8 @@ var legions: Array[Legion] = []
 var turn_manager: TurnManager
 var team_ids: Array[String] = []
 var action_log: BattleActionLogScript
+## False for headless simulation (AI duels run on worker threads): skip EventBus autoload emits.
+var emit_global_events: bool = true
 
 func _init(p_team_ids: Array[String]) -> void:
 	team_ids = p_team_ids.duplicate()
@@ -135,7 +137,8 @@ func _append_action_log(entry: Dictionary) -> void:
 	if action_log == null or entry.is_empty():
 		return
 	action_log.append(entry)
-	EventBus.battle_log_entry_added.emit(entry)
+	if emit_global_events:
+		EventBus.battle_log_entry_added.emit(entry)
 
 func _collect_cleanup_coords(payload: Dictionary) -> void:
 	var cleanup_coords: Array[Vector2i] = []

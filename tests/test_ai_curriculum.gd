@@ -22,6 +22,8 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_eval_cum_promotion_gate():
 		return false
+	if not _test_min_promotion_games_floor():
+		return false
 	if not _test_retain_win_rate():
 		return false
 	if not _test_promotion_audit_pairs():
@@ -110,17 +112,48 @@ func _test_tracker_promotion() -> bool:
 func _test_eval_cum_promotion_gate() -> bool:
 	var stage: Dictionary = AiCurriculumScript.stage_at(1)
 	var desc := {
-		"cum_wins": 20,
+		"cum_wins": 38,
 		"cum_losses": 0,
 		"cum_draws": 2,
-		"cum_pair_count": 11,
+		"cum_pair_count": 20,
 	}
 	if not AiGaPopulationScript.eval_meets_promotion(desc, stage):
-		push_error("Eval cum should pass pass_random gate at ~95%% wr")
+		push_error("Eval cum should pass pass_random gate at ~95%% wr over 40 games")
 		return false
-	var weak := {"cum_wins": 7, "cum_losses": 0, "cum_draws": 3, "cum_pair_count": 5}
+	var few := {"cum_wins": 22, "cum_losses": 0, "cum_draws": 0, "cum_pair_count": 11}
+	if AiGaPopulationScript.eval_meets_promotion(few, stage):
+		push_error("22 perfect games are not enough evidence to promote")
+		return false
+	var weak := {"cum_wins": 28, "cum_losses": 0, "cum_draws": 12, "cum_pair_count": 20}
 	if AiGaPopulationScript.eval_meets_promotion(weak, stage):
 		push_error("Eval cum should fail with too few wins")
+		return false
+	return true
+
+func _test_min_promotion_games_floor() -> bool:
+	if AiCurriculumScript.MIN_PROMOTION_GAMES != 40:
+		push_error("Promotion needs at least 40 games of evidence")
+		return false
+	for i in range(AiCurriculumScript.stage_count()):
+		var stage: Dictionary = AiCurriculumScript.stage_at(i)
+		if AiCurriculumScript.promote_min_games(stage) < 40:
+			push_error("Stage %s promotes on fewer than 40 games" % stage.get("id"))
+			return false
+	var stage0: Dictionary = AiCurriculumScript.stage_at(0)
+	var at39 := {"cum_wins": 39, "cum_losses": 0, "cum_draws": 0}
+	var at40 := {"cum_wins": 40, "cum_losses": 0, "cum_draws": 0}
+	if AiGaPopulationScript.eval_meets_promotion(at39, stage0):
+		push_error("39 games must not promote")
+		return false
+	if not AiGaPopulationScript.eval_meets_promotion(at40, stage0):
+		push_error("40 perfect games should promote pass_mirror")
+		return false
+	var audit: Dictionary = AiEvaluator.evaluate_curriculum_promotion_audit(
+		AiGenomeScript.from_hand_v1(), CurriculumTrackerScript.new(), at39,
+		RandomNumberGenerator.new(), 3, 75, 0
+	)
+	if int(audit.get("need_games", 0)) < 40 or bool(audit.get("current_passed", true)):
+		push_error("Promotion audit must apply the 40-game floor")
 		return false
 	return true
 
@@ -317,8 +350,8 @@ func _test_curriculum_draw_scoring() -> bool:
 		"gold_start_blue": 100.0,
 		"gold_end_blue": 100.0,
 	}
-	if not is_equal_approx(CurriculumScoreScript.simple_draw_score(stale, true), -0.5):
-		push_error("Full-army stale draw should score -0.5")
+	if not is_equal_approx(CurriculumScoreScript.simple_draw_score(stale, true), 0.0):
+		push_error("Full-army stale draw should tie a loss (0.0), never score below it")
 		return false
 	var bloody := stale.duplicate(true)
 	bloody["gold_end_green"] = 5.0

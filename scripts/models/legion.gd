@@ -14,6 +14,8 @@ var current_ap: int = DEFAULT_MAX_AP
 var action_cooldowns: Dictionary = {}
 ## Skip one tick after start so cooldown 1 blocks the next full turn.
 var _cooldown_skip_tick: Dictionary = {}
+## False for headless simulation: skip EventBus autoload emits (unsafe off the main thread).
+var emit_global_events: bool = true
 
 func _init(unit_type: String, unit_count: int, tile_coords: Vector2i, team_id: String) -> void:
 	self.unit_type = unit_type
@@ -55,7 +57,7 @@ func refresh_ap() -> void:
 	for unit in units:
 		if unit and unit.reset_turn_state():
 			any_shield_restored = true
-	if any_shield_restored:
+	if any_shield_restored and emit_global_events:
 		EventBus.legion_shields_refilled.emit(self)
 
 func get_cooldown_remaining(action_id: String) -> int:

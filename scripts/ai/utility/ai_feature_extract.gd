@@ -10,32 +10,30 @@ const AiMatchScore = preload("res://scripts/ai/evolution/ai_match_score.gd")
 const MinigameRulesScript = preload("res://scripts/minigame/minigame_rules.gd")
 const ActionParams = preload("res://scripts/actions/action_params.gd")
 
-## Combat-estimate memo, active only between begin_pass() and end_pass(). Within one pass the
-## board is read-only, so (attacker, defender, action, from, to) fully determines the estimate.
-static var _est_memo: Dictionary = {}
-static var _memo_active: bool = false
-
-static func begin_pass() -> void:
-	_est_memo = {}
-	_memo_active = true
-
-static func end_pass() -> void:
-	_est_memo = {}
-	_memo_active = false
-
-static func _estimate(
-	attacker: Legion, defender: Legion, action_id: String, from_coords: Vector2i, to_coords: Vector2i
+## Combat estimate for one (attacker, defender, action, from, to). `sim_count` < 0 falls back to the
+## global default. A non-null `memo` (owned by the caller, one board snapshot) caches estimates;
+## the key includes the sim count so brains with different counts never share an entry.
+static func estimate(
+	attacker: Legion,
+	defender: Legion,
+	action_id: String,
+	from_coords: Vector2i,
+	to_coords: Vector2i,
+	sim_count: int = -1,
+	memo = null
 ) -> Dictionary:
-	if not _memo_active:
-		return CombatExpectation.estimate_combat(attacker, defender, action_id, from_coords, to_coords)
+	var n := CombatExpectation.get_sim_count() if sim_count < 0 else maxi(1, sim_count)
+	if memo == null:
+		return CombatExpectation.estimate_combat(attacker, defender, action_id, from_coords, to_coords, n)
 	var key := "%d|%d|%s|%s|%s|%d" % [
-		attacker.get_instance_id(), defender.get_instance_id(), action_id,
-		from_coords, to_coords, CombatExpectation.get_sim_count(),
+		attacker.get_instance_id(), defender.get_instance_id(), action_id, from_coords, to_coords, n,
 	]
-	if _est_memo.has(key):
-		return _est_memo[key]
-	var est: Dictionary = CombatExpectation.estimate_combat(attacker, defender, action_id, from_coords, to_coords)
-	_est_memo[key] = est
+	if memo.has(key):
+		return memo[key]
+	var est: Dictionary = CombatExpectation.estimate_combat(
+		attacker, defender, action_id, from_coords, to_coords, n
+	)
+	memo[key] = est
 	return est
 
 ## Expected gold destroyed minus gold lost, divided by a fixed team scale, in [-1, 1].
@@ -58,7 +56,10 @@ static func _trade_scale(session, attacker: Legion, defender: Legion) -> float:
 		+ AiMatchScore.team_living_gold(session, defender.team_id)
 	)
 
-static func extract(session, legion: Legion, ctx: AiContext, cand: AiCandidate) -> Dictionary:
+## `sim_count` / `memo`: see estimate(). Both are per call so concurrent brains never share state.
+static func extract(
+	session, legion: Legion, ctx: AiContext, cand: AiCandidate, sim_count: int = -1, memo = null
+) -> Dictionary:
 	var feats: Dictionary = {}
 	for name in AiFeatureNames.all_names():
 		feats[name] = 0.0
@@ -101,7 +102,7 @@ static func extract(session, legion: Legion, ctx: AiContext, cand: AiCandidate) 
 	_fill_threat(ctx, legion, stand, feats)
 
 	if action_id in ["melee_attack", "ranged_attack"]:
-		_fill_combat(session, legion, stand, target_coords, action_id, feats)
+		_fill_combat(session, legion, stand, target_coords, action_id, feats, sim_count, memo)
 	elif action_id in ["self_heal", "heal_ally"]:
 		_fill_heal(session, legion, stand, target_coords, action_id, feats)
 	elif action_id == "teleport":
@@ -114,7 +115,9 @@ static func extract(session, legion: Legion, ctx: AiContext, cand: AiCandidate) 
 			else 0.0
 		)
 		if not cand.followup_action_id.is_empty() and cand.followup_action_id in ["melee_attack", "ranged_attack"]:
-			_fill_combat(session, legion, stand, cand.followup_to, cand.followup_action_id, feats)
+			_fill_combat(
+			session, legion, stand, cand.followup_to, cand.followup_action_id, feats, sim_count, memo
+		)
 			feats[AiFeatureNames.IS_COMBAT] = 1.0
 			feats[AiFeatureNames.IS_MOVE] = 0.0
 			feats[AiFeatureNames.IS_TERMINAL] = 1.0
@@ -154,13 +157,15 @@ static func _fill_combat(
 	from_coords: Vector2i,
 	to_coords: Vector2i,
 	action_id: String,
-	feats: Dictionary
+	feats: Dictionary,
+	sim_count: int,
+	memo
 ) -> void:
 	var defender: Legion = session.get_legion_at(to_coords)
 	if defender == null:
 		return
 	var restored := _push_coords(session, legion, from_coords)
-	var est: Dictionary = _estimate(legion, defender, action_id, from_coords, to_coords)
+	var est: Dictionary = estimate(legion, defender, action_id, from_coords, to_coords, sim_count, memo)
 	_pop_coords(session, legion, restored)
 
 	var def_hp := maxf(1.0, float(est.get("defender_hp", 1.0)))

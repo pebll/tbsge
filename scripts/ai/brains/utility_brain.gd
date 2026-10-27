@@ -16,8 +16,12 @@ var profile: AiProfile
 var force_argmax: bool = true
 var debug_enabled: bool = false
 var probe = null
+## Monte Carlo rollouts per combat estimate made by this brain.
+var sim_count: int = CombatExpectation.PLAY_SIM_COUNT
 ## Decisions answered from the sort_actionable cache (diagnostics / tests).
 var cache_hits: int = 0
+## Combat estimates for the board snapshot being scored; per brain, so parallel duels never share it.
+var _memo: Dictionary = {}
 ## legion instance id -> {"sig": String, "scored": Array} from the last sort_actionable pass.
 var _cache: Dictionary = {}
 
@@ -67,9 +71,9 @@ func _scored_for(session, legion: Legion) -> Array:
 	if entry != null and String(entry["sig"]) == _board_signature(session):
 		cache_hits += 1
 		return entry["scored"]
-	AiFeatureExtract.begin_pass()
+	_memo = {}
 	var rows: Array = _score_legion(session, legion)
-	AiFeatureExtract.end_pass()
+	_memo = {}
 	return rows
 
 func _score_legion(session, legion: Legion) -> Array:
@@ -77,7 +81,7 @@ func _score_legion(session, legion: Legion) -> Array:
 	var cands: Array = AiCandidateGen.generate(session, legion, ctx)
 	var scored: Array = []
 	for cand in cands:
-		var feats: Dictionary = AiFeatureExtract.extract(session, legion, ctx, cand)
+		var feats: Dictionary = AiFeatureExtract.extract(session, legion, ctx, cand, sim_count, _memo)
 		var score := AiUtilityScorer.score(feats, profile)
 		scored.append({"cand": cand, "score": score, "feats": feats})
 	scored.sort_custom(_row_before)
@@ -101,7 +105,7 @@ static func _row_before(a: Dictionary, b: Dictionary) -> bool:
 ## unit HP/shields, AP and cooldowns, plus the sim count and the profile identity.
 func _board_signature(session) -> String:
 	var parts: PackedStringArray = PackedStringArray()
-	parts.append("%d|%d" % [CombatExpectation.get_sim_count(), profile.get_instance_id()])
+	parts.append("%d|%d" % [sim_count, profile.get_instance_id()])
 	for L in session.legions:
 		if L == null:
 			continue
@@ -128,7 +132,7 @@ func sort_actionable(session, actionable: Array[Vector2i]) -> Array[Vector2i]:
 	var scored: Array[Dictionary] = []
 	_cache.clear()
 	var sig := _board_signature(session)
-	AiFeatureExtract.begin_pass()
+	_memo = {}
 	for coords in actionable:
 		var legion: Legion = session.get_legion_at(coords)
 		if legion == null or not session.can_act_legion(legion):
@@ -138,7 +142,7 @@ func sort_actionable(session, actionable: Array[Vector2i]) -> Array[Vector2i]:
 		_cache[legion.get_instance_id()] = {"sig": sig, "scored": rows}
 		var best := -INF if rows.is_empty() else float(rows[0]["score"])
 		scored.append({"coords": coords, "score": best})
-	AiFeatureExtract.end_pass()
+	_memo = {}
 	scored.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		var sa: float = float(a["score"])
 		var sb: float = float(b["score"])

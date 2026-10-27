@@ -4,6 +4,7 @@ extends RefCounted
 ## Headless full-match AI vs AI (random draft + pluggable brains).
 ## With mirror=true, each seed runs twice with brains swapped on the same drafts.
 
+const UtilityBrain = preload("res://scripts/ai/brains/utility_brain.gd")
 const AiBrainRegistry = preload("res://scripts/ai/ai_brain_registry.gd")
 const AiDrafter = preload("res://scripts/ai/ai_drafter.gd")
 const AiDuelReport = preload("res://scripts/balance/ai_duel_report.gd")
@@ -34,18 +35,15 @@ static func run_batch(
 	seed_offset: int = 0,
 	play_sims: bool = false
 ) -> Dictionary:
-	var prev_ai_debug := AttackNearestEnemyBehavior.debug_enabled
-	var prev_combat_quiet := CombatResolver.quiet
-	AttackNearestEnemyBehavior.debug_enabled = false
-	CombatResolver.quiet = true
+	var headless := begin_headless()
 
 	var brain_a: AiBrain = AiBrainRegistry.create(brain_a_id)
 	var brain_b: AiBrain = AiBrainRegistry.create(brain_b_id)
 	# Fitness / batch eval: cheap MC. Benchmarks pass play_sims to measure the shipped N.
-	if play_sims:
-		CombatExpectation.use_play_mode()
-	else:
-		CombatExpectation.use_train_mode()
+	var sims := CombatExpectation.PLAY_SIM_COUNT if play_sims else CombatExpectation.TRAIN_SIM_COUNT
+	for brain in [brain_a, brain_b]:
+		if brain is UtilityBrain:
+			(brain as UtilityBrain).sim_count = sims
 
 	var brain_a_wins := 0
 	var brain_b_wins := 0
@@ -169,9 +167,7 @@ static func run_batch(
 			"match_winners": ",".join(pair_match_winners),
 		})
 
-	AttackNearestEnemyBehavior.debug_enabled = prev_ai_debug
-	CombatResolver.quiet = prev_combat_quiet
-	CombatExpectation.use_play_mode()
+	end_headless(headless)
 
 	var batch := {
 		"games": total_matches,
@@ -210,6 +206,29 @@ static func run_batch(
 static func print_report(batch: Dictionary) -> void:
 	AiDuelReport.print_extended_report(batch, batch.get("csv_paths", {}))
 
+## Silences combat/AI log spam for headless play. These flags are process-wide statics, so only the
+## main thread may write them: call this once before dispatching parallel jobs and end_headless()
+## after they all finish. From a worker thread it is a no-op (returns {}).
+static func begin_headless() -> Dictionary:
+	if OS.get_thread_caller_id() != OS.get_main_thread_id():
+		return {}
+	var saved := {
+		"quiet": CombatResolver.quiet,
+		"ai_debug": AttackNearestEnemyBehavior.debug_enabled,
+		"expect_log": GameSettings.battle_expectation_log_timing,
+	}
+	CombatResolver.quiet = true
+	AttackNearestEnemyBehavior.debug_enabled = false
+	GameSettings.battle_expectation_log_timing = false
+	return saved
+
+static func end_headless(saved: Dictionary) -> void:
+	if saved.is_empty():
+		return
+	CombatResolver.quiet = bool(saved["quiet"])
+	AttackNearestEnemyBehavior.debug_enabled = bool(saved["ai_debug"])
+	GameSettings.battle_expectation_log_timing = bool(saved["expect_log"])
+
 static func run_one(
 	game_index: int,
 	map_size: int,
@@ -219,21 +238,12 @@ static func run_one(
 	draft_scenario: DraftScenarioScript = null,
 	stale_idle_turns: int = 0
 ) -> Dictionary:
-	# Headless evolve/duel always silences combat hit spam + AI debug.
-	var prev_quiet := CombatResolver.quiet
-	var prev_ai_debug := AttackNearestEnemyBehavior.debug_enabled
-	var prev_expect_log: bool = GameSettings.battle_expectation_log_timing
-	CombatResolver.quiet = true
-	AttackNearestEnemyBehavior.debug_enabled = false
-	GameSettings.battle_expectation_log_timing = false
-
+	# Headless duels silence combat hit spam + AI debug; on a worker the dispatcher already did.
+	var headless := begin_headless()
 	var result: Dictionary = _run_one_impl(
 		game_index, map_size, budget, green_brain, blue_brain, draft_scenario, stale_idle_turns
 	)
-
-	CombatResolver.quiet = prev_quiet
-	AttackNearestEnemyBehavior.debug_enabled = prev_ai_debug
-	GameSettings.battle_expectation_log_timing = prev_expect_log
+	end_headless(headless)
 	return result
 
 static func _run_one_impl(
@@ -263,6 +273,8 @@ static func _run_one_impl(
 	var map_seed := game_index * 7919 + 42
 	var combat_seed := map_seed ^ 0xDEAD
 	var session: MinigameSessionScript = MinigameSessionScript.new(config)
+	# Worker threads must not touch the EventBus autoload, and nothing listens during a duel.
+	session.emit_global_events = false
 	session.grid = MapBuilderScript.build_grid(config.map_radius, map_seed, config.team_ids)
 	session.refresh_deploy_slots()
 
@@ -289,6 +301,8 @@ static func _run_one_impl(
 		AiDuelTraceScript.match_end(failed, green_brain.id, blue_brain.id)
 		return failed
 
+	for legion in session.legions:
+		legion.emit_global_events = false
 	AiDuelTraceScript.reset_game()
 
 	var tracker := MatchBattleStats.new()

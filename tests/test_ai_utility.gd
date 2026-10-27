@@ -52,6 +52,10 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_estimate_memo_within_pass():
 		return false
+	if not _test_brain_sim_count_is_per_brain():
+		return false
+	if not _test_memo_key_includes_sim_count():
+		return false
 	print("Success: Utility AI P1 tests")
 	return true
 
@@ -451,12 +455,11 @@ func _test_estimate_memo_within_pass() -> bool:
 	if cand == null:
 		push_error("No melee candidate found")
 		return false
-	AiFeatureExtract.begin_pass()
+	var memo: Dictionary = {}
 	var before: int = CombatExpectation.estimate_calls
-	var f1: Dictionary = AiFeatureExtract.extract(session, green, ctx, cand)
-	var f2: Dictionary = AiFeatureExtract.extract(session, green, ctx, cand)
+	var f1: Dictionary = AiFeatureExtract.extract(session, green, ctx, cand, -1, memo)
+	var f2: Dictionary = AiFeatureExtract.extract(session, green, ctx, cand, -1, memo)
 	var used: int = CombatExpectation.estimate_calls - before
-	AiFeatureExtract.end_pass()
 	if used != 1 or str(f1) != str(f2):
 		push_error("Memo should simulate once per (stand,target) in a pass (calls=%d)" % used)
 		return false
@@ -465,5 +468,57 @@ func _test_estimate_memo_within_pass() -> bool:
 	AiFeatureExtract.extract(session, green, ctx, cand)
 	if CombatExpectation.estimate_calls - before != 2:
 		push_error("Outside a pass nothing must be memoized")
+		return false
+	return true
+
+func _test_brain_sim_count_is_per_brain() -> bool:
+	var CombatExpectation = preload("res://scripts/ai/expectation/combat_expectation.gd")
+	CombatExpectation.use_play_mode()
+	if UtilityBrainScript.new().sim_count != CombatExpectation.PLAY_SIM_COUNT:
+		push_error("UtilityBrain.sim_count must default to PLAY_SIM_COUNT")
+		return false
+	var w := _adjacent_pair()
+	var session = w["session"]
+	var green: Legion = w["green"]
+	var low = UtilityBrainScript.new()
+	low.sim_count = 2
+	var high = UtilityBrainScript.new()
+	high.sim_count = 5
+	var calls0: int = CombatExpectation.estimate_calls
+	var sims0: int = CombatExpectation.sims_run
+	low.decide(session, green)
+	var calls_low: int = CombatExpectation.estimate_calls - calls0
+	var sims_low: int = CombatExpectation.sims_run - sims0
+	calls0 = CombatExpectation.estimate_calls
+	sims0 = CombatExpectation.sims_run
+	high.decide(session, green)
+	var calls_high: int = CombatExpectation.estimate_calls - calls0
+	var sims_high: int = CombatExpectation.sims_run - sims0
+	if calls_low <= 0 or calls_high <= 0:
+		push_error("Both brains should have estimated combat")
+		return false
+	if sims_low != 2 * calls_low or sims_high != 5 * calls_high:
+		push_error("Each brain must simulate its own sim_count (low %d/%d, high %d/%d)" % [
+			sims_low, calls_low, sims_high, calls_high])
+		return false
+	if CombatExpectation.get_sim_count() != CombatExpectation.PLAY_SIM_COUNT:
+		push_error("Per-brain sim counts must not touch the global")
+		return false
+	return true
+
+func _test_memo_key_includes_sim_count() -> bool:
+	var w := _adjacent_pair()
+	var session = w["session"]
+	var green: Legion = w["green"]
+	var blue: Legion = w["blue"]
+	var memo: Dictionary = {}
+	var a: Dictionary = AiFeatureExtract.estimate(
+		green, blue, "melee_attack", green.tile_coords, blue.tile_coords, 3, memo
+	)
+	var b: Dictionary = AiFeatureExtract.estimate(
+		green, blue, "melee_attack", green.tile_coords, blue.tile_coords, 4, memo
+	)
+	if int(a.get("sim_count", 0)) != 3 or int(b.get("sim_count", 0)) != 4:
+		push_error("Memo must not serve an estimate made with another sim count")
 		return false
 	return true

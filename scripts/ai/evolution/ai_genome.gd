@@ -6,6 +6,9 @@ extends RefCounted
 const AiFeatureNames = preload("res://scripts/ai/utility/ai_feature_names.gd")
 const AiProfileScript = preload("res://scripts/ai/utility/ai_profile.gd")
 
+## Largest (least negative) pass penalty a genome may keep.
+const MAX_PASS_PENALTY := -10.0
+
 var weights: Dictionary = {}
 
 static func from_profile(profile: AiProfile) -> AiGenome:
@@ -40,19 +43,11 @@ func mutate(rng: RandomNumberGenerator, sigma: float = 0.35, gene_chance: float 
 		child.weights[name] = clampf(base + rng.randfn() * sigma, lo, 12.0)
 	return child.reinforce_engage()
 
-## Keep evolving genomes from drifting into pure stall/pass policies.
+## Keep evolving genomes from drifting into pure stall/pass policies. Only the pass penalty is
+## floored; the engage-related weights are left free so the search is not fenced in.
 func reinforce_engage() -> AiGenome:
 	weights[AiFeatureNames.PASS_PENALTY] = minf(
-		float(weights.get(AiFeatureNames.PASS_PENALTY, 0.0)), -14.0
-	)
-	weights[AiFeatureNames.CLOSER_TO_FOCUS] = maxf(
-		float(weights.get(AiFeatureNames.CLOSER_TO_FOCUS, 0.0)), 6.0
-	)
-	weights[AiFeatureNames.ENABLES_ATTACK] = maxf(
-		float(weights.get(AiFeatureNames.ENABLES_ATTACK, 0.0)), 4.5
-	)
-	weights[AiFeatureNames.IS_COMBAT] = maxf(
-		float(weights.get(AiFeatureNames.IS_COMBAT, 0.0)), 2.5
+		float(weights.get(AiFeatureNames.PASS_PENALTY, 0.0)), MAX_PASS_PENALTY
 	)
 	return self
 

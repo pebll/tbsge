@@ -3,6 +3,7 @@ extends RefCounted
 
 ## Standard GA population: ranked genomes with fitness (no MAP niches).
 
+const AiCurriculumScript = preload("res://scripts/ai/curriculum/ai_curriculum.gd")
 const AiGenomeScript = preload("res://scripts/ai/evolution/ai_genome.gd")
 const AiMapElitesArchiveScript = preload("res://scripts/ai/evolution/ai_map_elites_archive.gd")
 
@@ -94,7 +95,7 @@ static func eval_cum_games(descriptor: Dictionary) -> int:
 	return int(wld.get("wins", 0)) + int(wld.get("losses", 0)) + int(wld.get("draws", 0))
 
 static func eval_meets_promotion(descriptor: Dictionary, stage: Dictionary) -> bool:
-	var min_games := int(stage.get("promote_min_games", 12))
+	var min_games := AiCurriculumScript.promote_min_games(stage)
 	if eval_cum_games(descriptor) < min_games:
 		return false
 	return cumulative_win_rate(descriptor) >= float(stage.get("promote_win_rate", 0.85))

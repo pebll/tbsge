@@ -108,6 +108,12 @@ static func all_stages() -> Array:
 		},
 	]
 
+## No stage promotes on less cumulative evidence than this (win-rate gates on 8-24 games are noise).
+const MIN_PROMOTION_GAMES := 40
+
+static func promote_min_games(stage: Dictionary) -> int:
+	return maxi(MIN_PROMOTION_GAMES, int(stage.get("promote_min_games", 12)))
+
 static func stage_count() -> int:
 	return all_stages().size()
 
@@ -171,7 +177,7 @@ static func retain_win_rate(stage: Dictionary) -> float:
 
 static func promotion_requirements(stage: Dictionary, stage_index: int = 0) -> String:
 	var need_wr := float(stage.get("promote_win_rate", 0.85))
-	var min_games := int(stage.get("promote_min_games", 12))
+	var min_games := promote_min_games(stage)
 	var retain_n := maxi(0, stage_index)
 	return (
 		"promote-check: eval cum ≥%.0f%% wr over %d scout/confirm games on %s%s"
@@ -191,7 +197,7 @@ static func promotion_requirements(stage: Dictionary, stage_index: int = 0) -> S
 static func eval_cum_progress(stage: Dictionary, member_desc: Dictionary) -> String:
 	const GaPop = preload("res://scripts/ai/evolution/ai_ga_population.gd")
 	var need_wr := float(stage.get("promote_win_rate", 0.85))
-	var min_games := int(stage.get("promote_min_games", 12))
+	var min_games := promote_min_games(stage)
 	var games := GaPop.eval_cum_games(member_desc)
 	var wr := 100.0 * GaPop.cumulative_win_rate(member_desc)
 	return (

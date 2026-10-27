@@ -442,7 +442,7 @@ static func evaluate_curriculum_promotion_audit(
 	seed_offset: int = 0
 ) -> Dictionary:
 	var stage: Dictionary = AiCurriculumScript.stage_at(tracker.stage_index)
-	var min_games := int(stage.get("promote_min_games", 12))
+	var min_games := AiCurriculumScript.promote_min_games(stage)
 	var need_wr := float(stage.get("promote_win_rate", 0.85))
 	var wins := int(member_desc.get("cum_wins", 0))
 	var losses := int(member_desc.get("cum_losses", 0))
@@ -690,9 +690,9 @@ static func _evaluate_vs_brain(
 	draft_mode_id: String = "random",
 	stale_idle_turns: int = 0
 ) -> Dictionary:
-	CombatExpectation.use_train_mode()
-	var prev_quiet := CombatResolver.quiet
-	CombatResolver.quiet = true
+	# Silences shared flags only when called from the main thread; parallel jobs rely on the
+	# dispatcher (AiEvalParallel.run_jobs) having set them once.
+	var headless: Dictionary = AiDuelRunner.begin_headless()
 	var probe = null
 	if collect_probe:
 		probe = AiBehaviorProbeScript.new()
@@ -700,6 +700,10 @@ static func _evaluate_vs_brain(
 	utility.force_argmax = true
 	utility.probe = probe
 	utility.debug_enabled = false
+	# Cheap Monte Carlo for fitness; held on the brains so no global toggling is needed.
+	utility.sim_count = CombatExpectation.TRAIN_SIM_COUNT
+	if opponent is UtilityBrain:
+		(opponent as UtilityBrain).sim_count = CombatExpectation.TRAIN_SIM_COUNT
 
 	var pair_points := 0.0
 	var rich_points := 0.0
@@ -768,8 +772,7 @@ static func _evaluate_vs_brain(
 	var descriptor := {}
 	if probe != null:
 		descriptor = probe.descriptor()
-	CombatResolver.quiet = prev_quiet
-	CombatExpectation.use_play_mode()
+	AiDuelRunner.end_headless(headless)
 	var opp_name := opponent_label if not opponent_label.is_empty() else opponent.id
 	return {
 		"fitness": fitness,

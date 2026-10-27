@@ -6,34 +6,53 @@ extends RefCounted
 const AiCurriculumScript = preload("res://scripts/ai/curriculum/ai_curriculum.gd")
 const AiEvaluator = preload("res://scripts/ai/evolution/ai_evaluator.gd")
 const AiGenomeScript = preload("res://scripts/ai/evolution/ai_genome.gd")
-const CombatExpectation = preload("res://scripts/ai/expectation/combat_expectation.gd")
-const CombatResolver = preload("res://scripts/core/combat_resolver.gd")
+const AiDuelRunner = preload("res://scripts/balance/ai_duel_runner.gd")
 const CurriculumTrackerScript = preload("res://scripts/ai/curriculum/curriculum_tracker.gd")
 
 ## jobs: Array[Dictionary] from AiEvolveRunner._make_eval_job
 static func run_jobs(jobs: Array, cores: int) -> Array:
 	if jobs.is_empty():
 		return []
-	if cores <= 1 or jobs.size() <= 1:
-		var sequential: Array = []
-		for job in jobs:
-			sequential.append(_run_job(job))
-		return sequential
+	# Process-wide log flags are written once here on the calling (main) thread, never by jobs.
+	var headless: Dictionary = AiDuelRunner.begin_headless()
 	var results: Array = []
 	results.resize(jobs.size())
-	var task_id := WorkerThreadPool.add_group_task(
-		func(task_index: int) -> void:
-			results[task_index] = _run_job(jobs[task_index]),
-		jobs.size(),
-		cores,
-		true
-	)
-	WorkerThreadPool.wait_for_group_task_completion(task_id)
+	if cores <= 1 or jobs.size() <= 1:
+		for i in range(jobs.size()):
+			results[i] = _run_job(jobs[i])
+	else:
+		var task_id := WorkerThreadPool.add_group_task(
+			func(task_index: int) -> void:
+				results[task_index] = _run_job(jobs[task_index]),
+			jobs.size(),
+			cores,
+			true
+		)
+		WorkerThreadPool.wait_for_group_task_completion(task_id)
+	AiDuelRunner.end_headless(headless)
+	for i in range(results.size()):
+		results[i] = result_or_error(results[i], i)
 	return results
 
+## A worker that died before storing its result leaves null; callers always .get on results, so
+## hand them an empty report plus an error they can surface instead.
+static func result_or_error(result, job_index: int = -1) -> Dictionary:
+	if result is Dictionary and (result as Dictionary).get("report") is Dictionary:
+		return result
+	var message := "eval job %d returned no result (worker error)" % job_index
+	push_error(message)
+	return {
+		"report": {
+			"error": message,
+			"pair_count": 0,
+			"pair_points": 0.0,
+			"match_stats": AiEvaluator.empty_match_stats(),
+		},
+		"eval_ms": 0,
+		"error": message,
+	}
+
 static func _run_job(job: Dictionary) -> Dictionary:
-	CombatExpectation.use_train_mode()
-	CombatResolver.quiet = true
 	var rng := RandomNumberGenerator.new()
 	rng.seed = int(job.get("rng_seed", 1))
 	var t0 := Time.get_ticks_msec()

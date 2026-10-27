@@ -109,8 +109,11 @@ static func build_plot_series(run_dir: String, last_n_gens: int = 0) -> Dictiona
 	for row in rows:
 		gens.append(int(row.get("gen", 0)))
 		fitness.append(float(row.get("best_fitness", 0.0)))
-		vs_cascade.append(float(row.get("vs_cascade", 0.0)))
-		vs_arena.append(float(row.get("vs_arena_fitness", row.get("vs_arena", 0.0))))
+		# Rows without an arena measurement plot as gaps (NAN), not as zero.
+		vs_cascade.append(float(row["vs_cascade"]) if row.has("vs_cascade") else NAN)
+		vs_arena.append(
+			float(row.get("vs_arena_fitness", row.get("vs_arena"))) if row.has("vs_arena_fitness") or row.has("vs_arena") else NAN
+		)
 		champ_wr.append(float(row.get("champ_cum_wr", row.get("curriculum_rolling_wr", 0.0))))
 		stages.append(String(row.get("inferred_stage", row.get("curriculum_stage", ""))))
 	return {
@@ -136,12 +139,16 @@ static func export_plot_csv(run_dir: String, out_path: String, last_n_gens: int 
 	])
 	for row in rows:
 		lines.append(
-			"%d,%.6f,%.6f,%.6f,%.6f,%s,%d"
+			"%d,%.6f,%s,%s,%.6f,%s,%d"
 			% [
 				int(row.get("gen", 0)),
 				float(row.get("best_fitness", 0.0)),
-				float(row.get("vs_cascade", 0.0)),
-				float(row.get("vs_arena_fitness", row.get("vs_arena", 0.0))),
+				"%.6f" % float(row["vs_cascade"]) if row.has("vs_cascade") else "",
+				(
+					"%.6f" % float(row.get("vs_arena_fitness", row.get("vs_arena")))
+					if row.has("vs_arena_fitness") or row.has("vs_arena")
+					else ""
+				),
 				float(row.get("champ_cum_wr", 0.0)),
 				String(row.get("inferred_stage", "")),
 				int(row.get("evaluations", 0)),

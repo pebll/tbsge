@@ -19,6 +19,13 @@ const AiEvolveHistory = preload("res://scripts/ai/evolution/ai_evolve_history.gd
 
 const PROMOTE_EVERY_DEFAULT := 5
 
+## Measurements only an arena run produces; absent from history rows when the arena was skipped.
+const ARENA_METRIC_KEYS := [
+	"vs_cascade", "vs_cascade_fitness", "vs_arena", "vs_arena_fitness", "opponents", "arena_ms", "match_stats",
+]
+const TRAIN_SEED_BASE := 10000
+const ARENA_SEED_BASE := 100000000
+
 static func run(
 	generations: int = 3,
 	population: int = 16,
@@ -81,6 +88,8 @@ static func run_session(opts: Dictionary) -> Dictionary:
 	var evals := 0
 	var last_metrics := {}
 	var stopped := false
+	## generation index -> seed offsets of every eval job (elites + children) in that generation.
+	var generation_seed_offsets: Dictionary = {}
 	var match_stats_total: Dictionary = AiEvaluator.empty_match_stats()
 	var rolling_outcomes: Array = []
 	var teacher_on := true
@@ -197,7 +206,7 @@ static func run_session(opts: Dictionary) -> Dictionary:
 				g = g.mutate(rng, 0.5, 0.5)
 			seed_jobs.append(
 				_make_eval_job(
-					g, {}, seed + i, seed, pop, rng, teacher_on, pairs_per_eval, map_size, budget,
+					g, {}, generation_seed_offset(seed, -1), seed, pop, rng, teacher_on, pairs_per_eval, map_size, budget,
 					use_curriculum, curriculum, true
 				)
 			)
@@ -221,7 +230,7 @@ static func run_session(opts: Dictionary) -> Dictionary:
 				)
 		pop.sort_desc()
 		last_metrics = _measure_and_log(
-			pop, arena_pairs, map_size, budget, seed, arena_opponents, 0, evals, verbose,
+			pop, arena_pairs, map_size, budget, arena_seed_offset(seed, 0), arena_opponents, 0, evals, verbose,
 			not use_curriculum, {},
 			arena_every, promote_every, use_curriculum, curriculum, rng
 		)
@@ -278,7 +287,7 @@ static func run_session(opts: Dictionary) -> Dictionary:
 				_make_eval_job(
 					elite_genome,
 					(em.get("descriptor", {}) as Dictionary).duplicate(true),
-					seed + 5000 + gen_idx * 100 + e,
+					generation_seed_offset(seed, gen_idx),
 					seed,
 					pop,
 					rng,
@@ -348,7 +357,7 @@ static func run_session(opts: Dictionary) -> Dictionary:
 				child = parent.mutate(rng)
 			child_specs.append({
 				"genome": child,
-				"seed_offset": seed + 10000 + gen_idx * 100 + child_i,
+				"seed_offset": generation_seed_offset(seed, gen_idx),
 				"index": child_i,
 			})
 			child_i += 1
@@ -372,6 +381,10 @@ static func run_session(opts: Dictionary) -> Dictionary:
 					true
 				)
 			)
+		var gen_offsets: Array = []
+		for job in elite_jobs + child_jobs:
+			gen_offsets.append(int(job["seed_offset"]))
+		generation_seed_offsets[gen_idx] = gen_offsets
 		var child_results: Array = AiEvalParallel.run_jobs(child_jobs, cores)
 		for i in range(child_specs.size()):
 			var spec: Dictionary = child_specs[i]
@@ -417,7 +430,7 @@ static func run_session(opts: Dictionary) -> Dictionary:
 			generations_completed, arena_every, generations_completed >= target_gen, use_curriculum
 		)
 		last_metrics = _measure_and_log(
-			pop, arena_pairs, map_size, budget, seed + generations_completed * 97,
+			pop, arena_pairs, map_size, budget, arena_seed_offset(seed, generations_completed),
 			arena_opponents, generations_completed, evals, verbose, run_arena, last_metrics,
 			arena_every, promote_every, use_curriculum, curriculum, rng
 		)
@@ -475,6 +488,7 @@ static func run_session(opts: Dictionary) -> Dictionary:
 		"last_metrics": last_metrics,
 		"run_dir": run_dir,
 		"stopped": stopped,
+		"generation_seed_offsets": generation_seed_offsets,
 		"vs_cascade": float(last_metrics.get("vs_cascade", 0.0)),
 		"vs_arena": float(last_metrics.get("vs_arena", 0.0)),
 		"vs_arena_fitness": float(last_metrics.get("vs_arena_fitness", 0.0)),
@@ -617,6 +631,16 @@ static func _evaluate_member(
 	return AiEvaluator.evaluate_for_evolve_with_confirm(
 		genome, pop_for_confirm, rng, teacher_on, pairs_per_eval, map_size, budget, seed_offset
 	)
+
+## Training seed offset shared by every genome evaluated in generation `gen` (-1 = initial
+## population / re-evaluation), so all of them play the same games (common random numbers).
+## Game indices are offset * 1000 + pair, so a stride of 1000 keeps generations disjoint.
+static func generation_seed_offset(seed: int, gen: int) -> int:
+	return seed + TRAIN_SEED_BASE + gen * 1000
+
+## Arena (vs cascade / vs population) seed offset: a range far above any training offset.
+static func arena_seed_offset(seed: int, gen: int) -> int:
+	return seed + ARENA_SEED_BASE + gen * 97
 
 static func _confirm_threshold(pop) -> float:
 	if pop == null or pop.size() == 0:
@@ -850,7 +874,7 @@ static func _ensure_population_evaluated(
 			_make_eval_job(
 				m["genome"],
 				(m.get("descriptor", {}) as Dictionary).duplicate(true),
-				seed + 90000 + i,
+				generation_seed_offset(seed, -1),
 				seed,
 				pop,
 				rng,
@@ -876,7 +900,7 @@ static func _ensure_population_evaluated(
 		pop.members[i]["descriptor"] = desc
 		added += 1
 		if verbose:
-			print("  [migrate] evaluated padded member fit=%.3f" % float(report["fitness"]))
+			print("  [migrate] evaluated padded member fit=%.3f" % float(report.get("fitness", fit)))
 	pop.sort_desc()
 	return added
 
@@ -973,9 +997,9 @@ static func _resolve_elite_count(population_size: int, requested: int) -> int:
 static func _elite_pairs_per_eval(child_pairs: int) -> int:
 	return maxi(1, int(child_pairs) / 2)
 
-static func _should_run_arena(gen: int, arena_every: int, is_session_end: bool, use_curriculum: bool = false) -> bool:
-	if use_curriculum:
-		return false
+## Arena measurement cadence. Curriculum runs measure too (against the current stage opponent),
+## otherwise history would only ever carry stale numbers.
+static func _should_run_arena(gen: int, arena_every: int, is_session_end: bool, _use_curriculum: bool = false) -> bool:
 	if gen <= 0:
 		return true
 	if is_session_end:
@@ -1136,6 +1160,10 @@ static func _history_row(
 	use_curriculum: bool
 ) -> Dictionary:
 	var row: Dictionary = _history_metrics(metrics)
+	if bool(metrics.get("arena_skipped", false)):
+		# Skipped rows carry the previous measurement forward in memory; never record it as new data.
+		for stale_key in ARENA_METRIC_KEYS:
+			row.erase(stale_key)
 	if use_curriculum and curriculum != null:
 		row["curriculum_stage"] = AiCurriculumScript.stage_at(curriculum.stage_index).get("id", "")
 	var desc: Dictionary = _champ_member_desc(pop)

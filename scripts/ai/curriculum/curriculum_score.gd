@@ -15,13 +15,14 @@ static func score_for_side(result: Dictionary, side_is_green: bool, use_simple: 
 		return simple_draw_score(result, side_is_green)
 	return outcome
 
-## Draw fitness: 0.5 - remaining_army_frac (full-army stall ≈ -0.5, bloody draw ≈ +0.5).
+## Draw fitness: 0.5 - remaining_army_frac, clamped to [0, 0.5] so a draw never scores below a
+## loss (0) and stays below a win (1): a full-army stall ties a loss, a bloody draw approaches 0.5.
 static func simple_draw_score(result: Dictionary, side_is_green: bool) -> float:
 	var my_key := "green" if side_is_green else "blue"
 	var my_start := maxf(1.0, float(result.get("gold_start_%s" % my_key, 1.0)))
 	var my_end := maxf(0.0, float(result.get("gold_end_%s" % my_key, 0.0)))
 	var remaining := clampf(my_end / my_start, 0.0, 1.0)
-	return SIMPLE_DRAW_BASE - remaining
+	return clampf(SIMPLE_DRAW_BASE - remaining, 0.0, SIMPLE_DRAW_BASE)
 
 static func batch_fitness(
 	pair_points: float,

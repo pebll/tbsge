@@ -13,9 +13,13 @@ const TRAIN_SIM_COUNT := 2
 ## Default N for in-game UtilityBrain decisions.
 const PLAY_SIM_COUNT := 12
 
+## Process-wide default for callers that pass no explicit count (tests, ad-hoc estimates). Brains
+## carry their own sim_count so concurrent evaluations never depend on this.
 static var _active_sim_count: int = PLAY_SIM_COUNT
 ## Monte Carlo estimates actually simulated (diagnostics / cache tests).
 static var estimate_calls: int = 0
+## Total Monte Carlo rollouts run (diagnostics / sim-count tests).
+static var sims_run: int = 0
 
 static func set_sim_count(n: int) -> void:
 	_active_sim_count = maxi(1, n)
@@ -45,6 +49,7 @@ static func estimate_combat(
 
 	estimate_calls += 1
 	var n := get_sim_count() if sim_count < 0 else maxi(1, sim_count)
+	sims_run += n
 	var mode := CombatResolver.MODE_MELEE if action_id == "melee_attack" else CombatResolver.MODE_RANGED
 	var distance := 1 if mode == CombatResolver.MODE_MELEE else HexPathfinder.hex_distance(from_coords, to_coords)
 
