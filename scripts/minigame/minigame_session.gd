@@ -97,7 +97,12 @@ func pass_legion_or_force_wait(coords: Vector2i) -> void:
 	var result := apply({"type": "pass_legion", "coords": coords})
 	if result["ok"]:
 		return
-	turn_manager.wait_legion(coords)
+	# Pass refused (e.g. stale legion no longer on its tile): force every legion that
+	# claims these coords to be done so the AI loop can't spin on them.
+	for legion in legions:
+		if legion.tile_coords == coords:
+			turn_manager.wait_legion(legion)
+	prune_stale_legions()
 	if AttackNearestEnemyBehavior.debug_enabled:
 		print("[AI] force-wait %s (%s)" % [coords, result.get("error", "?")])
 

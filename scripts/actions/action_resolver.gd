@@ -66,9 +66,7 @@ static func _execute_move(
 	to_tile.legion = legion
 	legion.tile_coords = to_coords
 	legion.spend_ap(action.ap_cost)
-	_apply_terminal(state, legion, action, from_coords)
-	# Moving onto a tile must not inherit a wait left by a destroyed previous occupant.
-	state.turn_manager.clear_wait(to_coords)
+	_apply_terminal(state, legion, action)
 	return _ok(["legion_moved"], {
 		"action_id": action.id,
 		"from": from_coords,
@@ -87,20 +85,14 @@ static func _execute_swap(
 	var legion_a: Legion = from_tile.legion
 	var legion_b: Legion = to_tile.legion
 
-	# Wait stains are per-tile: a waited partner must stay waited after the swap
-	# (otherwise "wait, then swap with it" refunds its turn).
-	var b_was_waited: bool = to_coords in state.turn_manager.waited_coords
+	# Waits live on the legion, so a waited partner stays waited after the swap.
 	from_tile.legion = legion_b
 	to_tile.legion = legion_a
 	legion_a.tile_coords = to_coords
 	legion_b.tile_coords = from_coords
 	legion_a.spend_ap(action.ap_cost)
 	legion_b.spend_ap(action.ap_cost)
-	state.turn_manager.clear_wait(from_coords)
-	state.turn_manager.clear_wait(to_coords)
-	if b_was_waited:
-		state.turn_manager.wait_legion(from_coords)
-	_apply_terminal(state, legion_a, action, from_coords)
+	_apply_terminal(state, legion_a, action)
 	return _ok(["legions_swapped"], {
 		"action_id": action.id,
 		"from": from_coords,
@@ -121,7 +113,7 @@ static func _execute_melee_attack(
 
 	var rng_seed: int = int(cmd.get("rng_seed", randi()))
 	attacker.spend_ap(action.ap_cost)
-	_apply_terminal(state, attacker, action, from_coords)
+	_apply_terminal(state, attacker, action)
 	var result: Dictionary = CombatResolver.resolve_combat(
 		attacker,
 		defender,
@@ -152,7 +144,7 @@ static func _execute_ranged_attack(
 	var distance := HexPathfinder.hex_distance(from_coords, to_coords)
 	var rng_seed: int = int(cmd.get("rng_seed", randi()))
 	attacker.spend_ap(action.ap_cost)
-	_apply_terminal(state, attacker, action, from_coords)
+	_apply_terminal(state, attacker, action)
 	var result: Dictionary = CombatResolver.resolve_combat(
 		attacker,
 		defender,
@@ -177,7 +169,7 @@ static func _execute_self_heal(
 	var heal_amount := ActionParams.resolve_int(legion, action, "heal_amount", action.heal_amount)
 	var heal_result := _apply_focused_heal(legion, legion, heal_amount)
 	legion.spend_ap(action.ap_cost)
-	_apply_terminal(state, legion, action, coords)
+	_apply_terminal(state, legion, action)
 	return _ok(["legion_healed"], {
 		"action_id": action.id,
 		"coords": coords,
@@ -206,7 +198,7 @@ static func _execute_ally_heal(
 	var heal_amount := ActionParams.resolve_int(caster, action, "heal_amount", action.heal_amount)
 	var heal_result := _apply_focused_heal(caster, target, heal_amount)
 	caster.spend_ap(action.ap_cost)
-	_apply_terminal(state, caster, action, from_coords)
+	_apply_terminal(state, caster, action)
 	return _ok(["legion_healed"], {
 		"action_id": action.id,
 		"coords": to_coords,
@@ -234,8 +226,7 @@ static func _execute_teleport(
 	to_tile.legion = legion
 	legion.tile_coords = to_coords
 	legion.spend_ap(action.ap_cost)
-	_apply_terminal(state, legion, action, from_coords)
-	state.turn_manager.clear_wait(to_coords)
+	_apply_terminal(state, legion, action)
 	return _ok(["legion_teleported"], {
 		"action_id": action.id,
 		"from": from_coords,
@@ -295,13 +286,12 @@ static func _start_action_cooldown(legion: Legion, action: ActionDefinitionScrip
 static func _apply_terminal(
 	state: BattleStateScript,
 	legion: Legion,
-	action: ActionDefinitionScript,
-	coords: Vector2i
+	action: ActionDefinitionScript
 ) -> void:
 	if not action.terminal:
 		return
 	legion.spend_all_ap()
-	state.finish_legion_turn(coords)
+	state.finish_legion_turn(legion)
 
 static func _cleanup_empty_legion(state: BattleStateScript, coords: Vector2i) -> void:
 	var tile: Tile = state.tile_at(coords)
@@ -309,8 +299,6 @@ static func _cleanup_empty_legion(state: BattleStateScript, coords: Vector2i) ->
 		return
 	if tile.legion and tile.legion.units.is_empty():
 		tile.legion = null
-		# Don't leave a wait stain on a vacated tile — another ally may move in.
-		state.turn_manager.clear_wait(coords)
 
 static func _ok(events: Array, payload: Dictionary = {}) -> Dictionary:
 	return {"ok": true, "events": events, "payload": payload}

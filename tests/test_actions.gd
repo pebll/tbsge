@@ -26,7 +26,7 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_wait_stain_survivor_and_end_turn():
 		return false
-	if not _test_swap_onto_stained_empty_tile():
+	if not _test_swap_onto_tile_of_wiped_waited_legion():
 		return false
 	if not _test_heal_ally_basic_and_terminal():
 		return false
@@ -62,7 +62,7 @@ func _test_self_heal_costs_two_ap_and_ends_turn() -> bool:
 	if green.current_ap != 0:
 		push_error("Heal should spend all AP (terminal)")
 		return false
-	if green.tile_coords not in session.turn_manager.waited_coords:
+	if not session.is_waited_at(green.tile_coords):
 		push_error("Heal should end legion turn")
 		return false
 	return true
@@ -176,8 +176,11 @@ func _test_stale_legion_not_actionable() -> bool:
 		push_error("Stale legion should not be actionable")
 		return false
 	session.pass_legion_or_force_wait(coords)
-	if coords not in session.turn_manager.waited_coords:
-		push_error("force-wait should mark coords as waited")
+	if green in session.legions and not green.waited:
+		push_error("force-wait should prune or mark the stale legion")
+		return false
+	if coords in session.get_actionable_coords():
+		push_error("Stale legion must stay non-actionable after force-wait")
 		return false
 	return true
 
@@ -247,9 +250,6 @@ func _test_move_onto_wiped_attacker_tile_can_still_act() -> bool:
 		return false
 	if session.grid[atk_coords].legion != null:
 		push_error("Expected attacker tile to be empty after wipe")
-		return false
-	if atk_coords in session.turn_manager.waited_coords:
-		push_error("Wait stain should clear when attacker tile is vacated")
 		return false
 
 	var move := session.apply({
@@ -342,7 +342,7 @@ func _test_ranged_attack_session_e2e() -> bool:
 	if goblin.tile_coords != to_coords:
 		push_error("Ranged defender should stay put")
 		return false
-	if from_coords not in session.turn_manager.waited_coords:
+	if not session.is_waited_at(from_coords):
 		push_error("Ranged attack is terminal and should wait attacker tile")
 		return false
 	if "combat_resolved" not in result.get("events", []):
@@ -430,7 +430,7 @@ func _test_action_failures() -> bool:
 	session.grid[empty].legion = null
 	session.legions.erase(blue)
 	green.refresh_ap()
-	session.turn_manager.waited_coords.clear()
+	session.turn_manager.clear_all_waits(session.legions)
 	# Place green adjacent if needed.
 	var adj := Vector2i(0, 0)
 	var enemy_spot := Vector2i(1, 0)
@@ -481,24 +481,25 @@ func _test_wait_stain_survivor_and_end_turn() -> bool:
 	if not melee["ok"]:
 		push_error("Survivor melee failed: %s" % melee.get("error"))
 		return false
-	if atk not in session.turn_manager.waited_coords:
-		push_error("Surviving attacker tile should remain waited")
+	if not green.waited or not session.is_waited_at(atk):
+		push_error("Surviving attacker should remain waited")
 		return false
 
 	var end := session.apply({"type": "end_turn"})
 	if not end["ok"]:
 		push_error("end_turn failed")
 		return false
-	if not session.turn_manager.waited_coords.is_empty():
-		push_error("end_turn should clear wait stains")
+	if green.waited or blue.waited:
+		push_error("end_turn should clear every legion's wait")
 		return false
 	if session.turn_manager.active_team_id != team_b:
 		push_error("Expected team B after end_turn")
 		return false
 	return true
 
-func _test_swap_onto_stained_empty_tile() -> bool:
-	## Wait stain on the swap destination must not block the arriving legion.
+func _test_swap_onto_tile_of_wiped_waited_legion() -> bool:
+	## A legion that waited and was then wiped must not leave its "done" state on the
+	## tile: a new occupant and a swap through that tile act normally.
 	var session := MinigameTestHelpersScript.prepare_session()
 	var started: Dictionary = MinigameTestHelpersScript.start_two_legion_battle(session)
 	var team_a: String = MinigameTestHelpersScript.team_a(session)
@@ -517,8 +518,10 @@ func _test_swap_onto_stained_empty_tile() -> bool:
 	var green_b := Legion.new("GOBLIN", 2, b_coords, team_a)
 	session.grid[b_coords].legion = green_b
 	session.legions.append(green_b)
-	# Stale wait on destination (e.g. wiped previous occupant).
-	session.turn_manager.wait_legion(b_coords)
+	# A previous occupant waited here and was wiped; its legion object is gone.
+	var ghost := Legion.new("GOBLIN", 1, b_coords, team_a)
+	session.turn_manager.wait_legion(ghost)
+	ghost.units.clear()
 
 	var result := session.apply({
 		"type": "use_action",
@@ -527,22 +530,22 @@ func _test_swap_onto_stained_empty_tile() -> bool:
 		"to": b_coords,
 	})
 	if not result["ok"]:
-		push_error("Swap onto stained tile failed: %s" % result.get("error"))
+		push_error("Swap onto wiped-waiter tile failed: %s" % result.get("error"))
 		return false
 	if "legions_swapped" not in result.get("events", []):
 		push_error("Expected swap event")
 		return false
-	if b_coords in session.turn_manager.waited_coords:
-		push_error("Swap should clear wait stain on destination")
+	if session.is_waited_at(b_coords):
+		push_error("Swapped-in legion must not inherit a wait")
 		return false
-	if a_coords in session.turn_manager.waited_coords:
-		push_error("Swap should clear wait stain on source")
+	if session.is_waited_at(a_coords):
+		push_error("Swapped-out legion must not inherit a wait")
 		return false
 	if green_a.tile_coords != b_coords:
 		push_error("Swap mover should land on destination")
 		return false
 	if not session.can_act_legion(green_a) and green_a.has_ap():
-		push_error("Arriving legion should be able to act after swap cleared stain")
+		push_error("Arriving legion should still be able to act")
 		return false
 	return true
 
@@ -599,7 +602,7 @@ func _test_heal_ally_basic_and_terminal() -> bool:
 	if mage.current_ap != 0:
 		push_error("heal_ally should be terminal")
 		return false
-	if mage_coords not in session.turn_manager.waited_coords:
+	if not session.is_waited_at(mage_coords):
 		push_error("heal_ally should end caster turn")
 		return false
 	var entry: Dictionary = session.action_log.latest()
@@ -805,7 +808,7 @@ func _test_teleport_basic_ap_and_cooldown() -> bool:
 		return false
 	# Restore AP but keep cooldown — still blocked.
 	assassin.current_ap = assassin.max_ap
-	session.turn_manager.clear_wait(assassin.tile_coords)
+	session.turn_manager.clear_wait(assassin)
 	if ActionTargetingScript.can_use(session.battle_state(), assassin, ActionDefs.get_def("teleport")):
 		push_error("Teleport should stay blocked by cooldown with AP restored")
 		return false

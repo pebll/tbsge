@@ -19,7 +19,8 @@ func can_act_legion(legion: Legion) -> bool:
 		legion != null
 		and turn_manager.is_legion_active(legion)
 		and legion.has_ap()
-		and legion.tile_coords not in turn_manager.waited_coords
+		and not legion.waited
 	)
-func finish_legion_turn(coords: Vector2i) -> void:
-	turn_manager.wait_legion(coords)
+
+func finish_legion_turn(legion: Legion) -> void:
+	turn_manager.wait_legion(legion)

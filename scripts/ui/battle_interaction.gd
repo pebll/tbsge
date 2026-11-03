@@ -300,7 +300,7 @@ func pass_current_legion() -> void:
 		var legion: Legion = _legion_at(state, selected_coords) if state else null
 		if legion and bool(can_act_fn.call(legion)):
 			var tm: TurnManager = turn_manager_fn.call()
-			tm.wait_legion(selected_coords)
+			tm.wait_legion(legion)
 			_sync_spent_visuals()
 		deselect()
 	cycle_legion_tab()

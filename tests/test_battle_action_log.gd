@@ -65,7 +65,7 @@ func _test_move_and_heal_log_fields() -> bool:
 	# Fresh legion with enough AP for heal (move spent 1).
 	if green.current_ap < 2:
 		green.current_ap = 2
-		session.turn_manager.clear_wait(green.tile_coords)
+		session.turn_manager.clear_wait(green)
 
 	var heal := session.apply({
 		"type": "use_action",
@@ -187,7 +187,7 @@ func _test_path_coalesce_logs_once() -> bool:
 	var legions: Dictionary = MinigameTestHelpersScript.start_two_legion_battle(session)
 	var green: Legion = legions["a"]
 	green.current_ap = max(green.current_ap, 3)
-	session.turn_manager.clear_wait(green.tile_coords)
+	session.turn_manager.clear_wait(green)
 
 	var start: Vector2i = green.tile_coords
 	var move_targets := session.get_action_targets(green, "move")

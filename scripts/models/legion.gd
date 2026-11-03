@@ -10,6 +10,10 @@ var tile_coords: Vector2i
 var unit_count: int
 var max_ap: int = DEFAULT_MAX_AP
 var current_ap: int = DEFAULT_MAX_AP
+## Done for this turn (wait/pass or a terminal action). Lives on the legion — not the
+## tile — so moves, swaps, teleports and wipes never leave stale state behind.
+## Cleared for every legion by TurnManager.end_team_turn.
+var waited: bool = false
 ## action_id -> remaining own-turns until ready (ticked on refresh_ap).
 var action_cooldowns: Dictionary = {}
 ## Skip one tick after start so cooldown 1 blocks the next full turn.
