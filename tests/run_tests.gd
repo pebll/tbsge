@@ -34,6 +34,14 @@ func _initialize() -> void:
 		"res://tests/test_match_setup.gd",
 		"res://tests/test_playtest_polish.gd",
 		"res://tests/test_ai_duel_report.gd",
+		"res://tests/test_ai_duel_harness.gd",
+		"res://tests/test_ai_utility.gd",
+		"res://tests/test_combat_expectation.gd",
+		"res://tests/test_ai_threat.gd",
+		"res://tests/test_ai_approach.gd",
+		"res://tests/test_ai_evolution.gd",
+		"res://tests/test_ai_curriculum.gd",
+		"res://tests/test_ai_match_score.gd",
 		"res://tests/test_match_battle_stats.gd",
 	]
 
@@ -53,6 +61,11 @@ func _run_test_script(path: String) -> void:
 	if script == null:
 		_fail_count += 1
 		push_error("FAILED to load test script: %s" % path)
+		return
+	# A script with a parse error still loads but cannot be instantiated.
+	if script is Script and not script.can_instantiate():
+		_fail_count += 1
+		push_error("FAILED to compile test script: %s" % path)
 		return
 
 	var inst = script.new()

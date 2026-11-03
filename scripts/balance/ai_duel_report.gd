@@ -8,6 +8,7 @@ const DEFAULT_OUT_ROOT := "res://data/ai_duel"
 
 static func write_csvs(out_dir: String, batch: Dictionary) -> Dictionary:
 	var paths := {}
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(out_dir))
 	var match_path := "%s/matches.csv" % out_dir
 	var legion_path := "%s/legions.csv" % out_dir
 	_write_matches_csv(match_path, batch.get("match_rows", []))
@@ -20,19 +21,48 @@ static func print_extended_report(batch: Dictionary, csv_paths: Dictionary = {})
 	print("")
 	print("=== AI vs AI Duel Report ===")
 	var games: int = int(batch.get("games", 0))
+	var pair_count: int = int(batch.get("pair_count", games))
 	var total_turns: int = int(batch.get("total_turns", 0))
 	var avg_turns := float(total_turns) / float(maxi(games, 1))
 	var elapsed_ms: int = int(batch.get("elapsed_ms", 0))
-	print("Games: %d | Map size: %d | Budget: %d | Wall time: %.2fs" % [
+	var brain_a := String(batch.get("brain_a", "cascade"))
+	var brain_b := String(batch.get("brain_b", "cascade"))
+	print("Brains: %s vs %s | Mirror: %s" % [
+		brain_a,
+		brain_b,
+		"yes" if bool(batch.get("mirror", false)) else "no",
+	])
+	print("Seeds: %d | Matches: %d | Map size: %d | Budget: %d | Wall time: %.2fs" % [
+		pair_count,
 		games,
 		int(batch.get("map_size", 0)),
 		int(batch.get("budget", 0)),
 		float(elapsed_ms) / 1000.0,
 	])
-	print("GREEN wins: %d (%d%%) | BLUE wins: %d (%d%%) | Draws: %d (%d%%)" % [
+	print("%s wins: %d (%d%%) | %s wins: %d (%d%%) | Draws: %d (%d%%)" % [
+		brain_a, int(batch.get("brain_a_wins", 0)), _pct(int(batch.get("brain_a_wins", 0)), games),
+		brain_b, int(batch.get("brain_b_wins", 0)), _pct(int(batch.get("brain_b_wins", 0)), games),
+		int(batch.get("draws", 0)), _pct(int(batch.get("draws", 0)), games),
+	])
+	if batch.has("brain_a_pair_score"):
+		var pair_score := float(batch.get("brain_a_pair_score", 0.0))
+		var max_per_pair := 2.0 if bool(batch.get("mirror", false)) else 1.0
+		print(
+			"Mirrored pair score (%s): %.3f / %.1f (win-rate equiv %.1f%%)"
+			% [brain_a, pair_score, max_per_pair, 100.0 * pair_score / max_per_pair]
+		)
+		var ci := wilson_interval(score_points(batch), games)
+		print("Score 95%% CI (%s, draw=0.5): [%.1f%%, %.1f%%]" % [brain_a, 100.0 * ci.x, 100.0 * ci.y])
+		if bool(batch.get("mirror", false)):
+			var d := decisive_pairs(batch)
+			var n_dec := int(d["wins"]) + int(d["losses"])
+			var dci := wilson_interval(float(d["wins"]), n_dec)
+			print("Decisive pairs (%s W-L): %d-%d, %d split | decisive win 95%% CI: [%.1f%%, %.1f%%]" % [
+				brain_a, int(d["wins"]), int(d["losses"]), int(d["split"]), 100.0 * dci.x, 100.0 * dci.y,
+			])
+	print("Seat bias — GREEN wins: %d (%d%%) | BLUE wins: %d (%d%%)" % [
 		int(batch.get("green_wins", 0)), _pct(int(batch.get("green_wins", 0)), games),
 		int(batch.get("blue_wins", 0)), _pct(int(batch.get("blue_wins", 0)), games),
-		int(batch.get("draws", 0)), _pct(int(batch.get("draws", 0)), games),
 	])
 	print("Avg team turns: %.1f | Timeouts: %d" % [avg_turns, int(batch.get("timeouts", 0))])
 
@@ -42,13 +72,48 @@ static func print_extended_report(batch: Dictionary, csv_paths: Dictionary = {})
 		for key in csv_paths.keys():
 			print("  %s: %s" % [key, csv_paths[key]])
 
-	var unit_stats: Array = _aggregate_unit_stats(batch.get("legion_rows", []))
+	var unit_stats: Array = aggregate_unit_stats(batch.get("legion_rows", []))
 	if unit_stats.is_empty():
 		print("")
 		print("(No legion-level stats — no completed battles.)")
 		return
 
-	var min_apps := maxi(1, int(round(float(games) * 0.05)))
+	_print_unit_table(unit_stats)
+	print_unit_highlights(batch)
+
+## Public: unit table + highlights for evolve balance logs.
+static func print_unit_stats_section(batch: Dictionary) -> void:
+	var unit_stats: Array = aggregate_unit_stats(batch.get("legion_rows", []))
+	if unit_stats.is_empty():
+		print("")
+		print("(No legion-level stats — no completed battles.)")
+		return
+	_print_unit_table(unit_stats)
+	print_unit_highlights(batch)
+
+static func print_unit_highlights(batch: Dictionary, min_apps_override: int = -1) -> void:
+	var games: int = int(batch.get("games", 0))
+	var unit_stats: Array = aggregate_unit_stats(batch.get("legion_rows", []))
+	if unit_stats.is_empty():
+		return
+	var min_apps := min_apps_override
+	if min_apps < 0:
+		min_apps = maxi(1, int(round(float(maxi(games, 1)) * 0.05)))
+	var filtered: Array = []
+	for row in unit_stats:
+		if int(row["appearances"]) >= min_apps:
+			filtered.append(row)
+	print("")
+	print("--- Highlights (min %d appearances) ---" % min_apps)
+	if filtered.is_empty():
+		filtered = unit_stats
+	_print_highlight(filtered, "Highest team win rate", "team_win_rate", true)
+	_print_highlight(filtered, "Lowest team win rate", "team_win_rate", false)
+	_print_highlight(filtered, "Most avg damage dealt", "avg_damage_dealt", true)
+	_print_highlight(filtered, "Most avg damage taken", "avg_damage_received", true)
+	_print_highlight(filtered, "Best survival", "avg_survival", true)
+
+static func _print_unit_table(unit_stats: Array) -> void:
 	print("")
 	print("--- Unit type stats (per legion appearance; relative to pick rate) ---")
 	print(_pad_row(["Unit", "Apps", "Team win%", "Dmg dealt", "Dmg taken", "Survival%"], [16, 6, 10, 10, 10, 10]))
@@ -62,28 +127,7 @@ static func print_extended_report(batch: Dictionary, csv_paths: Dictionary = {})
 			"%.1f" % float(row["avg_survival"] * 100.0),
 		], [16, 6, 10, 10, 10, 10]))
 
-	var filtered: Array = []
-	for row in unit_stats:
-		if int(row["appearances"]) >= min_apps:
-			filtered.append(row)
-
-	print("")
-	print("--- Highlights (min %d appearances) ---" % min_apps)
-	if filtered.is_empty():
-		filtered = unit_stats
-	_print_highlight(filtered, "Highest team win rate", "team_win_rate", true)
-	_print_highlight(filtered, "Lowest team win rate", "team_win_rate", false)
-	_print_highlight(filtered, "Most avg damage dealt", "avg_damage_dealt", true)
-	_print_highlight(filtered, "Most avg damage taken", "avg_damage_received", true)
-	_print_highlight(filtered, "Best survival", "avg_survival", true)
-
-static func make_run_dir(root: String = DEFAULT_OUT_ROOT) -> String:
-	var stamp := Time.get_datetime_string_from_system().replace(":", "-")
-	var dir := "%s/run_%s" % [root, stamp]
-	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(dir))
-	return dir
-
-static func _aggregate_unit_stats(legion_rows: Array) -> Array:
+static func aggregate_unit_stats(legion_rows: Array) -> Array:
 	var by_type: Dictionary = {}
 	for row in legion_rows:
 		var unit_type := String(row.get("unit_type", ""))
@@ -125,6 +169,43 @@ static func _aggregate_unit_stats(legion_rows: Array) -> Array:
 	)
 	return out
 
+## Paired sign test input: a mirrored pair is won by whoever scored more than 1 point of 2.
+## Split pairs (1-1) mean the draft, not the brain, decided both games.
+static func decisive_pairs(batch: Dictionary) -> Dictionary:
+	var wins := 0
+	var losses := 0
+	var split := 0
+	for row in batch.get("pair_rows", []):
+		var points := float(row.get("brain_a_points", 1.0))
+		if points > 1.0 + 0.001:
+			wins += 1
+		elif points < 1.0 - 0.001:
+			losses += 1
+		else:
+			split += 1
+	return {"wins": wins, "losses": losses, "split": split}
+
+## Brain A match points: win = 1, draw = 0.5.
+static func score_points(batch: Dictionary) -> float:
+	return float(batch.get("brain_a_wins", 0)) + 0.5 * float(batch.get("draws", 0))
+
+## Wilson score interval for a binomial proportion; z=1.96 is 95%.
+static func wilson_interval(successes: float, n: int, z: float = 1.96) -> Vector2:
+	if n <= 0:
+		return Vector2(0.0, 1.0)
+	var p := successes / float(n)
+	var z2 := z * z
+	var denom := 1.0 + z2 / float(n)
+	var center := (p + z2 / (2.0 * float(n))) / denom
+	var half := z * sqrt(p * (1.0 - p) / float(n) + z2 / (4.0 * float(n) * float(n))) / denom
+	return Vector2(clampf(center - half, 0.0, 1.0), clampf(center + half, 0.0, 1.0))
+
+static func make_run_dir(root: String = DEFAULT_OUT_ROOT) -> String:
+	var stamp := Time.get_datetime_string_from_system().replace(":", "-")
+	var dir := "%s/run_%s" % [root, stamp]
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(dir))
+	return dir
+
 static func _print_highlight(rows: Array, title: String, field: String, higher_is_better: bool) -> void:
 	if rows.is_empty():
 		return
@@ -144,8 +225,11 @@ static func _print_highlight(rows: Array, title: String, field: String, higher_i
 
 static func _write_matches_csv(path: String, rows: Array) -> void:
 	var headers := [
-		"game_id", "map_size", "budget", "map_seed", "combat_seed",
-		"team_turns", "elapsed_ms", "winner", "timed_out",
+		"game_id", "pair_index", "mirror_index", "a_is_green",
+		"brain_a", "brain_b", "green_brain", "blue_brain",
+		"map_size", "budget", "map_seed", "combat_seed",
+		"team_turns", "elapsed_ms", "winner", "timed_out", "stale_draw",
+		"curriculum_stage", "draft_mode",
 		"survivors_green", "survivors_blue",
 		"green_legions", "blue_legions",
 		"green_draft", "blue_draft",
@@ -154,6 +238,13 @@ static func _write_matches_csv(path: String, rows: Array) -> void:
 	for row in rows:
 		lines.append(_csv_line([
 			row.get("game_id", 0),
+			row.get("pair_index", 0),
+			row.get("mirror_index", 0),
+			row.get("a_is_green", true),
+			row.get("brain_a", ""),
+			row.get("brain_b", ""),
+			row.get("green_brain", ""),
+			row.get("blue_brain", ""),
 			row.get("map_size", 0),
 			row.get("budget", 0),
 			row.get("map_seed", 0),
@@ -162,6 +253,9 @@ static func _write_matches_csv(path: String, rows: Array) -> void:
 			row.get("elapsed_ms", 0),
 			row.get("winner", ""),
 			row.get("timed_out", false),
+			row.get("stale_draw", false),
+			row.get("curriculum_stage", ""),
+			row.get("draft_mode", ""),
 			row.get("survivors_green", 0),
 			row.get("survivors_blue", 0),
 			row.get("green_legions", 0),

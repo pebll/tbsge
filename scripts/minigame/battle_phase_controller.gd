@@ -2,11 +2,13 @@ class_name BattlePhaseController
 extends RefCounted
 
 const MinigameSessionScript = preload("res://scripts/minigame/minigame_session.gd")
+const AiBrainRegistry = preload("res://scripts/ai/ai_brain_registry.gd")
 const AttackNearestEnemyBehavior = preload("res://scripts/ai/behaviors/attack_nearest_enemy.gd")
 const BattleInputLockScript = preload("res://scripts/battle/battle_input_lock.gd")
 const BattleHostWiringScript = preload("res://scripts/battle/battle_host_wiring.gd")
 const BattleActionLogFormatterScript = preload("res://scripts/battle/battle_action_log_formatter.gd")
 const MatchBattleStats = preload("res://scripts/battle/match_battle_stats.gd")
+const AiBrainCommand = preload("res://scripts/ai/ai_brain_command.gd")
 
 const AI_LEGION_DELAY := 0.5
 
@@ -16,6 +18,7 @@ var deps: MinigamePhaseDeps
 var ai_running: bool = false
 var _lock: BattleInputLockScript = BattleInputLockScript.new()
 var battle_stats: MatchBattleStats = MatchBattleStats.new()
+var ai_brain: AiBrain = AiBrainRegistry.create("utility")
 
 func _init(phase_deps: MinigamePhaseDeps) -> void:
 	deps = phase_deps
@@ -280,7 +283,7 @@ func _run_ai_turn_async() -> void:
 		deps.session.phase == MinigameSessionScript.Phase.BATTLE
 		and deps.is_ai_team(deps.session.turn_manager.active_team_id)
 	):
-		var actionable := AttackNearestEnemyBehavior.sort_actionable_by_enemy_distance(
+		var actionable := ai_brain.sort_actionable(
 			deps.session,
 			deps.session.get_actionable_coords()
 		)
@@ -310,7 +313,7 @@ func _run_ai_turn_async() -> void:
 			await deps.host.get_tree().create_timer(AI_LEGION_DELAY).timeout
 			continue
 
-		var cmd: Dictionary = AttackNearestEnemyBehavior.decide(deps.session, legion)
+		var cmd: Dictionary = ai_brain.decide(deps.session, legion)
 		match String(cmd.get("type", "")):
 			"use_action":
 				var action_id := String(cmd.get("action_id", ""))
@@ -326,6 +329,11 @@ func _run_ai_turn_async() -> void:
 						int(cmd.get("rng_seed", randi()))
 					)
 					ok = step.get("ok", false)
+				if ok and AiBrainCommand.has_followup(cmd):
+					var follow: Dictionary = AiBrainCommand.apply_followup_if_any(
+						deps.session, cmd, legion, randi()
+					)
+					ok = ok and bool(follow.get("ok", true))
 				if not ok:
 					if AttackNearestEnemyBehavior.debug_enabled:
 						print("[AI] action failed for %s @ %s, passing legion" % [legion.team_id, coords])

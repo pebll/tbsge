@@ -16,3 +16,11 @@ export_credentials.cfg
 .mono/
 data_*/
 mono_crash.*.json
+
+# AI evolve/duel run outputs (tests and local experiments)
+data/ai/evolve/_test_*/
+data/ai/evolve/cascade/
+data/ai/evolve/cascade_m/
+data/ai/evolve/*/plots/
+data/ai_duel/
+data/**/*.csv.import

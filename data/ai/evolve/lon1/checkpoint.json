@@ -1,0 +1,632 @@
+{
+	"archive": {
+		"bins_x": 5,
+		"bins_y": 5,
+		"cells": {
+			"0_0": {
+				"descriptor": {
+					"aggression": 0.151515151515152,
+					"risk": 0.181818181818182,
+					"support_focus": 0.4
+				},
+				"evaluations": 31,
+				"fitness": 1.07375,
+				"genome": {
+					"weights": {
+						"closer_to_focus": 7.30496280193328,
+						"enables_attack": 5.5,
+						"enemy_kill_frac": 6.71122934222221,
+						"enemy_loss_frac": 4.86385661363602,
+						"enemy_loss_spread": 0.171685433387756,
+						"focus_low_hp": 2.55763286352158,
+						"focus_support": 1.62289877831936,
+						"heal_efficiency": 3.0,
+						"heal_urgency": 3.54757586121559,
+						"is_combat": 3.19499846696853,
+						"is_heal": 0.2,
+						"is_move": 1.2,
+						"is_pass": 0.41987881064415,
+						"is_teleport": -0.192351953685283,
+						"is_terminal": -0.11369042545557,
+						"kill_prob": 3.45834161639214,
+						"leftover_ap_frac": 0.5,
+						"low_hp_exposure": -4.02490993961692,
+						"net_hp_frac": 4.02233183979988,
+						"own_death_frac": -4.30915081501007,
+						"own_loss_frac": -4.30174341797829,
+						"pass_penalty": -12.0,
+						"threat_at_stand": -3.22718691080809,
+						"threat_relief": 2.5
+					}
+				}
+			},
+			"0_1": {
+				"descriptor": {
+					"aggression": 0.196078431372549,
+					"risk": 0.338779956427015,
+					"support_focus": 0.2
+				},
+				"evaluations": 51,
+				"fitness": 2.03975675675676,
+				"genome": {
+					"weights": {
+						"closer_to_focus": 7.7529145181179,
+						"enables_attack": 5.5,
+						"enemy_kill_frac": 6.71122934222221,
+						"enemy_loss_frac": 4.86385661363602,
+						"enemy_loss_spread": 0.171685433387756,
+						"focus_low_hp": 2.55763286352158,
+						"focus_support": 1.88232659101486,
+						"heal_efficiency": 3.0,
+						"heal_urgency": 3.54757586121559,
+						"is_combat": 2.7555072247982,
+						"is_heal": 0.2,
+						"is_move": 1.2,
+						"is_pass": 0.41987881064415,
+						"is_teleport": 0.623978812992573,
+						"is_terminal": -0.11369042545557,
+						"kill_prob": 4.0,
+						"leftover_ap_frac": 0.5,
+						"low_hp_exposure": -4.03115903958678,
+						"net_hp_frac": 3.5,
+						"own_death_frac": -4.30915081501007,
+						"own_loss_frac": -4.30174341797829,
+						"pass_penalty": -12.0,
+						"threat_at_stand": -3.22718691080809,
+						"threat_relief": 2.5
+					}
+				}
+			},
+			"0_2": {
+				"descriptor": {
+					"aggression": 0.170454545454545,
+					"risk": 0.407180038775131,
+					"support_focus": 0.333333333333333
+				},
+				"evaluations": 1,
+				"fitness": 1.38441666666667,
+				"genome": {
+					"weights": {
+						"closer_to_focus": 7.6131447032094,
+						"enables_attack": 5.5,
+						"enemy_kill_frac": 7.48906439095736,
+						"enemy_loss_frac": 5.32657836079597,
+						"enemy_loss_spread": -0.297448635101318,
+						"focus_low_hp": 2.40677892267704,
+						"focus_support": 2.06141318529845,
+						"heal_efficiency": 3.23903997540474,
+						"heal_urgency": 3.15698389410973,
+						"is_combat": 2.22212940454483,
+						"is_heal": 0.2,
+						"is_move": 1.2,
+						"is_pass": -0.234588792920113,
+						"is_teleport": 1.40841389074921,
+						"is_terminal": 0.209178258478642,
+						"kill_prob": 3.35689578652381,
+						"leftover_ap_frac": 1.1123962238431,
+						"low_hp_exposure": -4.30802114233375,
+						"net_hp_frac": 3.20539106288925,
+						"own_death_frac": -3.49769390821457,
+						"own_loss_frac": -4.38863737732172,
+						"pass_penalty": -11.6540765911341,
+						"threat_at_stand": -3.80053753554821,
+						"threat_relief": 2.5
+					}
+				}
+			},
+			"0_4": {
+				"descriptor": {
+					"aggression": 0.146464646464646,
+					"risk": 0.835596360541532,
+					"support_focus": 0.241379310344828
+				},
+				"evaluations": 1,
+				"fitness": 0.133561643835616,
+				"genome": {
+					"weights": {
+						"closer_to_focus": 7.90925670415163,
+						"enables_attack": 5.32267486751079,
+						"enemy_kill_frac": 6.44858111515641,
+						"enemy_loss_frac": 5.36577022075653,
+						"enemy_loss_spread": -0.5,
+						"focus_low_hp": 2.40677892267704,
+						"focus_support": 2.24143978357315,
+						"heal_efficiency": 2.92585077285767,
+						"heal_urgency": 3.28243671953678,
+						"is_combat": 2.5,
+						"is_heal": 0.2,
+						"is_move": 1.2,
+						"is_pass": 0.550853478908539,
+						"is_teleport": 1.20544429719448,
+						"is_terminal": -0.345988424122333,
+						"kill_prob": 4.11688757911324,
+						"leftover_ap_frac": 0.317789126932621,
+						"low_hp_exposure": -3.73947024568915,
+						"net_hp_frac": 3.20539106288925,
+						"own_death_frac": -4.30915081501007,
+						"own_loss_frac": -4.38863737732172,
+						"pass_penalty": -11.7873775392771,
+						"threat_at_stand": -2.98740082979202,
+						"threat_relief": 2.0961621940136
+					}
+				}
+			},
+			"1_1": {
+				"descriptor": {
+					"aggression": 0.393203883495146,
+					"risk": 0.38410598226975,
+					"support_focus": 0.827160493827161
+				},
+				"evaluations": 145,
+				"fitness": 2.79292612304085,
+				"genome": {
+					"weights": {
+						"closer_to_focus": 7.6131447032094,
+						"enables_attack": 5.5,
+						"enemy_kill_frac": 6.90950536727905,
+						"enemy_loss_frac": 5.32657836079597,
+						"enemy_loss_spread": -0.5,
+						"focus_low_hp": 2.40677892267704,
+						"focus_support": 2.27447337508202,
+						"heal_efficiency": 3.23903997540474,
+						"heal_urgency": 3.54757586121559,
+						"is_combat": 2.5,
+						"is_heal": 0.2,
+						"is_move": 1.2,
+						"is_pass": 0.41987881064415,
+						"is_teleport": 1.31463499516249,
+						"is_terminal": -0.138560424745083,
+						"kill_prob": 4.07289198040962,
+						"leftover_ap_frac": 0.613452623784542,
+						"low_hp_exposure": -3.73947024568915,
+						"net_hp_frac": 3.20539106288925,
+						"own_death_frac": -4.30915081501007,
+						"own_loss_frac": -4.38863737732172,
+						"pass_penalty": -11.9436532914639,
+						"threat_at_stand": -3.11852129995823,
+						"threat_relief": 2.5
+					}
+				}
+			},
+			"1_2": {
+				"descriptor": {
+					"aggression": 0.390804597701149,
+					"risk": 0.454641909814324,
+					"support_focus": 0.5
+				},
+				"evaluations": 163,
+				"fitness": 2.29737671232877,
+				"genome": {
+					"weights": {
+						"closer_to_focus": 7.62200864106416,
+						"enables_attack": 5.00922996401787,
+						"enemy_kill_frac": 6.26680411696434,
+						"enemy_loss_frac": 4.78228027746082,
+						"enemy_loss_spread": 0.171685433387756,
+						"focus_low_hp": 1.86132862567902,
+						"focus_support": 1.77294117063284,
+						"heal_efficiency": 3.0,
+						"heal_urgency": 3.28442001342773,
+						"is_combat": 2.7555072247982,
+						"is_heal": 0.2,
+						"is_move": 1.2,
+						"is_pass": 0.41987881064415,
+						"is_teleport": 0.623978812992573,
+						"is_terminal": -0.11369042545557,
+						"kill_prob": 3.9571885176003,
+						"leftover_ap_frac": 0.5,
+						"low_hp_exposure": -4.70038918480277,
+						"net_hp_frac": 3.5,
+						"own_death_frac": -4.30915081501007,
+						"own_loss_frac": -4.78541674613953,
+						"pass_penalty": -12.0,
+						"threat_at_stand": -3.22718691080809,
+						"threat_relief": 2.33296348750591
+					}
+				}
+			},
+			"1_3": {
+				"descriptor": {
+					"aggression": 0.30952380952381,
+					"risk": 0.606242398736211,
+					"support_focus": 0.5
+				},
+				"evaluations": 45,
+				"fitness": 2.05436643835616,
+				"genome": {
+					"weights": {
+						"closer_to_focus": 7.5336231328547,
+						"enables_attack": 5.2433368742466,
+						"enemy_kill_frac": 6.53381289839744,
+						"enemy_loss_frac": 5.32657836079597,
+						"enemy_loss_spread": -0.813290423154831,
+						"focus_low_hp": 2.77838246077299,
+						"focus_support": 1.21704726219177,
+						"heal_efficiency": 3.1028646029532,
+						"heal_urgency": 3.54757586121559,
+						"is_combat": 2.7555072247982,
+						"is_heal": 0.2,
+						"is_move": 0.889535868167877,
+						"is_pass": 0.41987881064415,
+						"is_teleport": 0.623978812992573,
+						"is_terminal": 0.327859170734882,
+						"kill_prob": 3.37177106440067,
+						"leftover_ap_frac": 0.5,
+						"low_hp_exposure": -4.09372766539455,
+						"net_hp_frac": 3.5,
+						"own_death_frac": -4.30915081501007,
+						"own_loss_frac": -4.30174341797829,
+						"pass_penalty": -12.0,
+						"threat_at_stand": -3.22718691080809,
+						"threat_relief": 2.5
+					}
+				}
+			},
+			"1_4": {
+				"descriptor": {
+					"aggression": 0.205882352941176,
+					"risk": 0.820069374460953,
+					"support_focus": 0.738095238095238
+				},
+				"evaluations": 1,
+				"fitness": 0.391726598173516,
+				"genome": {
+					"weights": {
+						"closer_to_focus": 7.04606304913759,
+						"enables_attack": 5.44430021047592,
+						"enemy_kill_frac": 6.74078859165311,
+						"enemy_loss_frac": 4.93949360847473,
+						"enemy_loss_spread": -0.5,
+						"focus_low_hp": 2.40677892267704,
+						"focus_support": 1.45266638994217,
+						"heal_efficiency": 1.93970533013344,
+						"heal_urgency": 3.28243671953678,
+						"is_combat": 2.32244983315468,
+						"is_heal": 0.2,
+						"is_move": 0.889535868167877,
+						"is_pass": 0.550853478908539,
+						"is_teleport": 1.4258458390832,
+						"is_terminal": 0.572675229609012,
+						"kill_prob": 4.14578078985214,
+						"leftover_ap_frac": 0.613452623784542,
+						"low_hp_exposure": -4.30802114233375,
+						"net_hp_frac": 3.31186211416498,
+						"own_death_frac": -4.56387299597263,
+						"own_loss_frac": -4.14566242992878,
+						"pass_penalty": -11.9137966021896,
+						"threat_at_stand": -2.98740082979202,
+						"threat_relief": 1.86693747788668
+					}
+				}
+			},
+			"2_0": {
+				"descriptor": {
+					"aggression": 0.502040816326531,
+					"risk": 0.121300492107768,
+					"support_focus": 0.869918699186992
+				},
+				"evaluations": 1,
+				"fitness": 1.19084968530174,
+				"genome": {
+					"weights": {
+						"closer_to_focus": 7.04776171222329,
+						"enables_attack": 5.53337822817266,
+						"enemy_kill_frac": 6.95037032179534,
+						"enemy_loss_frac": 5.68737854957581,
+						"enemy_loss_spread": -0.5,
+						"focus_low_hp": 3.09542099833488,
+						"focus_support": 1.45266638994217,
+						"heal_efficiency": 2.86521432995796,
+						"heal_urgency": 3.54757586121559,
+						"is_combat": 2.5,
+						"is_heal": 0.2,
+						"is_move": 0.889535868167877,
+						"is_pass": 0.0660818278789521,
+						"is_teleport": 0.90831782668829,
+						"is_terminal": 0.327859170734882,
+						"kill_prob": 4.14578078985214,
+						"leftover_ap_frac": 0.327769891917706,
+						"low_hp_exposure": -4.30802114233375,
+						"net_hp_frac": 3.20539106288925,
+						"own_death_frac": -4.56387299597263,
+						"own_loss_frac": -4.03881302177906,
+						"pass_penalty": -11.3835773050785,
+						"threat_at_stand": -3.03255232423544,
+						"threat_relief": 1.86693747788668
+					}
+				}
+			},
+			"2_1": {
+				"descriptor": {
+					"aggression": 0.412213740458015,
+					"risk": 0.395238064848075,
+					"support_focus": 0.444444444444444
+				},
+				"evaluations": 1,
+				"fitness": 2.12774389115143,
+				"genome": {
+					"weights": {
+						"closer_to_focus": 6.93032813742757,
+						"enables_attack": 5.24427892528474,
+						"enemy_kill_frac": 6.95037032179534,
+						"enemy_loss_frac": 5.16646075248719,
+						"enemy_loss_spread": 0.0221785485744476,
+						"focus_low_hp": 3.09542099833488,
+						"focus_support": 1.45266638994217,
+						"heal_efficiency": 2.77195247411728,
+						"heal_urgency": 3.49501525610685,
+						"is_combat": 2.64869790226221,
+						"is_heal": -0.101176995038986,
+						"is_move": 0.899730795994401,
+						"is_pass": 0.807153362035751,
+						"is_teleport": 0.90831782668829,
+						"is_terminal": 0.670066373050213,
+						"kill_prob": 3.63661801815033,
+						"leftover_ap_frac": 0.180034336447716,
+						"low_hp_exposure": -4.57390055879951,
+						"net_hp_frac": 3.15207486534491,
+						"own_death_frac": -4.56387299597263,
+						"own_loss_frac": -3.80421708896756,
+						"pass_penalty": -11.7610577404499,
+						"threat_at_stand": -3.43364811986685,
+						"threat_relief": 1.86693747788668
+					}
+				}
+			},
+			"2_2": {
+				"descriptor": {
+					"aggression": 0.454545454545455,
+					"risk": 0.535862528084136,
+					"support_focus": 0.45
+				},
+				"evaluations": 188,
+				"fitness": 2.94254658768357,
+				"genome": {
+					"weights": {
+						"closer_to_focus": 7.04776171222329,
+						"enables_attack": 5.24427892528474,
+						"enemy_kill_frac": 6.95037032179534,
+						"enemy_loss_frac": 5.68737854957581,
+						"enemy_loss_spread": -0.5,
+						"focus_low_hp": 3.09542099833488,
+						"focus_support": 1.45266638994217,
+						"heal_efficiency": 2.86521432995796,
+						"heal_urgency": 3.49501525610685,
+						"is_combat": 2.64869790226221,
+						"is_heal": -0.101176995038986,
+						"is_move": 0.889535868167877,
+						"is_pass": 0.0660818278789521,
+						"is_teleport": 0.90831782668829,
+						"is_terminal": 0.327859170734882,
+						"kill_prob": 4.14578078985214,
+						"leftover_ap_frac": 0.327769891917706,
+						"low_hp_exposure": -4.57390055879951,
+						"net_hp_frac": 3.15207486534491,
+						"own_death_frac": -4.56387299597263,
+						"own_loss_frac": -4.06740689948201,
+						"pass_penalty": -11.3835773050785,
+						"threat_at_stand": -3.03255232423544,
+						"threat_relief": 1.86693747788668
+					}
+				}
+			},
+			"2_3": {
+				"descriptor": {
+					"aggression": 0.5125,
+					"risk": 0.725355747372045,
+					"support_focus": 0.585365853658537
+				},
+				"evaluations": 156,
+				"fitness": 2.83129956497593,
+				"genome": {
+					"weights": {
+						"closer_to_focus": 7.6131447032094,
+						"enables_attack": 5.05114656090736,
+						"enemy_kill_frac": 6.74078859165311,
+						"enemy_loss_frac": 4.93949360847473,
+						"enemy_loss_spread": -0.5,
+						"focus_low_hp": 2.40677892267704,
+						"focus_support": 1.87206112742424,
+						"heal_efficiency": 2.92585077285767,
+						"heal_urgency": 3.28243671953678,
+						"is_combat": 2.5,
+						"is_heal": 0.2,
+						"is_move": 1.2,
+						"is_pass": 0.550853478908539,
+						"is_teleport": 1.31463499516249,
+						"is_terminal": -0.345988424122333,
+						"kill_prob": 4.11688757911324,
+						"leftover_ap_frac": 0.613452623784542,
+						"low_hp_exposure": -3.73947024568915,
+						"net_hp_frac": 3.20539106288925,
+						"own_death_frac": -4.30915081501007,
+						"own_loss_frac": -4.38863737732172,
+						"pass_penalty": -11.7873775392771,
+						"threat_at_stand": -2.98740082979202,
+						"threat_relief": 2.0961621940136
+					}
+				}
+			},
+			"3_1": {
+				"descriptor": {
+					"aggression": 0.747899159663866,
+					"risk": 0.329787561459287,
+					"support_focus": 0.887640449438202
+				},
+				"evaluations": 1,
+				"fitness": 1.40433390410959,
+				"genome": {
+					"weights": {
+						"closer_to_focus": 7.89096514731646,
+						"enables_attack": 5.5,
+						"enemy_kill_frac": 6.70634712725878,
+						"enemy_loss_frac": 5.32657836079597,
+						"enemy_loss_spread": -0.297448635101318,
+						"focus_low_hp": 2.40677892267704,
+						"focus_support": 2.06141318529845,
+						"heal_efficiency": 3.23903997540474,
+						"heal_urgency": 3.15698389410973,
+						"is_combat": 2.22212940454483,
+						"is_heal": 0.2,
+						"is_move": 1.23171595297754,
+						"is_pass": -0.234588792920113,
+						"is_teleport": 1.40841389074921,
+						"is_terminal": 0.0101426824927335,
+						"kill_prob": 3.35689578652381,
+						"leftover_ap_frac": 1.1123962238431,
+						"low_hp_exposure": -4.42549640908838,
+						"net_hp_frac": 3.20539106288925,
+						"own_death_frac": -3.80474993884564,
+						"own_loss_frac": -4.38863737732172,
+						"pass_penalty": -11.6540765911341,
+						"threat_at_stand": -3.80053753554821,
+						"threat_relief": 2.5
+					}
+				}
+			},
+			"3_2": {
+				"descriptor": {
+					"aggression": 0.644444444444444,
+					"risk": 0.592570876095031,
+					"support_focus": 0.46551724137931
+				},
+				"evaluations": 2,
+				"fitness": 1.79128099160805,
+				"genome": {
+					"weights": {
+						"closer_to_focus": 7.6131447032094,
+						"enables_attack": 5.5,
+						"enemy_kill_frac": 6.95037032179534,
+						"enemy_loss_frac": 5.32657836079597,
+						"enemy_loss_spread": -0.5,
+						"focus_low_hp": 2.40677892267704,
+						"focus_support": 2.43540092557669,
+						"heal_efficiency": 3.31465259864926,
+						"heal_urgency": 3.54757586121559,
+						"is_combat": 2.5,
+						"is_heal": 0.2,
+						"is_move": 1.12839372158051,
+						"is_pass": 0.41987881064415,
+						"is_teleport": 1.37412775158882,
+						"is_terminal": -0.138560424745083,
+						"kill_prob": 3.57276742458343,
+						"leftover_ap_frac": 0.327769891917706,
+						"low_hp_exposure": -4.30802114233375,
+						"net_hp_frac": 3.20539106288925,
+						"own_death_frac": -4.30915081501007,
+						"own_loss_frac": -4.38863737732172,
+						"pass_penalty": -11.9697385560721,
+						"threat_at_stand": -3.11852129995823,
+						"threat_relief": 2.5
+					}
+				}
+			},
+			"3_3": {
+				"descriptor": {
+					"aggression": 0.60377358490566,
+					"risk": 0.675214373555977,
+					"support_focus": 0.53125
+				},
+				"evaluations": 9,
+				"fitness": 2.28319141058867,
+				"genome": {
+					"weights": {
+						"closer_to_focus": 7.6131447032094,
+						"enables_attack": 5.40531496405602,
+						"enemy_kill_frac": 8.13313654214144,
+						"enemy_loss_frac": 5.32657836079597,
+						"enemy_loss_spread": -0.472369246184826,
+						"focus_low_hp": 2.40677892267704,
+						"focus_support": 2.06141318529845,
+						"heal_efficiency": 3.48941688835621,
+						"heal_urgency": 3.15698389410973,
+						"is_combat": 2.22212940454483,
+						"is_heal": 0.2,
+						"is_move": 0.800310111045837,
+						"is_pass": -0.234588792920113,
+						"is_teleport": 1.40841389074921,
+						"is_terminal": 0.293058948963881,
+						"kill_prob": 3.35689578652381,
+						"leftover_ap_frac": 1.1123962238431,
+						"low_hp_exposure": -4.30802114233375,
+						"net_hp_frac": 3.20539106288925,
+						"own_death_frac": -3.49769390821457,
+						"own_loss_frac": -4.38863737732172,
+						"pass_penalty": -11.4284215390683,
+						"threat_at_stand": -3.80053753554821,
+						"threat_relief": 2.5
+					}
+				}
+			}
+		}
+	},
+	"archive_size": 15,
+	"best_fitness": 2.94254658768357,
+	"best_weights": {
+		"closer_to_focus": 7.04776171222329,
+		"enables_attack": 5.24427892528474,
+		"enemy_kill_frac": 6.95037032179534,
+		"enemy_loss_frac": 5.68737854957581,
+		"enemy_loss_spread": -0.5,
+		"focus_low_hp": 3.09542099833488,
+		"focus_support": 1.45266638994217,
+		"heal_efficiency": 2.86521432995796,
+		"heal_urgency": 3.49501525610685,
+		"is_combat": 2.64869790226221,
+		"is_heal": -0.101176995038986,
+		"is_move": 0.889535868167877,
+		"is_pass": 0.0660818278789521,
+		"is_teleport": 0.90831782668829,
+		"is_terminal": 0.327859170734882,
+		"kill_prob": 4.14578078985214,
+		"leftover_ap_frac": 0.327769891917706,
+		"low_hp_exposure": -4.57390055879951,
+		"net_hp_frac": 3.15207486534491,
+		"own_death_frac": -4.56387299597263,
+		"own_loss_frac": -4.06740689948201,
+		"pass_penalty": -11.3835773050785,
+		"threat_at_stand": -3.03255232423544,
+		"threat_relief": 1.86693747788668
+	},
+	"config": {
+		"arena_opponents": 3.0,
+		"arena_pairs": 2.0,
+		"budget": 75.0,
+		"map_size": 3.0,
+		"pairs": 2.0,
+		"pop": 12.0,
+		"seed": 42.0
+	},
+	"evaluations": 1332,
+	"generations_completed": 110,
+	"last_metrics": {
+		"archive_size": 15,
+		"arena_ms": 5190,
+		"best_fitness": 2.94254658768357,
+		"evaluations": 1332,
+		"gen": 110,
+		"match_stats": {
+			"games": 16,
+			"other_draws": 0,
+			"stale_draws": 13,
+			"team_turns_sum": 197,
+			"timeouts": 0
+		},
+		"opponents": 3,
+		"time": "2026-08-21T22:13:08",
+		"vs_arena": 0.517694063926941,
+		"vs_arena_fitness": 0.517694063926941,
+		"vs_cascade": 0.625,
+		"vs_cascade_fitness": 1.64371347031963
+	},
+	"match_stats": {
+		"games": 4736,
+		"other_draws": 0,
+		"stale_draws": 1420,
+		"team_turns_sum": 59865,
+		"timeouts": 9
+	},
+	"rng_state": 2312165590168906784,
+	"target_gen": 158,
+	"version": 1
+}

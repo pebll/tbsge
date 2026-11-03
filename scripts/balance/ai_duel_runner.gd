@@ -1,12 +1,19 @@
 class_name AiDuelRunner
 extends RefCounted
 
-## Headless full-match AI vs AI (random draft + attack-nearest battle).
+## Headless full-match AI vs AI (random draft + pluggable brains).
+## With mirror=true, each seed runs twice with brains swapped on the same drafts.
 
+const UtilityBrain = preload("res://scripts/ai/brains/utility_brain.gd")
+const AiBrainRegistry = preload("res://scripts/ai/ai_brain_registry.gd")
 const AiDrafter = preload("res://scripts/ai/ai_drafter.gd")
 const AiDuelReport = preload("res://scripts/balance/ai_duel_report.gd")
 const AttackNearestEnemyBehavior = preload("res://scripts/ai/behaviors/attack_nearest_enemy.gd")
+const CombatExpectation = preload("res://scripts/ai/expectation/combat_expectation.gd")
 const CombatResolver = preload("res://scripts/core/combat_resolver.gd")
+const DraftScenarioScript = preload("res://scripts/ai/curriculum/draft_scenario.gd")
+const AiDuelTraceScript = preload("res://scripts/ai/evolution/ai_duel_trace.gd")
+const AiBrainCommand = preload("res://scripts/ai/ai_brain_command.gd")
 const MapBuilderScript = preload("res://scripts/minigame/map_builder.gd")
 const MatchBattleStats = preload("res://scripts/battle/match_battle_stats.gd")
 const MinigameConfigScript = preload("res://scripts/minigame/minigame_config.gd")
@@ -14,79 +21,178 @@ const MinigameSessionScript = preload("res://scripts/minigame/minigame_session.g
 const MinigameRulesScript = preload("res://scripts/minigame/minigame_rules.gd")
 
 const MAX_TEAM_TURNS := 200
+const AiMatchScore = preload("res://scripts/ai/evolution/ai_match_score.gd")
 
 static func run_batch(
-	games: int,
+	pair_count: int,
 	map_size: int,
 	budget: int,
 	verbose: bool = false,
-	out_dir: String = ""
+	out_dir: String = "",
+	brain_a_id: String = "cascade",
+	brain_b_id: String = "cascade",
+	mirror: bool = true,
+	seed_offset: int = 0,
+	play_sims: bool = false
 ) -> Dictionary:
-	var prev_ai_debug := AttackNearestEnemyBehavior.debug_enabled
-	var prev_combat_quiet := CombatResolver.quiet
-	AttackNearestEnemyBehavior.debug_enabled = false
-	CombatResolver.quiet = true
+	var headless := begin_headless()
 
+	var brain_a: AiBrain = AiBrainRegistry.create(brain_a_id)
+	var brain_b: AiBrain = AiBrainRegistry.create(brain_b_id)
+	# Fitness / batch eval: cheap MC. Benchmarks pass play_sims to measure the shipped N.
+	var sims := CombatExpectation.PLAY_SIM_COUNT if play_sims else CombatExpectation.TRAIN_SIM_COUNT
+	for brain in [brain_a, brain_b]:
+		if brain is UtilityBrain:
+			(brain as UtilityBrain).sim_count = sims
+
+	var brain_a_wins := 0
+	var brain_b_wins := 0
+	var draws := 0
 	var green_wins := 0
 	var blue_wins := 0
-	var draws := 0
+	var color_draws := 0
 	var total_turns := 0
 	var timeouts := 0
 	var match_rows: Array = []
 	var legion_rows: Array = []
+	var pair_rows: Array = []
+	var brain_a_pair_points := 0.0
+
+	var matches_per_pair := 2 if mirror else 1
+	var total_matches := pair_count * matches_per_pair
+	var game_serial := 0
 
 	var batch_start := Time.get_ticks_msec()
-	print("Running %d AI vs AI games (map r%d, budget %d)..." % [games, map_size, budget])
+	print(
+		"Running %d seed(s) × %d (%s vs %s, map r%d, budget %d)..."
+		% [pair_count, matches_per_pair, brain_a.id, brain_b.id, map_size, budget]
+	)
 
-	for i in range(games):
-		var t0 := Time.get_ticks_msec()
-		var result: Dictionary = run_one(i, map_size, budget)
-		result["elapsed_ms"] = Time.get_ticks_msec() - t0
-		total_turns += int(result.get("team_turns", 0))
+	for pair_i in range(pair_count):
+		var pair_a_points := 0.0
+		var pair_match_winners: Array[String] = []
 
-		if not result.get("match_row", {}).is_empty():
-			var mr: Dictionary = result["match_row"]
-			mr["elapsed_ms"] = int(result.get("elapsed_ms", 0))
-			match_rows.append(mr)
-		for leg_row in result.get("legion_rows", []):
-			legion_rows.append(leg_row)
+		for mirror_i in range(matches_per_pair):
+			var a_is_green := mirror_i == 0
+			var green_brain: AiBrain = brain_a if a_is_green else brain_b
+			var blue_brain: AiBrain = brain_b if a_is_green else brain_a
+			var t0 := Time.get_ticks_msec()
+			var result: Dictionary = run_one(
+				seed_offset + pair_i, map_size, budget, green_brain, blue_brain
+			)
+			result["elapsed_ms"] = Time.get_ticks_msec() - t0
+			result["pair_index"] = pair_i
+			result["mirror_index"] = mirror_i
+			result["a_is_green"] = a_is_green
+			result["brain_a"] = brain_a.id
+			result["brain_b"] = brain_b.id
+			result["green_brain"] = green_brain.id
+			result["blue_brain"] = blue_brain.id
+			total_turns += int(result.get("team_turns", 0))
+			game_serial += 1
 
-		if result.get("timed_out", false):
-			timeouts += 1
-			draws += 1
-		elif String(result.get("winner", "")) == "GREEN":
-			green_wins += 1
-		elif String(result.get("winner", "")) == "BLUE":
-			blue_wins += 1
-		else:
-			draws += 1
-		if verbose:
-			var tag := String(result.get("winner", ""))
-			if tag.is_empty():
-				tag = "DRAW"
-			if result.get("timed_out", false):
-				tag = "TIMEOUT"
-			print("  Game %d: %s in %d turns (G:%d B:%d) [%dms]" % [
-				i + 1, tag, int(result.get("team_turns", 0)),
-				int(result.get("survivors_green", 0)), int(result.get("survivors_blue", 0)),
-				int(result.get("elapsed_ms", 0)),
-			])
+			if not result.get("match_row", {}).is_empty():
+				var mr: Dictionary = result["match_row"]
+				mr["elapsed_ms"] = int(result.get("elapsed_ms", 0))
+				mr["game_id"] = game_serial
+				mr["pair_index"] = pair_i + 1
+				mr["mirror_index"] = mirror_i
+				mr["a_is_green"] = a_is_green
+				mr["brain_a"] = brain_a.id
+				mr["brain_b"] = brain_b.id
+				mr["green_brain"] = green_brain.id
+				mr["blue_brain"] = blue_brain.id
+				match_rows.append(mr)
+			for leg_row in result.get("legion_rows", []):
+				leg_row["game_id"] = game_serial
+				legion_rows.append(leg_row)
 
-	AttackNearestEnemyBehavior.debug_enabled = prev_ai_debug
-	CombatResolver.quiet = prev_combat_quiet
+			var winner_team := String(result.get("winner", ""))
+			var timed_out := bool(result.get("timed_out", false))
+			var stale_draw := bool(result.get("stale_draw", false))
+			if timed_out:
+				timeouts += 1
+
+			var brain_winner := ""
+			if timed_out or stale_draw or winner_team.is_empty():
+				draws += 1
+				color_draws += 1
+				pair_a_points += 0.5
+				brain_winner = "DRAW"
+			elif winner_team == "GREEN":
+				green_wins += 1
+				if a_is_green:
+					brain_a_wins += 1
+					pair_a_points += 1.0
+					brain_winner = brain_a.id
+				else:
+					brain_b_wins += 1
+					brain_winner = brain_b.id
+			elif winner_team == "BLUE":
+				blue_wins += 1
+				if a_is_green:
+					brain_b_wins += 1
+					brain_winner = brain_b.id
+				else:
+					brain_a_wins += 1
+					pair_a_points += 1.0
+					brain_winner = brain_a.id
+			else:
+				draws += 1
+				color_draws += 1
+				pair_a_points += 0.5
+				brain_winner = "DRAW"
+
+			pair_match_winners.append(brain_winner)
+
+			if verbose:
+				var tag := brain_winner
+				if timed_out:
+					tag = "TIMEOUT"
+				elif stale_draw:
+					tag = "STALE_DRAW"
+				print("  Pair %d mirror %d: %s (A %s) in %d turns [%dms]" % [
+					pair_i + 1,
+					mirror_i,
+					tag,
+					"GREEN" if a_is_green else "BLUE",
+					int(result.get("team_turns", 0)),
+					int(result.get("elapsed_ms", 0)),
+				])
+
+		brain_a_pair_points += pair_a_points
+		pair_rows.append({
+			"pair_index": pair_i + 1,
+			"brain_a_points": pair_a_points,
+			"match_winners": ",".join(pair_match_winners),
+		})
+
+	end_headless(headless)
 
 	var batch := {
-		"games": games,
+		"games": total_matches,
+		"pair_count": pair_count,
+		"mirror": mirror,
+		"seed_offset": seed_offset,
+		"play_sims": play_sims,
 		"map_size": map_size,
 		"budget": budget,
+		"brain_a": brain_a.id,
+		"brain_b": brain_b.id,
+		"brain_a_wins": brain_a_wins,
+		"brain_b_wins": brain_b_wins,
+		"draws": draws,
+		"brain_a_pair_points": brain_a_pair_points,
+		"brain_a_pair_score": brain_a_pair_points / float(maxi(pair_count, 1)),
 		"green_wins": green_wins,
 		"blue_wins": blue_wins,
-		"draws": draws,
+		"color_draws": color_draws,
 		"total_turns": total_turns,
 		"timeouts": timeouts,
 		"elapsed_ms": Time.get_ticks_msec() - batch_start,
 		"match_rows": match_rows,
 		"legion_rows": legion_rows,
+		"pair_rows": pair_rows,
 		"out_dir": out_dir,
 	}
 
@@ -100,7 +206,60 @@ static func run_batch(
 static func print_report(batch: Dictionary) -> void:
 	AiDuelReport.print_extended_report(batch, batch.get("csv_paths", {}))
 
-static func run_one(game_index: int, map_size: int, budget: int) -> Dictionary:
+## Silences combat/AI log spam for headless play. These flags are process-wide statics, so only the
+## main thread may write them: call this once before dispatching parallel jobs and end_headless()
+## after they all finish. From a worker thread it is a no-op (returns {}).
+static func begin_headless() -> Dictionary:
+	if OS.get_thread_caller_id() != OS.get_main_thread_id():
+		return {}
+	var saved := {
+		"quiet": CombatResolver.quiet,
+		"ai_debug": AttackNearestEnemyBehavior.debug_enabled,
+		"expect_log": GameSettings.battle_expectation_log_timing,
+	}
+	CombatResolver.quiet = true
+	AttackNearestEnemyBehavior.debug_enabled = false
+	GameSettings.battle_expectation_log_timing = false
+	return saved
+
+static func end_headless(saved: Dictionary) -> void:
+	if saved.is_empty():
+		return
+	CombatResolver.quiet = bool(saved["quiet"])
+	AttackNearestEnemyBehavior.debug_enabled = bool(saved["ai_debug"])
+	GameSettings.battle_expectation_log_timing = bool(saved["expect_log"])
+
+static func run_one(
+	game_index: int,
+	map_size: int,
+	budget: int,
+	green_brain: AiBrain = null,
+	blue_brain: AiBrain = null,
+	draft_scenario: DraftScenarioScript = null,
+	stale_idle_turns: int = 0
+) -> Dictionary:
+	# Headless duels silence combat hit spam + AI debug; on a worker the dispatcher already did.
+	var headless := begin_headless()
+	var result: Dictionary = _run_one_impl(
+		game_index, map_size, budget, green_brain, blue_brain, draft_scenario, stale_idle_turns
+	)
+	end_headless(headless)
+	return result
+
+static func _run_one_impl(
+	game_index: int,
+	map_size: int,
+	budget: int,
+	green_brain: AiBrain = null,
+	blue_brain: AiBrain = null,
+	draft_scenario: DraftScenarioScript = null,
+	stale_idle_turns: int = 0
+) -> Dictionary:
+	if green_brain == null:
+		green_brain = AiBrainRegistry.create("cascade")
+	if blue_brain == null:
+		blue_brain = AiBrainRegistry.create("cascade")
+
 	var empty := _empty_result(game_index, map_size, budget)
 	var config: MinigameConfigScript = MinigameConfigScript.new()
 	config.map_radius = map_size
@@ -114,37 +273,71 @@ static func run_one(game_index: int, map_size: int, budget: int) -> Dictionary:
 	var map_seed := game_index * 7919 + 42
 	var combat_seed := map_seed ^ 0xDEAD
 	var session: MinigameSessionScript = MinigameSessionScript.new(config)
+	# Worker threads must not touch the EventBus autoload, and nothing listens during a duel.
+	session.emit_global_events = false
 	session.grid = MapBuilderScript.build_grid(config.map_radius, map_seed, config.team_ids)
 	session.refresh_deploy_slots()
 
 	var rng := RandomNumberGenerator.new()
 	rng.seed = map_seed
 
-	for team_id in config.team_ids:
-		for cmd in AiDrafter.build_draft_commands(session, team_id, rng):
-			var r: Dictionary = session.apply(cmd)
-			if not r.get("ok", false):
-				return empty
+	var draft_err := DraftScenarioScript.apply_drafts(session, config.team_ids, rng, draft_scenario)
+	if not draft_err.is_empty():
+		AiDuelTraceScript.draft_fail(draft_err, game_index)
+		var failed: Dictionary = empty.duplicate(true)
+		failed["fail_reason"] = draft_err
+		failed["draft_failed"] = true
+		failed["game_index"] = game_index
+		AiDuelTraceScript.match_end(failed, green_brain.id, blue_brain.id)
+		return failed
 
 	if session.phase != MinigameSessionScript.Phase.BATTLE:
-		return empty
+		var phase_err := "Expected battle phase after draft, got phase %d" % int(session.phase)
+		AiDuelTraceScript.draft_fail(phase_err, game_index)
+		var failed: Dictionary = empty.duplicate(true)
+		failed["fail_reason"] = phase_err
+		failed["draft_failed"] = true
+		failed["game_index"] = game_index
+		AiDuelTraceScript.match_end(failed, green_brain.id, blue_brain.id)
+		return failed
+
+	for legion in session.legions:
+		legion.emit_global_events = false
+	AiDuelTraceScript.reset_game()
 
 	var tracker := MatchBattleStats.new()
 	tracker.begin(session)
 	var combat_rng := RandomNumberGenerator.new()
 	combat_rng.seed = combat_seed
 
+	var gold_start_green := AiMatchScore.team_living_gold(session, "GREEN")
+	var gold_start_blue := AiMatchScore.team_living_gold(session, "BLUE")
+
 	var team_turns := 0
 	var timed_out := false
+	var stale_draw := false
+	var stale_turns := 0
+	var damage_this_team_turn := false
 	while session.phase == MinigameSessionScript.Phase.BATTLE:
-		var actionable := AttackNearestEnemyBehavior.sort_actionable_by_enemy_distance(
-			session, session.get_actionable_coords()
-		)
+		var active_team := session.turn_manager.active_team_id
+		var brain: AiBrain = green_brain if active_team == "GREEN" else blue_brain
+		var actionable := brain.sort_actionable(session, session.get_actionable_coords())
 		if actionable.is_empty():
 			var end_result: Dictionary = session.apply({"type": "end_turn"})
 			if not end_result.get("ok", false):
 				break
 			team_turns += 1
+			if damage_this_team_turn:
+				stale_turns = 0
+			else:
+				stale_turns += 1
+			damage_this_team_turn = false
+			if (
+				team_turns >= AiMatchScore.STALE_MIN_TEAM_TURNS
+				and stale_turns >= _stale_idle_limit(stale_idle_turns)
+			):
+				stale_draw = true
+				break
 			if team_turns > MAX_TEAM_TURNS:
 				timed_out = true
 				break
@@ -156,40 +349,40 @@ static func run_one(game_index: int, map_size: int, budget: int) -> Dictionary:
 			session.pass_legion_or_force_wait(coords)
 			continue
 
-		var cmd: Dictionary = AttackNearestEnemyBehavior.decide(session, legion)
-		match String(cmd.get("type", "")):
-			"use_action":
-				var apply_cmd := {
-					"type": "use_action",
-					"action_id": String(cmd.get("action_id", "")),
-					"from": cmd.get("from", coords),
-					"to": cmd.get("to", coords),
-					"skip_action_log": true,
-				}
-				if apply_cmd["action_id"] in ["melee_attack", "ranged_attack"]:
-					apply_cmd["rng_seed"] = combat_rng.randi()
-				var step: Dictionary = session.apply(apply_cmd)
-				tracker.record_apply(step)
-				if not step.get("ok", false):
-					session.pass_legion_or_force_wait(coords)
-			_:
-				session.pass_legion_or_force_wait(coords)
+		var cmd: Dictionary = brain.decide(session, legion)
+		var applied: Dictionary = AiBrainCommand.apply(
+			session, cmd, coords, legion, combat_rng, tracker
+		)
+		if bool(applied.get("damage", false)):
+			damage_this_team_turn = true
 
 		if session.phase == MinigameSessionScript.Phase.ENDED:
 			break
 
-	var winner := session.winner if not timed_out else ""
+	var winner := ""
+	if not timed_out and not stale_draw:
+		winner = session.winner
 	var survivors_green := MinigameRulesScript.count_living_units(session.legions, "GREEN")
 	var survivors_blue := MinigameRulesScript.count_living_units(session.legions, "BLUE")
+	var gold_end_green := AiMatchScore.team_living_gold(session, "GREEN")
+	var gold_end_blue := AiMatchScore.team_living_gold(session, "BLUE")
 	var legion_rows := tracker.legion_rows_for_csv(game_index, winner)
 
-	return {
+	var out := {
 		"winner": winner,
 		"team_turns": team_turns,
 		"timed_out": timed_out,
+		"stale_draw": stale_draw,
 		"survivors_green": survivors_green,
 		"survivors_blue": survivors_blue,
+		"gold_start_green": gold_start_green,
+		"gold_start_blue": gold_start_blue,
+		"gold_end_green": gold_end_green,
+		"gold_end_blue": gold_end_blue,
 		"legion_rows": legion_rows,
+		"game_index": game_index,
+		"draft_failed": false,
+		"fail_reason": "",
 		"match_row": {
 			"game_id": game_index + 1,
 			"map_size": map_size,
@@ -200,22 +393,36 @@ static func run_one(game_index: int, map_size: int, budget: int) -> Dictionary:
 			"elapsed_ms": 0,
 			"winner": winner,
 			"timed_out": timed_out,
+			"stale_draw": stale_draw,
 			"survivors_green": survivors_green,
 			"survivors_blue": survivors_blue,
+			"gold_start_green": gold_start_green,
+			"gold_start_blue": gold_start_blue,
+			"gold_end_green": gold_end_green,
+			"gold_end_blue": gold_end_blue,
 			"green_legions": _legion_count_for_team(session, "GREEN"),
 			"blue_legions": _legion_count_for_team(session, "BLUE"),
 			"green_draft": _draft_summary(session, "GREEN"),
 			"blue_draft": _draft_summary(session, "BLUE"),
+			"green_brain": green_brain.id,
+			"blue_brain": blue_brain.id,
 		},
 	}
+	AiDuelTraceScript.match_end(out, green_brain.id, blue_brain.id)
+	return out
 
 static func _empty_result(game_index: int, map_size: int, budget: int) -> Dictionary:
 	return {
 		"winner": "",
 		"team_turns": 0,
 		"timed_out": false,
+		"stale_draw": false,
 		"survivors_green": 0,
 		"survivors_blue": 0,
+		"gold_start_green": 0.0,
+		"gold_start_blue": 0.0,
+		"gold_end_green": 0.0,
+		"gold_end_blue": 0.0,
 		"legion_rows": [],
 		"match_row": {
 			"game_id": game_index + 1,
@@ -227,12 +434,19 @@ static func _empty_result(game_index: int, map_size: int, budget: int) -> Dictio
 			"elapsed_ms": 0,
 			"winner": "",
 			"timed_out": false,
+			"stale_draw": false,
 			"survivors_green": 0,
 			"survivors_blue": 0,
+			"gold_start_green": 0.0,
+			"gold_start_blue": 0.0,
+			"gold_end_green": 0.0,
+			"gold_end_blue": 0.0,
 			"green_legions": 0,
 			"blue_legions": 0,
 			"green_draft": "",
 			"blue_draft": "",
+			"green_brain": "",
+			"blue_brain": "",
 		},
 	}
 
@@ -256,3 +470,8 @@ static func _legion_count_for_team(session: MinigameSessionScript, team_id: Stri
 	if draft == null:
 		return 0
 	return draft.placements.size()
+
+static func _stale_idle_limit(override_turns: int) -> int:
+	if override_turns > 0:
+		return override_turns
+	return AiMatchScore.STALE_TEAM_TURNS_FOR_DRAW

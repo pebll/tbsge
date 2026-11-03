@@ -1,0 +1,433 @@
+{
+	"algo": "ga",
+	"archive_size": 8,
+	"best_fitness": 0.2,
+	"best_weights": {
+		"closer_to_focus": 10.0,
+		"enables_attack": 7.5,
+		"enemy_kill_frac": 6.0,
+		"enemy_loss_frac": 5.0,
+		"enemy_loss_spread": -0.5,
+		"focus_low_hp": 2.0,
+		"focus_support": 1.5,
+		"heal_efficiency": 3.0,
+		"heal_urgency": 4.0,
+		"is_combat": 4.0,
+		"is_heal": 0.2,
+		"is_move": 0.8,
+		"is_pass": 0.0,
+		"is_teleport": 1.2,
+		"is_terminal": 0.0,
+		"kill_prob": 4.0,
+		"leftover_ap_frac": 0.4,
+		"low_hp_exposure": -4.0,
+		"net_hp_frac": 3.5,
+		"own_death_frac": -5.5,
+		"own_loss_frac": -4.5,
+		"pass_penalty": -18.0,
+		"threat_at_stand": -3.0,
+		"threat_relief": 2.5
+	},
+	"config": {
+		"algo": "ga",
+		"arena_every": 10,
+		"arena_opponents": 3.0,
+		"arena_pairs": 2.0,
+		"budget": 75.0,
+		"curriculum": true,
+		"map_size": 3.0,
+		"pairs": 5.0,
+		"pop": 8.0,
+		"seed": 42.0
+	},
+	"curriculum": {
+		"hall_of_fame": [],
+		"history": [],
+		"promotions_blocked": false,
+		"rolling_draws": 24,
+		"rolling_losses": 0,
+		"rolling_wins": 0,
+		"stage_index": 0
+	},
+	"evaluations": 2822,
+	"generations_completed": 469,
+	"last_metrics": {
+		"archive_size": 8,
+		"arena_ms": 3612,
+		"arena_skipped": true,
+		"best_fitness": 0.2,
+		"curriculum_rolling_wr": 0.0,
+		"curriculum_stage": "pass_mirror",
+		"evaluations": 2822,
+		"gen": 469,
+		"legion_rows": [],
+		"match_rows": [],
+		"match_stats": {
+			"games": 16,
+			"other_draws": 4,
+			"stale_draws": 10,
+			"team_turns_sum": 200,
+			"timeouts": 0
+		},
+		"opponents": 3,
+		"time": "2026-08-22T10:51:44",
+		"vs_arena": 0.728319444444444,
+		"vs_arena_fitness": 0.728319444444444,
+		"vs_cascade": 0.5,
+		"vs_cascade_fitness": 0.2
+	},
+	"match_stats": {
+		"games": 28972,
+		"other_draws": 28408,
+		"stale_draws": 246,
+		"team_turns_sum": 10164,
+		"timeouts": 6
+	},
+	"population": {
+		"members": [
+			{
+				"descriptor": {
+					"aggression": 0.0,
+					"risk": 0.0,
+					"support_focus": 0.0
+				},
+				"fitness": 0.2,
+				"genome": {
+					"weights": {
+						"closer_to_focus": 10.0,
+						"enables_attack": 7.5,
+						"enemy_kill_frac": 6.0,
+						"enemy_loss_frac": 5.0,
+						"enemy_loss_spread": -0.5,
+						"focus_low_hp": 2.0,
+						"focus_support": 1.5,
+						"heal_efficiency": 3.0,
+						"heal_urgency": 4.0,
+						"is_combat": 4.0,
+						"is_heal": 0.2,
+						"is_move": 0.8,
+						"is_pass": 0.0,
+						"is_teleport": 1.2,
+						"is_terminal": 0.0,
+						"kill_prob": 4.0,
+						"leftover_ap_frac": 0.4,
+						"low_hp_exposure": -4.0,
+						"net_hp_frac": 3.5,
+						"own_death_frac": -5.5,
+						"own_loss_frac": -4.5,
+						"pass_penalty": -18.0,
+						"threat_at_stand": -3.0,
+						"threat_relief": 2.5
+					}
+				}
+			},
+			{
+				"descriptor": {
+					"aggression": 0.0,
+					"risk": 0.0,
+					"support_focus": 0.0
+				},
+				"fitness": 0.2,
+				"genome": {
+					"weights": {
+						"closer_to_focus": 9.7529145181179,
+						"enables_attack": 7.5,
+						"enemy_kill_frac": 6.90950536727905,
+						"enemy_loss_frac": 4.86385661363602,
+						"enemy_loss_spread": -0.5,
+						"focus_low_hp": 2.55763286352158,
+						"focus_support": 1.5,
+						"heal_efficiency": 3.0,
+						"heal_urgency": 3.54757586121559,
+						"is_combat": 4.0,
+						"is_heal": 0.2,
+						"is_move": 0.8,
+						"is_pass": 0.41987881064415,
+						"is_teleport": 1.10831782668829,
+						"is_terminal": 0.0,
+						"kill_prob": 4.0,
+						"leftover_ap_frac": 0.4,
+						"low_hp_exposure": -4.03115903958678,
+						"net_hp_frac": 3.5,
+						"own_death_frac": -4.30915081501007,
+						"own_loss_frac": -4.30174341797829,
+						"pass_penalty": -18.4260296225548,
+						"threat_at_stand": -3.03255232423544,
+						"threat_relief": 2.5
+					}
+				}
+			},
+			{
+				"descriptor": {
+					"aggression": 0.0,
+					"risk": 0.0,
+					"support_focus": 0.0
+				},
+				"fitness": 0.2,
+				"genome": {
+					"weights": {
+						"closer_to_focus": 10.3125107496977,
+						"enables_attack": 6.97067995667458,
+						"enemy_kill_frac": 6.0,
+						"enemy_loss_frac": 5.0,
+						"enemy_loss_spread": -0.5,
+						"focus_low_hp": 1.60869952738285,
+						"focus_support": 0.681589883565903,
+						"heal_efficiency": 3.0,
+						"heal_urgency": 4.31175252199173,
+						"is_combat": 4.0,
+						"is_heal": 0.541942730545998,
+						"is_move": 0.953381738066673,
+						"is_pass": 0.0,
+						"is_teleport": 2.07496435046196,
+						"is_terminal": -0.117095670849085,
+						"kill_prob": 3.84309321939945,
+						"leftover_ap_frac": 0.12855289131403,
+						"low_hp_exposure": -4.04893740005791,
+						"net_hp_frac": 3.1739930331707,
+						"own_death_frac": -5.99975870251656,
+						"own_loss_frac": -5.61755768060684,
+						"pass_penalty": -18.0910260409117,
+						"threat_at_stand": -2.78578685522079,
+						"threat_relief": 2.5
+					}
+				}
+			},
+			{
+				"descriptor": {
+					"aggression": 0.0,
+					"risk": 0.0,
+					"support_focus": 0.0
+				},
+				"fitness": 0.2,
+				"genome": {
+					"weights": {
+						"closer_to_focus": 10.0167794618756,
+						"enables_attack": 7.5,
+						"enemy_kill_frac": 5.87626251131296,
+						"enemy_loss_frac": 5.0256737690419,
+						"enemy_loss_spread": -0.5,
+						"focus_low_hp": 2.0,
+						"focus_support": 1.5,
+						"heal_efficiency": 3.0,
+						"heal_urgency": 4.0,
+						"is_combat": 4.0,
+						"is_heal": -0.00178709924221038,
+						"is_move": 0.8,
+						"is_pass": 0.0,
+						"is_teleport": 1.2,
+						"is_terminal": 0.0,
+						"kill_prob": 4.0,
+						"leftover_ap_frac": 0.736712896823883,
+						"low_hp_exposure": -4.0,
+						"net_hp_frac": 3.28679470717907,
+						"own_death_frac": -5.22074621617794,
+						"own_loss_frac": -4.03311030864716,
+						"pass_penalty": -18.0,
+						"threat_at_stand": -3.0,
+						"threat_relief": 2.5
+					}
+				}
+			},
+			{
+				"descriptor": {
+					"aggression": 0.0,
+					"risk": 0.0,
+					"support_focus": 0.0
+				},
+				"fitness": 0.2,
+				"genome": {
+					"weights": {
+						"closer_to_focus": 9.7529145181179,
+						"enables_attack": 7.6091517701745,
+						"enemy_kill_frac": 6.06769714176189,
+						"enemy_loss_frac": 4.86385661363602,
+						"enemy_loss_spread": 0.168446749448776,
+						"focus_low_hp": 2.25468949377537,
+						"focus_support": 1.5,
+						"heal_efficiency": 3.18307257294655,
+						"heal_urgency": 3.09382603168487,
+						"is_combat": 3.81267868578434,
+						"is_heal": 0.614379435777664,
+						"is_move": 0.560389333963394,
+						"is_pass": 0.410927561670542,
+						"is_teleport": 1.10831782668829,
+						"is_terminal": -0.245956788212061,
+						"kill_prob": 3.06825746297836,
+						"leftover_ap_frac": 0.300624237954617,
+						"low_hp_exposure": -4.03115903958678,
+						"net_hp_frac": 3.20008046030998,
+						"own_death_frac": -4.30915081501007,
+						"own_loss_frac": -3.57005327343941,
+						"pass_penalty": -18.4260296225548,
+						"threat_at_stand": -3.65505964607,
+						"threat_relief": 2.5
+					}
+				}
+			},
+			{
+				"descriptor": {
+					"aggression": 0.0,
+					"risk": 0.0,
+					"support_focus": 0.0
+				},
+				"fitness": 0.2,
+				"genome": {
+					"weights": {
+						"closer_to_focus": 9.98722288273275,
+						"enables_attack": 7.43232198953629,
+						"enemy_kill_frac": 4.8962054848671,
+						"enemy_loss_frac": 4.86385661363602,
+						"enemy_loss_spread": 0.631251287460327,
+						"focus_low_hp": 2.55763286352158,
+						"focus_support": 1.5,
+						"heal_efficiency": 3.05663405135274,
+						"heal_urgency": 3.54757586121559,
+						"is_combat": 3.98736526966095,
+						"is_heal": 0.2,
+						"is_move": 0.8,
+						"is_pass": 0.41987881064415,
+						"is_teleport": 1.6585864007473,
+						"is_terminal": -0.462332667410374,
+						"kill_prob": 3.61406080126762,
+						"leftover_ap_frac": 0.410750131309032,
+						"low_hp_exposure": -4.03115903958678,
+						"net_hp_frac": 3.88157486319542,
+						"own_death_frac": -4.49169765412807,
+						"own_loss_frac": -3.87654447555542,
+						"pass_penalty": -18.4260296225548,
+						"threat_at_stand": -3.32347042709589,
+						"threat_relief": 2.96077293753624
+					}
+				}
+			},
+			{
+				"descriptor": {
+					"aggression": 0.0,
+					"risk": 0.0,
+					"support_focus": 0.0
+				},
+				"fitness": 0.2,
+				"genome": {
+					"weights": {
+						"closer_to_focus": 10.0,
+						"enables_attack": 7.5,
+						"enemy_kill_frac": 6.0,
+						"enemy_loss_frac": 5.0,
+						"enemy_loss_spread": -0.47204894721508,
+						"focus_low_hp": 1.27002635002136,
+						"focus_support": 1.5,
+						"heal_efficiency": 3.0,
+						"heal_urgency": 4.0,
+						"is_combat": 4.0,
+						"is_heal": 0.2,
+						"is_move": 0.8,
+						"is_pass": 0.0,
+						"is_teleport": 1.2,
+						"is_terminal": -0.151310674846172,
+						"kill_prob": 4.09991675615311,
+						"leftover_ap_frac": 0.4,
+						"low_hp_exposure": -3.78655068874359,
+						"net_hp_frac": 3.5,
+						"own_death_frac": -5.5,
+						"own_loss_frac": -4.5,
+						"pass_penalty": -18.4157122850418,
+						"threat_at_stand": -3.0,
+						"threat_relief": 2.26924065053463
+					}
+				}
+			},
+			{
+				"descriptor": {
+					"aggression": 0.0,
+					"risk": 0.0,
+					"support_focus": 0.0
+				},
+				"fitness": 0.2,
+				"genome": {
+					"weights": {
+						"closer_to_focus": 10.3326555192471,
+						"enables_attack": 7.46362249851227,
+						"enemy_kill_frac": 6.06980922669172,
+						"enemy_loss_frac": 4.26516755223274,
+						"enemy_loss_spread": -0.606461872160435,
+						"focus_low_hp": 2.34418223798275,
+						"focus_support": 0.967349582910538,
+						"heal_efficiency": 3.34606163799763,
+						"heal_urgency": 3.54757586121559,
+						"is_combat": 3.89551533176564,
+						"is_heal": 0.663046833872795,
+						"is_move": 0.8,
+						"is_pass": 1.66505632102489,
+						"is_teleport": 0.904806482652202,
+						"is_terminal": 0.049938627332449,
+						"kill_prob": 4.0,
+						"leftover_ap_frac": 0.290959057211876,
+						"low_hp_exposure": -3.63602043394931,
+						"net_hp_frac": 3.43069419562817,
+						"own_death_frac": -4.2085337549448,
+						"own_loss_frac": -4.79547294937074,
+						"pass_penalty": -18.2018563764635,
+						"threat_at_stand": -3.29948278591037,
+						"threat_relief": 2.5
+					}
+				}
+			}
+		]
+	},
+	"population_size": 8,
+	"rng_state": 5184527214869734382,
+	"rolling_outcomes": [
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1,
+		1
+	],
+	"target_gen": 1100,
+	"teacher_on": true,
+	"version": 4
+}
