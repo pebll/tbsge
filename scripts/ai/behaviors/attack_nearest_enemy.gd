@@ -704,11 +704,7 @@ static func _legion_shoot_range(legion: Legion) -> int:
 		return 0
 	if "ranged_attack" not in ActionDefs.legion_action_ids(legion):
 		return 0
-	var best := 0
-	for u in legion.units:
-		if u and u.attack_range > best and u.ranged_attack > 0:
-			best = u.attack_range
-	return best
+	return legion.max_attack_range()
 
 ## Walk the soft path only onto empty tiles, up to `max_steps` AP.
 static func _legal_move_prefix(

@@ -125,8 +125,4 @@ static func _legion_ranged_power(legion: Legion) -> float:
 	return t
 
 static func _legion_shoot_range(legion: Legion) -> int:
-	var best := 0
-	for u in legion.units:
-		if u and u.attack_range > best and u.ranged_attack > 0:
-			best = u.attack_range
-	return best
+	return legion.max_attack_range() if legion != null else 0

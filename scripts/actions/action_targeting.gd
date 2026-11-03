@@ -129,16 +129,10 @@ static func _legion_needs_heal(legion: Legion) -> bool:
 	return false
 
 static func _legion_has_ranged(legion: Legion) -> bool:
-	if legion == null or legion.units.is_empty():
-		return false
-	var u: Unit = legion.units[0]
-	return u != null and u.has_ranged()
+	return legion != null and legion.has_ranged()
 
 static func _legion_attack_range(legion: Legion) -> int:
-	if legion == null or legion.units.is_empty():
-		return 0
-	var u: Unit = legion.units[0]
-	return u.attack_range if u else 0
+	return legion.max_attack_range() if legion != null else 0
 
 static func is_swap_target(state: BattleStateScript, from_coords: Vector2i, to_coords: Vector2i) -> bool:
 	var to_tile: Tile = state.tile_at(to_coords)
