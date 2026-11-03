@@ -124,7 +124,7 @@ static func _coords_from_tiles(tiles: Array) -> Array[Vector2i]:
 
 static func _legion_needs_heal(legion: Legion) -> bool:
 	for unit in legion.units:
-		if unit != null and int(unit.current_health) < int(unit.max_health):
+		if unit != null and unit.current_health < unit.max_health:
 			return true
 	return false
 

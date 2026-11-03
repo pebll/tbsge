@@ -60,35 +60,21 @@ static func estimate_combat(
 	var kill_hits := 0
 	var wipe_hits := 0
 
-	var prev_quiet := CombatResolver.quiet
-	CombatResolver.quiet = true
 	var atk_hp0 := _total_hp(attacker)
 	var def_hp0 := _total_hp(defender)
 	var atk_n0 := attacker.units.size()
 	var def_n0 := defender.units.size()
 
-	for i in range(n):
-		var sim_a := CombatSimSnapshot.clone_legion(attacker)
-		var sim_d := CombatSimSnapshot.clone_legion(defender)
-		CombatResolver.resolve_combat(
-			sim_a,
-			sim_d,
-			10007 + i * 7919,
-			{"mode": mode, "distance": distance}
-		)
-		var enemy_loss := maxf(0.0, def_hp0 - _total_hp(sim_d))
-		var own_loss := maxf(0.0, atk_hp0 - _total_hp(sim_a))
-		var enemy_kills := float(maxi(0, def_n0 - sim_d.units.size()))
-		var own_kills := float(maxi(0, atk_n0 - sim_a.units.size()))
-		enemy_loss_samples.append(enemy_loss)
-		own_loss_samples.append(own_loss)
+	for row in CombatSampler.sample(attacker, defender, mode, distance, n):
+		var enemy_kills := float(row["enemy_deaths"])
+		enemy_loss_samples.append(float(row["enemy_hp_lost"]))
+		own_loss_samples.append(float(row["own_hp_lost"]))
 		enemy_kill_samples.append(enemy_kills)
-		own_kill_samples.append(own_kills)
+		own_kill_samples.append(float(row["own_deaths"]))
 		if enemy_kills >= 1.0:
 			kill_hits += 1
-		if sim_d.units.is_empty():
+		if bool(row["enemy_wiped"]):
 			wipe_hits += 1
-	CombatResolver.quiet = prev_quiet
 
 	var mean_enemy := _mean(enemy_loss_samples)
 	var mean_own := _mean(own_loss_samples)

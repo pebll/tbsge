@@ -237,7 +237,7 @@ static func _execute_teleport(
 
 ## Each caster unit applies heal_amount once to the current lowest-HP wounded unit.
 static func _apply_focused_heal(caster: Legion, target: Legion, heal_amount: int) -> Dictionary:
-	var healed := 0
+	var healed := 0.0
 	var unit_heals: Array = []
 	if caster == null or target == null or heal_amount <= 0:
 		return {"healed_total": 0, "unit_heals": unit_heals}
@@ -247,12 +247,13 @@ static func _apply_focused_heal(caster: Legion, target: Legion, heal_amount: int
 		var focus := _pick_lowest_hp_wounded(target)
 		if focus == null:
 			break
-		var before := int(focus.current_health)
-		focus.current_health = mini(before + heal_amount, int(focus.max_health))
-		var after := int(focus.current_health)
+		# HP is float (damage can be fractional); never truncate when healing.
+		var before: float = focus.current_health
+		focus.current_health = minf(before + float(heal_amount), focus.max_health)
+		var after: float = focus.current_health
 		if after <= before:
 			continue
-		var gained := after - before
+		var gained: float = after - before
 		healed += gained
 		unit_heals.append({
 			"caster": caster_unit,
@@ -265,12 +266,12 @@ static func _apply_focused_heal(caster: Legion, target: Legion, heal_amount: int
 
 static func _pick_lowest_hp_wounded(legion: Legion) -> Unit:
 	var best: Unit = null
-	var best_hp := 2147483647
+	var best_hp := INF
 	for unit in legion.units:
 		if unit == null:
 			continue
-		var hp := int(unit.current_health)
-		if hp >= int(unit.max_health):
+		var hp: float = unit.current_health
+		if hp >= unit.max_health:
 			continue
 		if hp < best_hp:
 			best_hp = hp

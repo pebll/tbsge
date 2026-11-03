@@ -47,7 +47,7 @@
 - Hit order is **alternate-then-drain**:
   - alternate hits between legions while both have eligible attackers;
   - once one side is out of eligible attackers, the other side continues with remaining attackers.
-- Print each hit for terminal inspection.
+- Per-hit trace: set `CombatResolver.quiet = false` (off by default; sims run thousands of combats).
 - Combat resolver returns ordered hit/death logs for driving visuals.
 - Melee and ranged are separate actions (`melee_attack`, `ranged_attack`). Counter-fire only if defender `attack_range` covers engagement distance.
 - **Move is non-terminal** (does not `wait_legion`); combat/heal terminal actions do. Wait stains are per-tile — move onto a stained empty tile clears that wait; a swap carries a waited partner's wait to its new tile.

@@ -4,7 +4,9 @@ extends RefCounted
 const MODE_MELEE := "melee"
 const MODE_RANGED := "ranged"
 
-static var quiet: bool = false
+## Per-hit stdout trace. Off by default (sims run thousands of combats, some on worker
+## threads); set CombatResolver.quiet = false while debugging a fight.
+static var quiet: bool = true
 
 static func _pick_next_attacker(
 	legion: Legion,
