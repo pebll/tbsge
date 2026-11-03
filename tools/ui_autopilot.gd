@@ -274,9 +274,11 @@ func _run() -> void:
 		await _wait(0.5)
 
 	if _phase() == PHASE_ENDED:
-		await _wait(1.5)
+		# The session ends when the last action resolves; the panel follows its playback.
+		var shown: bool = await _wait_until(func() -> bool: return _find_button("Main menu") != null, 30.0)
+		await _wait(0.5)
 		await _shot("game_over")
-		_check(_find_button("Main menu") != null, "game-over panel shows Main menu")
+		_check(shown, "game-over panel appears after the final playback")
 	else:
 		# Abandon from the pause menu, ideally while the AI is acting (old crash path).
 		await _click_button("Next turn")
@@ -368,7 +370,7 @@ func _do_attack(g, legion, from: Vector2i, action_id: String, target: Vector2i, 
 	await _shot("turn%d_mid_combat" % turn_no)
 	if mid_locked:
 		_check(g._legion_strip.visible and g._legion_strip.current_legion() == legion, "turn %d: attacker stays in legion strip during combat" % turn_no)
-	await _wait_until(func() -> bool: return not g.battle.is_input_locked() or not _is_battle(), 20.0)
+	await _wait_until(func() -> bool: return not g.battle.is_input_locked(), 30.0)
 	await _wait(0.6)
 	await _shot("turn%d_after_combat" % turn_no)
 	_check(g.session.action_log.entries.size() > log_before, "turn %d: combat logged" % turn_no)
