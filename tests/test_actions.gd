@@ -10,6 +10,8 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_swap_via_move_action():
 		return false
+	if not _test_swap_keeps_partner_wait():
+		return false
 	if not _test_stale_legion_not_actionable():
 		return false
 	if not _test_self_heal_unavailable_at_full_hp():
@@ -118,6 +120,48 @@ func _test_swap_via_move_action() -> bool:
 		return false
 	if "legions_swapped" not in result.get("events", []):
 		push_error("Expected legions_swapped event")
+		return false
+	return true
+
+func _test_swap_keeps_partner_wait() -> bool:
+	## Waiting a legion and then swapping with it must not refund its turn.
+	var session := MinigameTestHelpersScript.prepare_session()
+	var legions: Dictionary = MinigameTestHelpersScript.start_two_legion_battle(session)
+	var team_a_id: String = MinigameTestHelpersScript.team_a(session)
+	var green_a: Legion = legions["a"]
+	var green_slots: Array = session.get_deploy_slots(team_a_id)
+	if green_slots.size() < 2:
+		return true
+	var swap_coords: Vector2i = green_slots[1]
+	var swap_tile: Tile = session.grid.get(swap_coords)
+	if swap_tile == null or swap_tile.has_legion():
+		return true
+	var green_b := Legion.new("GOBLIN", 2, swap_coords, team_a_id)
+	swap_tile.legion = green_b
+	session.legions.append(green_b)
+	var a_start := green_a.tile_coords
+
+	var pass_result := session.apply({"type": "pass_legion", "coords": swap_coords})
+	if not pass_result["ok"]:
+		push_error("Pass failed: %s" % pass_result.get("error"))
+		return false
+	var result := session.apply({
+		"type": "use_action",
+		"action_id": "move",
+		"from": a_start,
+		"to": swap_coords,
+	})
+	if not result["ok"] or "legions_swapped" not in result.get("events", []):
+		push_error("Expected swap with waited ally: %s" % result.get("error"))
+		return false
+	if green_b.tile_coords != a_start:
+		push_error("Waited ally should have moved to the swapper's tile")
+		return false
+	if session.can_act_legion(green_b):
+		push_error("Waited ally must stay waited after being swapped")
+		return false
+	if not session.can_act_legion(green_a) and green_a.has_ap():
+		push_error("Swapper should keep acting if it has AP left")
 		return false
 	return true
 

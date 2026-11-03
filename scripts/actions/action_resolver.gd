@@ -87,16 +87,20 @@ static func _execute_swap(
 	var legion_a: Legion = from_tile.legion
 	var legion_b: Legion = to_tile.legion
 
+	# Wait stains are per-tile: a waited partner must stay waited after the swap
+	# (otherwise "wait, then swap with it" refunds its turn).
+	var b_was_waited: bool = to_coords in state.turn_manager.waited_coords
 	from_tile.legion = legion_b
 	to_tile.legion = legion_a
 	legion_a.tile_coords = to_coords
 	legion_b.tile_coords = from_coords
 	legion_a.spend_ap(action.ap_cost)
 	legion_b.spend_ap(action.ap_cost)
-	_apply_terminal(state, legion_a, action, from_coords)
-	# Wait stains are per-tile; swapping must not strand either legion under a stale wait.
 	state.turn_manager.clear_wait(from_coords)
 	state.turn_manager.clear_wait(to_coords)
+	if b_was_waited:
+		state.turn_manager.wait_legion(from_coords)
+	_apply_terminal(state, legion_a, action, from_coords)
 	return _ok(["legions_swapped"], {
 		"action_id": action.id,
 		"from": from_coords,

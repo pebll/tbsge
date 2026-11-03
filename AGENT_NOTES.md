@@ -5,7 +5,7 @@
 - **Minigame** (`scenes/runnables/minigame.tscn`) is the primary product (draft + battle). Main scene in `project.godot`.
 - **Sandbox** (`unit_preview` / `sandbox_root`) is a second mode for spawn/fight — keep it so the engine stays modular and not overfit to minigame.
 - Mode-specific code lives under `scripts/minigame/` (draft, deploy rules, AI drafter, win conditions) and sandbox session/root.
-- Living mission board: **`MISSIONS.md`** (short-term polish vs next features).
+- Living board: **`doc/roadmap.md`** (bugs + milestones). Design docs in `doc/` (index: `doc/README.md`); open decisions in `doc/open_questions.md`. The old v0.1 board is frozen at `doc/archive/missions_v0.1.md`.
 
 ### Workflow
 - **Always run unit tests** after code changes: `./run_tests.sh`.
@@ -50,16 +50,18 @@
 - Print each hit for terminal inspection.
 - Combat resolver returns ordered hit/death logs for driving visuals.
 - Melee and ranged are separate actions (`melee_attack`, `ranged_attack`). Counter-fire only if defender `attack_range` covers engagement distance.
-- **Move is non-terminal** (does not `wait_legion`); combat/heal terminal actions do. Wait stains are per-tile — move/swap onto a stained tile clears that wait.
+- **Move is non-terminal** (does not `wait_legion`); combat/heal terminal actions do. Wait stains are per-tile — move onto a stained empty tile clears that wait; a swap carries a waited partner's wait to its new tile.
 
 ### Combat visuals requirements (current)
-- Animations are **sequential** with a fixed delay between hits (currently **0.3s**).
+- Animations are **sequential** with a fixed delay between hits (`ActionPlayback.COMBAT_HIT_BEAT`, currently **0.4s**; 0.6s on a kill).
+- Human attacks keep the attacker selected during playback (legion strip mirrors vitals live); AI turns deselect.
+- Playback/AI coroutines must bail out if the host scene was freed (`is_instance_valid(host)`) — never touch nodes after an `await` without that check.
 - Only the **attacking unit** animates attack and only the **target unit** animates being hit.
 - Before combat begins, **both legions face each other**.
 - When a unit dies, update the **legion visu immediately** (remove unit visu, re-pack).
 - After combat, remaining units should **tween** into their re-packed positions (no snapping).
 
 ### Assets
-- Runtime art lives under `assets/`. Unused / pipeline piles live under `assets/_archive/` — see `ASSETS_ARCHIVE.md`.
+- Runtime art lives under `assets/`. Unused / pipeline piles live under `assets/_archive/` — see `doc/assets_archive.md`.
 - Prefer archiving over deleting until explicitly approved (speeches were an exception).
 - Menu music: `assets/music/bgmusic_menu.wav`.

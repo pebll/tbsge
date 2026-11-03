@@ -385,7 +385,7 @@ func _apply_tick_to_side(
 		live[side] = side_data
 	if death_delta > 0:
 		totals[death_key] = int(totals.get(death_key, 0)) + death_delta
-		_add_or_bump_stat(stats, "death", death_delta, COLOR_TEXT, ICON_DEATH, false)
+		_add_or_bump_stat(stats, "death", death_delta, COLOR_TEXT, ICON_DEATH, true)
 		side_data["stats"] = stats
 		live[side] = side_data
 

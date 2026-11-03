@@ -122,6 +122,8 @@ func request_move_path(path: Array) -> void:
 			last_ok_to,
 			steps_ok == 1 and last_was_swap
 		)
+	if not _host_alive():
+		return
 	# If no steps succeeded the legion is still at start, not the planned destination.
 	var end_coords: Vector2i = last_ok_to
 	var tile: Tile = deps.session.grid.get(end_coords)
@@ -145,6 +147,8 @@ func perform_use_action(
 		action_id, from_coords, to_coords, rng_seed, skip_action_log
 	)
 	_lock.end()
+	if not _host_alive():
+		return result
 	check_match_end()
 	return result
 
@@ -157,6 +161,8 @@ func _perform_use_action_unlocked(
 	rng_seed: int = 0,
 	skip_action_log: bool = false
 ) -> Dictionary:
+	if not _host_alive():
+		return {"ok": false, "error": "Battle host gone", "events": [], "payload": {}}
 	if ai_running:
 		deps.battle_ui.deselect()
 		deps.battle_ui.clear_overlays()
@@ -195,6 +201,8 @@ func _perform_use_action_unlocked(
 		from_coords,
 		_battle_action_hooks()
 	)
+	if not _host_alive():
+		return result
 	if deps.action_log_panel:
 		deps.action_log_panel.reveal_pending()
 	return result
@@ -307,7 +315,9 @@ func _run_ai_turn_async() -> void:
 			deps.session.pass_legion_or_force_wait(coords)
 			deps.presenter.sync_spent_visuals(deps.session)
 			prefer_coords = Vector2i(2147483646, 2147483646)
-			await deps.host.get_tree().create_timer(AI_LEGION_DELAY).timeout
+			var still_alive: bool = await _ai_delay(AI_LEGION_DELAY)
+			if not still_alive:
+				return
 			continue
 
 		var cmd: Dictionary = AttackNearestEnemyBehavior.decide(deps.session, legion)
@@ -326,6 +336,9 @@ func _run_ai_turn_async() -> void:
 						int(cmd.get("rng_seed", randi()))
 					)
 					ok = step.get("ok", false)
+				# Scene may have changed (abandon to menu) while playback awaited.
+				if not _host_alive():
+					return
 				if not ok:
 					if AttackNearestEnemyBehavior.debug_enabled:
 						print("[AI] action failed for %s @ %s, passing legion" % [legion.team_id, coords])
@@ -340,7 +353,9 @@ func _run_ai_turn_async() -> void:
 				deps.presenter.sync_spent_visuals(deps.session)
 				prefer_coords = Vector2i(2147483646, 2147483646)
 
-		await deps.host.get_tree().create_timer(AI_LEGION_DELAY).timeout
+		var alive: bool = await _ai_delay(AI_LEGION_DELAY)
+		if not alive:
+			return
 		if deps.session.phase == MinigameSessionScript.Phase.ENDED:
 			break
 
@@ -349,6 +364,23 @@ func _run_ai_turn_async() -> void:
 	ai_turn_finished.emit()
 	if deps.session.phase == MinigameSessionScript.Phase.BATTLE and deps.is_ai_team(deps.session.turn_manager.active_team_id):
 		maybe_start_ai_turn()
+
+func _host_alive() -> bool:
+	return is_instance_valid(deps.host) and deps.host.is_inside_tree()
+
+## AI pacing delay that also holds while the pause menu is open.
+## Returns false if the battle host was freed (scene change) — caller must bail.
+func _ai_delay(seconds: float) -> bool:
+	if not _host_alive():
+		return false
+	await deps.host.get_tree().create_timer(seconds).timeout
+	while (
+		_host_alive()
+		and is_instance_valid(deps.pause_menu)
+		and deps.pause_menu.is_open()
+	):
+		await deps.host.get_tree().create_timer(0.1).timeout
+	return _host_alive()
 
 ## Walk a planned path in one AI activation (skip per-step log; one coalesced card).
 func _ai_walk_move_path(path: Array) -> bool:
@@ -372,7 +404,9 @@ func _ai_walk_move_path(path: Array) -> bool:
 
 func _battle_action_hooks() -> Dictionary:
 	var hooks := BattleHostWiringScript.action_hooks(deps.session, deps.battle_ui, {
-		"deselect_before_combat": true,
+		# Humans watch the fight live in the legion strip; AI turns override below.
+		"deselect_before_combat": false,
+		"keep_selection_in_combat": true,
 		"deselect_after_heal": true,
 		"on_finished": func() -> void:
 			deps.presenter.sync_spent_visuals(deps.session),
@@ -384,4 +418,5 @@ func _battle_action_hooks() -> Dictionary:
 			deps.battle_ui.clear_overlays()
 			deps.presenter.sync_spent_visuals(deps.session)
 		hooks["deselect_after_combat"] = true
+		hooks["keep_selection_in_combat"] = false
 	return hooks

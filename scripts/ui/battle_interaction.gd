@@ -145,6 +145,29 @@ func deselect() -> void:
 	if action_bar:
 		action_bar.clear_bar()
 
+## Before combat playback: drop targeting state/overlays but keep the selected
+## legion inspected so the strip mirrors the fight live.
+func prepare_for_playback() -> void:
+	_hide_attack_choice_popup()
+	_clear_overlay_visuals()
+	_clear_expectation_preview()
+	selected_action = null
+	target_coords.clear()
+	default_target_actions.clear()
+	_pending_move_active = false
+	_pending_first_steps.clear()
+	_pending_parents.clear()
+	if action_bar:
+		action_bar.clear_bar()
+
+## After playback: keep inspecting the legion at coords if it survived, else deselect.
+func reselect_or_deselect(coords: Vector2i) -> void:
+	var state: BattleStateScript = battle_state_fn.call()
+	if state == null or _legion_at(state, coords) == null:
+		deselect()
+		return
+	select_tile(coords)
+
 func select_tile(coords: Vector2i) -> void:
 	var state: BattleStateScript = battle_state_fn.call()
 	if state == null:

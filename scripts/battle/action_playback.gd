@@ -14,6 +14,8 @@ const COMBAT_HIT_BEAT := 0.4
 const COMBAT_DEATH_BEAT := 0.6
 const COMBAT_REPOSITION_BEAT := 0.45
 const RANGED_FLIGHT_TIME := 0.26
+## Battle log: the loss (skull) chip pops this long after the damage chip of the killing hit.
+const LOG_DEATH_POP_DELAY := 0.22
 
 var _host: Node
 var _tile_visu_at: Callable
@@ -88,6 +90,8 @@ func play_combat(from_coords: Vector2i, to_coords: Vector2i, combat: Dictionary,
 		d_visu.update_direction(-face_dir)
 
 	for h in hits:
+		if not _host_alive():
+			return
 		var atk_legion: Legion = h["attacker_legion"]
 		var def_legion: Legion = h["defender_legion"]
 		var atk_unit: Unit = h["attacker"]
@@ -111,15 +115,21 @@ func play_combat(from_coords: Vector2i, to_coords: Vector2i, combat: Dictionary,
 			var died_on_hit := _apply_defender_reaction(
 				def_visu, def_legion, def_unit, direction, def_hp_before, def_hp_after, h, deaths_by_hit
 			)
-			_emit_combat_log_tick(attacker, defender, def_legion, h, died_on_hit)
+			await _emit_combat_log_tick(attacker, defender, def_legion, h, died_on_hit)
 			var beat := COMBAT_DEATH_BEAT if died_on_hit else COMBAT_HIT_BEAT
+			if died_on_hit:
+				beat = maxf(0.0, beat - LOG_DEATH_POP_DELAY)
 			await _beat(beat)
 
+	if not _host_alive():
+		return
 	for lv in legion_to_visu.values():
 		if lv:
 			lv.update_local_positions()
 			lv.tween_units_to_local_positions()
 	await _beat(COMBAT_REPOSITION_BEAT)
+	if not _host_alive():
+		return
 	_restart_idle_animations(legion_to_visu)
 	for lv in legion_to_visu.values():
 		if lv:
@@ -180,8 +190,8 @@ func _play_ranged_hit(
 	var died_on_hit := _apply_defender_reaction(
 		def_visu, def_legion, def_unit, direction, def_hp_before, def_hp_after, hit, deaths_by_hit
 	)
-	_emit_combat_log_tick(attacker, defender, def_legion, hit, died_on_hit)
-	await _beat(COMBAT_DEATH_BEAT if died_on_hit else 0.15)
+	await _emit_combat_log_tick(attacker, defender, def_legion, hit, died_on_hit)
+	await _beat(maxf(0.0, COMBAT_DEATH_BEAT - LOG_DEATH_POP_DELAY) if died_on_hit else 0.15)
 
 func _apply_defender_reaction(
 	def_visu: LegionVisu,
@@ -242,6 +252,8 @@ func play_heal(coords: Vector2i, payload: Dictionary, options: Dictionary = {}) 
 
 	# One pulse per caster unit (unit_heals is already focused onto lowest-HP targets).
 	for entry in unit_heals:
+		if not _host_alive():
+			return
 		var unit: Unit = entry.get("unit")
 		if unit == null:
 			continue
@@ -279,6 +291,8 @@ func play_heal(coords: Vector2i, payload: Dictionary, options: Dictionary = {}) 
 	target_visu.update_local_positions()
 	target_visu.tween_units_to_local_positions()
 	await _beat(COMBAT_REPOSITION_BEAT)
+	if not _host_alive():
+		return
 	target_visu.start_idle_animation()
 	target_visu.sync_all_unit_hp_bars()
 
@@ -416,6 +430,7 @@ func _register_legion_visu(legion_to_visu: Dictionary, legion: Legion) -> void:
 	if visu:
 		legion_to_visu[legion] = visu
 
+## Damage and losses are emitted as separate ticks so each log chip pops on its own beat.
 func _emit_combat_log_tick(
 	attacker: Legion,
 	defender: Legion,
@@ -423,28 +438,34 @@ func _emit_combat_log_tick(
 	hit: Dictionary,
 	died_on_hit: bool
 ) -> void:
-	var hp_lost := int(round(float(hit.get("hp_lost", 0.0))))
-	if hp_lost <= 0 and not died_on_hit:
-		return
-	var tick := {}
+	var side := ""
 	if def_legion == attacker:
-		if hp_lost > 0:
-			tick["caster_hp_lost"] = hp_lost
-		if died_on_hit:
-			tick["caster_deaths"] = 1
+		side = "caster"
 	elif def_legion == defender:
+		side = "target"
+	else:
+		return
+	var hp_lost := int(round(float(hit.get("hp_lost", 0.0))))
+	if hp_lost > 0:
+		var dmg_tick := {}
+		dmg_tick["%s_hp_lost" % side] = hp_lost
+		EventBus.battle_log_live_tick.emit(dmg_tick)
+	if died_on_hit:
 		if hp_lost > 0:
-			tick["target_hp_lost"] = hp_lost
-		if died_on_hit:
-			tick["target_deaths"] = 1
-	if not tick.is_empty():
-		EventBus.battle_log_live_tick.emit(tick)
+			await _beat(LOG_DEATH_POP_DELAY)
+		var death_tick := {}
+		death_tick["%s_deaths" % side] = 1
+		EventBus.battle_log_live_tick.emit(death_tick)
 
 func _restart_idle_animations(legion_to_visu: Dictionary) -> void:
 	for lv in legion_to_visu.values():
 		if lv and is_instance_valid(lv):
 			lv.start_idle_animation()
 
+func _host_alive() -> bool:
+	return is_instance_valid(_host) and _host.is_inside_tree()
+
 func _beat(seconds: float) -> void:
-	if _host and _host.is_inside_tree():
+	# Host may be freed mid-playback (e.g. abandon to main menu); never touch it then.
+	if _host_alive():
 		await _host.get_tree().create_timer(seconds).timeout

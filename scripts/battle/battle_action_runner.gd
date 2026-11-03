@@ -30,6 +30,8 @@ func play_result(
 		var tween: Tween = presenter.tween_legion_move(legion, to_coords)
 		if tween:
 			await tween.finished
+		if not _host_alive(host):
+			return false
 		_call_hook(hooks, "on_ap_changed", legion)
 	elif "legion_teleported" in events:
 		var legion: Legion = payload.get("legion")
@@ -48,6 +50,8 @@ func play_result(
 						lv.position = to_visu.position
 						lv._sync_depth_sort(),
 		})
+		if not _host_alive(host):
+			return false
 		_call_hook(hooks, "deselect")
 		_call_hook(hooks, "clear_overlays")
 		_call_hook(hooks, "on_finished")
@@ -60,15 +64,26 @@ func play_result(
 		for tween in presenter.tween_legion_swap(legion_a, legion_b, to_coords, from_coords):
 			if tween:
 				await tween.finished
+		if not _host_alive(host):
+			return false
 		_call_hook(hooks, "on_ap_changed", legion_a)
 		_call_hook(hooks, "on_ap_changed", legion_b)
 	elif "combat_resolved" in events:
+		var keep_selection := bool(hooks.get("keep_selection_in_combat", false))
+		if keep_selection:
+			_call_hook(hooks, "prepare_playback")
 		var played := await _play_combat(
 			host, presenter, playback, from_coords, to_coords, payload.get("combat", {}), hooks
 		)
-		# Combat is terminal — always clear selection/overlays after it resolves.
-		_call_hook(hooks, "deselect")
-		_call_hook(hooks, "clear_overlays")
+		if not _host_alive(host):
+			return false
+		# Combat is terminal — clear targeting; optionally keep inspecting the attacker.
+		if keep_selection and not bool(hooks.get("deselect_after_combat", false)):
+			_call_hook(hooks, "clear_overlays")
+			_call_hook(hooks, "reselect", from_coords)
+		else:
+			_call_hook(hooks, "deselect")
+			_call_hook(hooks, "clear_overlays")
 		_call_hook(hooks, "on_finished")
 		return played
 	elif "legion_healed" in events:
@@ -78,6 +93,8 @@ func play_result(
 			"deselect": hooks.get("deselect", Callable()),
 			"on_ap_changed": hooks.get("on_ap_changed", Callable()),
 		})
+		if not _host_alive(host):
+			return false
 		_call_hook(hooks, "on_finished")
 		return true
 
@@ -114,6 +131,8 @@ func _play_combat(
 			"deselect": hooks.get("deselect", Callable()),
 			"on_ap_changed": hooks.get("on_ap_changed", Callable()),
 		})
+		if not _host_alive(host):
+			return false
 	else:
 		# Model already resolved; skip visuals rather than reporting failure.
 		if hooks.get("deselect_before_combat", false):
@@ -129,6 +148,10 @@ func _play_combat(
 		presenter.remove_dead_legions(session)
 	_call_hook(hooks, "clear_overlays")
 	return true
+
+## Scene may be freed mid-playback (e.g. abandon to menu); stop touching UI then.
+static func _host_alive(host: Node) -> bool:
+	return is_instance_valid(host) and host.is_inside_tree()
 
 func _call_hook(hooks: Dictionary, key: String, arg = null) -> void:
 	if not hooks.has(key):
