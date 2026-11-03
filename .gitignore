@@ -24,3 +24,6 @@ data/ai/evolve/cascade_m/
 data/ai/evolve/*/plots/
 data/ai_duel/
 data/**/*.csv.import
+
+# Godot movie-writer captures (project.godot writes res://videos/recording.avi)
+videos/
