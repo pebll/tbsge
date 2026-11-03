@@ -40,6 +40,8 @@ func run(_tree: SceneTree) -> bool:
 		return false
 	if not _test_teleport_rejects_occupied_and_oor():
 		return false
+	if not _test_match_rng_reproducible():
+		return false
 	print("Success: Action system tests")
 	return true
 
@@ -866,5 +868,42 @@ func _test_teleport_rejects_occupied_and_oor() -> bool:
 	})
 	if bad["ok"]:
 		push_error("Teleport onto occupied tile should fail")
+		return false
+	return true
+
+func _test_match_rng_reproducible() -> bool:
+	## Same match seed => same combat outcome for commands without an explicit rng_seed.
+	var hp_after: Array = []
+	for _i in range(2):
+		var session := MinigameTestHelpersScript.prepare_session()
+		var started: Dictionary = MinigameTestHelpersScript.start_two_legion_battle(session)
+		var green: Legion = started["a"]
+		var blue: Legion = started["b"]
+		var atk := Vector2i(0, 0)
+		var def := Vector2i(1, 0)
+		if session.grid.get(atk) == null or session.grid.get(def) == null:
+			return true
+		for c in [green.tile_coords, blue.tile_coords]:
+			if session.grid.get(c):
+				session.grid[c].legion = null
+		_teleport(session, green, atk)
+		_teleport(session, blue, def)
+		session.set_match_seed(1234)
+		var result := session.apply({
+			"type": "use_action",
+			"action_id": "melee_attack",
+			"from": atk,
+			"to": def,
+		})
+		if not result["ok"]:
+			push_error("Seeded melee failed: %s" % result.get("error"))
+			return false
+		var hits: Array = result["payload"]["combat"]["hits"]
+		var trace: Array = []
+		for h in hits:
+			trace.append([h["damage"], h["target_hp_after"]])
+		hp_after.append(trace)
+	if hp_after[0] != hp_after[1]:
+		push_error("Same match seed must reproduce the same combat")
 		return false
 	return true

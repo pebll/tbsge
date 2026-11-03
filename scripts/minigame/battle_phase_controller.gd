@@ -93,7 +93,7 @@ func handle_pass_continue() -> void:
 func request_use_action(action_id: String, from_coords: Vector2i, to_coords: Vector2i) -> void:
 	if is_input_locked():
 		return
-	await perform_use_action(action_id, from_coords, to_coords, randi())
+	await perform_use_action(action_id, from_coords, to_coords, deps.session.next_rng_seed())
 
 func request_move_path(path: Array) -> void:
 	if is_input_locked():
@@ -336,7 +336,7 @@ func _run_ai_turn_async() -> void:
 						action_id,
 						cmd.get("from", coords),
 						cmd.get("to", coords),
-						int(cmd.get("rng_seed", randi()))
+						int(cmd["rng_seed"]) if cmd.has("rng_seed") else deps.session.next_rng_seed()
 					)
 					ok = step.get("ok", false)
 				# Scene may have changed (abandon to menu) while playback awaited.
@@ -344,7 +344,7 @@ func _run_ai_turn_async() -> void:
 					return
 				if ok and AiBrainCommand.has_followup(cmd):
 					var follow: Dictionary = AiBrainCommand.apply_followup_if_any(
-						deps.session, cmd, legion, randi()
+						deps.session, cmd, legion, deps.session.next_rng_seed()
 					)
 					ok = ok and bool(follow.get("ok", true))
 				if not ok:

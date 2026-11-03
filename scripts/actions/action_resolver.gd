@@ -111,7 +111,7 @@ static func _execute_melee_attack(
 	if defender == null:
 		return _fail("No defender")
 
-	var rng_seed: int = int(cmd.get("rng_seed", randi()))
+	var rng_seed: int = int(cmd["rng_seed"]) if cmd.has("rng_seed") else state.next_rng_seed()
 	attacker.spend_ap(action.ap_cost)
 	_apply_terminal(state, attacker, action)
 	var result: Dictionary = CombatResolver.resolve_combat(
@@ -142,7 +142,7 @@ static func _execute_ranged_attack(
 		return _fail("No defender")
 
 	var distance := HexPathfinder.hex_distance(from_coords, to_coords)
-	var rng_seed: int = int(cmd.get("rng_seed", randi()))
+	var rng_seed: int = int(cmd["rng_seed"]) if cmd.has("rng_seed") else state.next_rng_seed()
 	attacker.spend_ap(action.ap_cost)
 	_apply_terminal(state, attacker, action)
 	var result: Dictionary = CombatResolver.resolve_combat(

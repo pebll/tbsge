@@ -16,11 +16,24 @@ var team_ids: Array[String] = []
 var action_log: BattleActionLogScript
 ## False for headless simulation (AI duels run on worker threads): skip EventBus autoload emits.
 var emit_global_events: bool = true
+## One RNG per match: every combat roll and AI tie-break draws from it, so a match
+## is reproducible from match_seed (replays, multiplayer, A/B evaluation).
+var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+var match_seed: int = 0
 
 func _init(p_team_ids: Array[String]) -> void:
 	team_ids = p_team_ids.duplicate()
 	turn_manager = TurnManagerRes.new(team_ids)
 	action_log = BattleActionLogScript.new()
+	set_match_seed(randi())
+
+func set_match_seed(p_seed: int) -> void:
+	match_seed = p_seed
+	rng.seed = p_seed
+
+## Seed for one combat resolution (or any other roll), drawn from the match RNG.
+func next_rng_seed() -> int:
+	return int(rng.randi())
 
 func battle_state() -> BattleStateScript:
 	return BattleStateScript.from_session(self)

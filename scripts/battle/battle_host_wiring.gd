@@ -73,7 +73,7 @@ static func wire_core_context(
 	if overlay_ui_fn.is_valid():
 		context.overlay_ui_fn = overlay_ui_fn
 
-static func rng_seed_for_action(action_id: String) -> Dictionary:
+static func rng_seed_for_action(action_id: String, session = null) -> Dictionary:
 	if action_id == "melee_attack" or action_id == "ranged_attack":
-		return {"rng_seed": randi()}
+		return {"rng_seed": session.next_rng_seed() if session != null else randi()}
 	return {}
