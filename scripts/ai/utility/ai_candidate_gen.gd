@@ -100,23 +100,14 @@ static func _targets_from(session, legion: Legion, at_coords: Vector2i, action_i
 	if at_coords == old:
 		return session.get_action_targets(legion, action_id)
 
-	var tile_old: Tile = session.grid.get(old)
 	var tile_new: Tile = session.grid.get(at_coords)
 	if tile_new == null:
 		return []
-	var prev_new = tile_new.legion
-	if prev_new != null and prev_new != legion:
+	if tile_new.legion != null and tile_new.legion != legion:
 		return []
-	legion.tile_coords = at_coords
-	if tile_old and tile_old.legion == legion:
-		tile_old.legion = null
-	tile_new.legion = legion
-	var targets: Array = session.get_action_targets(legion, action_id)
-	legion.tile_coords = old
-	if tile_old:
-		tile_old.legion = legion
-	tile_new.legion = prev_new
-	return targets
+	var targets_there := func() -> Array:
+		return session.get_action_targets(legion, action_id)
+	return HypotheticalPosition.evaluate(session.grid, legion, at_coords, targets_there, [])
 
 static func _preferred_first_step(
 	start: Vector2i, dest: Vector2i, parents: Dictionary

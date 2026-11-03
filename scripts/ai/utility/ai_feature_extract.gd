@@ -164,9 +164,11 @@ static func _fill_combat(
 	var defender: Legion = session.get_legion_at(to_coords)
 	if defender == null:
 		return
-	var restored := _push_coords(session, legion, from_coords)
-	var est: Dictionary = estimate(legion, defender, action_id, from_coords, to_coords, sim_count, memo)
-	_pop_coords(session, legion, restored)
+	var estimate_there := func() -> Dictionary:
+		return estimate(legion, defender, action_id, from_coords, to_coords, sim_count, memo)
+	var est: Dictionary = HypotheticalPosition.evaluate(
+		session.grid, legion, from_coords, estimate_there, {}
+	)
 
 	var def_hp := maxf(1.0, float(est.get("defender_hp", 1.0)))
 	var own_hp := maxf(1.0, float(est.get("attacker_hp", 1.0)))
@@ -234,43 +236,11 @@ static func _fill_heal(
 	feats[AiFeatureNames.HEAL_URGENCY] = clampf(1.0 - minf(stack_frac, worst_unit_frac), 0.0, 1.0)
 
 static func _has_combat_from(session, legion: Legion, at_coords: Vector2i) -> bool:
-	var restored: Dictionary = _push_coords(session, legion, at_coords)
-	var melee_targets: Array = session.get_action_targets(legion, "melee_attack")
-	var ranged_targets: Array = session.get_action_targets(legion, "ranged_attack")
-	var has_combat: bool = (not melee_targets.is_empty()) or (not ranged_targets.is_empty())
-	_pop_coords(session, legion, restored)
-	return has_combat
-
-static func _push_coords(session, legion: Legion, at_coords: Vector2i) -> Dictionary:
-	var old := legion.tile_coords
-	if at_coords == old:
-		return {"moved": false}
-	var tile_old: Tile = session.grid.get(old)
-	var tile_new: Tile = session.grid.get(at_coords)
-	var prev_new = tile_new.legion if tile_new else null
-	legion.tile_coords = at_coords
-	if tile_old and tile_old.legion == legion:
-		tile_old.legion = null
-	if tile_new:
-		tile_new.legion = legion
-	return {
-		"moved": true,
-		"old": old,
-		"tile_old": tile_old,
-		"tile_new": tile_new,
-		"prev_new": prev_new,
-	}
-
-static func _pop_coords(session, legion: Legion, restored: Dictionary) -> void:
-	if not bool(restored.get("moved", false)):
-		return
-	legion.tile_coords = restored["old"]
-	var tile_old: Tile = restored.get("tile_old")
-	var tile_new: Tile = restored.get("tile_new")
-	if tile_old:
-		tile_old.legion = legion
-	if tile_new:
-		tile_new.legion = restored.get("prev_new")
+	var combat_there := func() -> bool:
+		var melee_targets: Array = session.get_action_targets(legion, "melee_attack")
+		var ranged_targets: Array = session.get_action_targets(legion, "ranged_attack")
+		return (not melee_targets.is_empty()) or (not ranged_targets.is_empty())
+	return bool(HypotheticalPosition.evaluate(session.grid, legion, at_coords, combat_there, false))
 
 static func _total_hp(legion: Legion) -> float:
 	var t := 0.0

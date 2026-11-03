@@ -37,38 +37,25 @@ static func _score_teleport(session, legion: Legion, to_coords: Vector2i) -> flo
 	if enemies.is_empty():
 		return -INF
 
-	# Simulate standing at destination for target checks via temporary coords.
-	var old := legion.tile_coords
-	legion.tile_coords = to_coords
-	var tile_old: Tile = session.grid.get(old)
-	var tile_new: Tile = session.grid.get(to_coords)
-	var prev_new_legion = tile_new.legion if tile_new else null
-	if tile_old and tile_old.legion == legion:
-		tile_old.legion = null
-	if tile_new:
-		tile_new.legion = legion
-
-	var melee_targets: Array = session.get_action_targets(legion, "melee_attack")
-	var ranged_targets: Array = session.get_action_targets(legion, "ranged_attack")
-	if not melee_targets.is_empty() or not ranged_targets.is_empty():
-		score += 20.0
-		for t in melee_targets:
-			score += 5.0 + _focus_hp_bonus(session.get_legion_at(t))
-		for t in ranged_targets:
-			score += 4.0 + _focus_hp_bonus(session.get_legion_at(t))
-	else:
-		# Closer to preferred enemy is still useful.
-		var best_close := INF
-		for e in enemies:
-			best_close = minf(best_close, float(HexPathfinder.hex_distance(to_coords, e.tile_coords)))
-		score += 8.0 - best_close
-
-	# Restore occupancy.
-	legion.tile_coords = old
-	if tile_old:
-		tile_old.legion = legion
-	if tile_new:
-		tile_new.legion = prev_new_legion
+	# Target checks as if standing at the destination (restored afterwards).
+	var at_destination := func() -> float:
+		var sub := 0.0
+		var melee_targets: Array = session.get_action_targets(legion, "melee_attack")
+		var ranged_targets: Array = session.get_action_targets(legion, "ranged_attack")
+		if not melee_targets.is_empty() or not ranged_targets.is_empty():
+			sub += 20.0
+			for t in melee_targets:
+				sub += 5.0 + _focus_hp_bonus(session.get_legion_at(t))
+			for t in ranged_targets:
+				sub += 4.0 + _focus_hp_bonus(session.get_legion_at(t))
+		else:
+			# Closer to preferred enemy is still useful.
+			var best_close := INF
+			for e in enemies:
+				best_close = minf(best_close, float(HexPathfinder.hex_distance(to_coords, e.tile_coords)))
+			sub += 8.0 - best_close
+		return sub
+	score += float(HypotheticalPosition.evaluate(session.grid, legion, to_coords, at_destination, 0.0))
 	return score
 
 static func _focus_hp_bonus(target: Legion) -> float:
