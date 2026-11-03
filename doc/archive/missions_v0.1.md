@@ -1,3 +1,5 @@
+> **Frozen (2026-11-03).** This was the v0.1 mission board. Open items moved to [`../roadmap.md`](../roadmap.md); design notes (per-unit params, complexity tiers) to [`../design/combat.md`](../design/combat.md).
+
 # FableQuest missions
 
 Living checklist. Update as items are done; keep **short-term** small and shippable.  

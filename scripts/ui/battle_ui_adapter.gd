@@ -34,6 +34,12 @@ func deselect() -> void:
 func select_tile(coords: Vector2i) -> void:
 	interaction.select_tile(coords)
 
+func prepare_for_playback() -> void:
+	interaction.prepare_for_playback()
+
+func reselect_or_deselect(coords: Vector2i) -> void:
+	interaction.reselect_or_deselect(coords)
+
 func refresh_after_action(legion_coords: Vector2i) -> void:
 	interaction.refresh_after_action(legion_coords)
 
