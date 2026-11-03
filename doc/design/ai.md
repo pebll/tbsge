@@ -6,18 +6,14 @@
 - The scoring weights are **parameters, not magic numbers**: collect them in one place so an optimiser (evolutionary algorithm) can tune them headless.
 - Build each new effect with its AI scoring in the same slice (see dev flow below).
 
-## Where it stands (code)
+## Where it stands (code, after PR #4)
 
-- `scripts/ai/behaviors/attack_nearest_enemy.gd` (~730 lines): legion ordering, heal gating, flanking, teleport-to-engage, stand goals, soft-path walking.
-- `scripts/ai/ai_action_scorer.gd`: a net-HP heuristic (`enemy_hp_lost + own_hp_gained - own_hp_lost`) with its **own** simplified combat simulation.
-- `scripts/battle/battle_expectation_estimator.gd`: a Monte Carlo estimator used by the UI preview (min–max damage/losses).
-- `scripts/balance/ai_duel_runner.gd`: headless AI-vs-AI runs with CSV reports. This is the natural fitness function for the EA.
-
-### Gaps that 0.1 should close
-1. **Two combat models.** The AI scorer ignores shields, assumes strikes hit the front unit (real combat targets randomly), and doesn't value kills. The UI estimator is closer to the truth. → The AI should call the same estimator (fewer sims + cache), or a deterministic expected-value version of it, so that one rule change updates the resolver, the preview and the AI together.
-2. **Constants are scattered** (`HEAL_CRITICAL_RATIO`, `FLANK_OPPORTUNITY_TAX`, scorer bonuses like `+20`, `+5`, `4/hp`…). → Move them into `AiParams` (a Resource) and pass it in. EA genomes = `AiParams` instances.
-3. **Hypothetical positions by mutating the grid.** `_score_teleport` temporarily moves the legion on the live grid to ask for targets. → Give the targeting helpers a "from coords" parameter, or score on a cloned `BattleState`.
-4. **Greedy, one legion at a time.** No notion of the turn as a whole (who attacks first to set up a kill, who stays back). A cheap upgrade: re-score after each action (already done), plus a "kill potential this turn" term and a threat map of where enemies can hit next turn.
+- **Shipped brain: `utility`** (`scripts/ai/brains/utility_brain.gd`): candidate generation → feature extraction → linear score with an `AiProfile` (weights in `data/ai/profiles/utility_default.json`, fallback `hand_v1`).
+- **Combat features** come from `CombatExpectation`, Monte Carlo over the real `CombatResolver` via the shared `CombatSampler` (same sampler as the UI preview). Shields, random targets, kills and wipe odds are all included.
+- **Threat map** + safety features, walking-distance focus field.
+- **Tuning:** GA + MAP-Elites + curriculum (`scripts/ai/evolution`, `run_ai_evolve.sh`), held-out gating bench (`run_ai_bench.sh`, Wilson CI, paired sign test).
+- **Baselines:** `cascade` (the old `AttackNearestEnemyBehavior`), `greedy`, `heal_only`, `pass`, used as fixed opponents.
+- Results so far and next steps: see `odd/tasks/utility-ai-quality.md`. Utility beats cascade significantly; vs greedy it's not yet significant. The proposed next step is structural (1-ply enemy reply, focus fire within a turn, kiting), not more weight tuning.
 
 ## Proposed considerations (a starting set to tune)
 

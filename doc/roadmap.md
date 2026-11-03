@@ -2,19 +2,19 @@
 
 The living board: what's next, in order. Design reasoning lives in `design/`; open decisions live in `open_questions.md`.
 
-Legend: `[x]` done · `[~]` fixed in code, needs an in-game check · `[ ]` open
+Legend: `[x]` done (bug fixes verified by tests; still give them one in-editor look) · `[ ]` open
 
 ---
 
 ## Bugs / UX notes
 
-- [~] **Battle log losses stop at 1.** The live death counter was overwritten instead of added to (`battle_action_log_panel.gd`, `cumulative=false`). Now adds up.
-- [~] **Loss & damage should pop separately.** The killing hit now emits the damage tick first and the loss tick ~0.22 s later, so each chip bumps on its own (`action_playback.gd`, `LOG_DEATH_POP_DELAY`). The overall hit rhythm is unchanged.
-- [~] **Keep selection when starting a combat** so you can watch it live in the legion strip. Human turns now keep the attacker selected during playback (targeting overlays are cleared) and still inspected afterwards. If the attacker is wiped, the selection is cleared. AI turns still deselect.
-- [~] **Action bar a bit higher** so it doesn't touch the legion stat box: raised 20 px (`scenes/ui/battle_action_bar.tscn`). Adjust `offset_top/bottom` if you want more room.
-- [~] **Crashing bug** — no repro given. Most likely cause found and fixed: the AI turn loop and combat playback kept running after leaving the battle scene (pause → abandon, or game over → menu) and touched freed nodes. All those coroutines now stop when the scene is gone. **If you still crash, note what you were doing** (AI turn? abandon? rematch?) and copy the Godot error line here.
-- [~] **Pause menu didn't pause the AI**: the AI kept acting under the pause box. It now holds between actions while the menu is open.
-- [~] **Swap exploit:** wait a legion, then swap another legion with it → the waited legion could act again. It now stays waited (test added).
+- [x] **Battle log losses stop at 1.** The live death counter was overwritten instead of added to (`battle_action_log_panel.gd`, `cumulative=false`). Now adds up.
+- [x] **Loss & damage should pop separately.** The killing hit now emits the damage tick first and the loss tick ~0.22 s later, so each chip bumps on its own (`action_playback.gd`, `LOG_DEATH_POP_DELAY`). The overall hit rhythm is unchanged.
+- [x] **Keep selection when starting a combat** so you can watch it live in the legion strip. Human turns now keep the attacker selected during playback (targeting overlays are cleared) and still inspected afterwards. If the attacker is wiped, the selection is cleared. AI turns still deselect.
+- [x] **Action bar a bit higher** so it doesn't touch the legion stat box: raised 20 px (`scenes/ui/battle_action_bar.tscn`). Adjust `offset_top/bottom` if you want more room.
+- [x] **Crashing bug** — no repro given. Most likely cause found and fixed: the AI turn loop and combat playback kept running after leaving the battle scene (pause → abandon, or game over → menu) and touched freed nodes. All those coroutines now stop when the scene is gone. **If you still crash, note what you were doing** (AI turn? abandon? rematch?) and copy the Godot error line here.
+- [x] **Pause menu didn't pause the AI**: the AI kept acting under the pause box. It now holds between actions while the menu is open.
+- [x] **Swap exploit:** wait a legion, then swap another legion with it → the waited legion could act again. It now stays waited (test added).
 
 Carried over from the v0.1 board:
 - [ ] Turn clarity: whose turn it is and how to end it should be obvious (`TurnHud` + discoverable wait/pass).
@@ -26,12 +26,14 @@ Carried over from the v0.1 board:
 ## Milestones
 
 ### 0.1 — AI overhaul
-Goal: the AI feels smart and isn't easy to exploit. See [`design/ai.md`](design/ai.md).
-- [ ] Utility AI: every candidate action scored by named, weighted considerations (no hidden magic numbers in code paths).
-- [ ] Use battle expectation (the same estimator as the UI preview) and **value kills**, not just HP traded.
-- [ ] Take maneuvering into account (threat maps, flanking, retreat, protecting soft legions).
-- [ ] All weights in one `AiParams` resource → an evolutionary algorithm (EA) can tune them headless via the AI-duel runner.
-- [ ] Define "smart & not exploitable" as tests: a regression set of tactical puzzles + win rate against the previous AI version.
+Goal: the AI feels smart and isn't easy to exploit. See [`design/ai.md`](design/ai.md) and the task log [`utility-ai-quality.md`](../odd/tasks/utility-ai-quality.md).
+- [x] Utility AI: candidates scored by named, weighted features (`AiProfile`, JSON profiles) — PR #4
+- [x] Uses Monte Carlo expectation over the real resolver; values trades by gold and wipe chance — PR #4
+- [x] Threat map / safety, walking-distance focus — PR #4
+- [x] GA + MAP-Elites tuning, held-out gating bench with Wilson CI — PR #4
+- [ ] Beat `greedy` with statistical significance (needs structure, not weights: 1-ply enemy reply, team focus fire within a turn, ranged kiting)
+- [ ] Stall-breaker for draws the baseline converts
+- [ ] Define "not exploitable" as tests: tactical puzzles + known-cheese list
 
 ### 0.2 — More effects
 Follow the per-effect dev flow (effect → legion → test → AI → AI test). See [`design/combat.md`](design/combat.md).
@@ -76,9 +78,11 @@ Goal: release a working and fun skirmish mode.
 - [ ] Content: more units, campaign?, tutorial?
 
 ### Tech/infra backlog (no milestone yet)
-- [ ] CI that runs `./run_tests.sh` headless
-- [ ] Seeded match RNG (replays, multiplayer, reproducible EA runs)
-- [ ] Repo slimming (videos, archived assets — see `codebase.md`)
+- [x] CI that runs `./run_tests.sh` headless (`.github/workflows/tests.yml`, `tools/get_godot.sh`)
+- [x] Seeded match RNG (`MatchSession.rng`)
+- [x] Wait state on the legion; capability aggregation; shared combat sampler (see `codebase.md`)
+- [ ] Repo slimming: archive delete list, evolve run data (see `codebase.md` #14/#15)
+- [ ] Parallel evolve worker silently failing a job (`eval job N returned no result`)
 
 ---
 

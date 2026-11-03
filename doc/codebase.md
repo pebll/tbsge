@@ -1,6 +1,6 @@
 # Codebase map & review
 
-Godot 4.6, GDScript, ~22.7k lines in `scripts/` + `tests/`. Review date: 2026-11-03.
+Godot 4.6, GDScript. Reviewed 2026-11-03; updated after the utility-AI merge (PR #4).
 
 ## Architecture
 
@@ -38,35 +38,36 @@ tests/                    headless suite (run_tests.gd), one file per area
 | 6 | Pause menu didn't stop the AI → AI holds between actions while paused | `battle_phase_controller.gd` (`_ai_delay`) |
 | 7 | Swapping with a waited ally cleared its wait (free extra turn) → wait kept; regression test added | `actions/action_resolver.gd`, `tests/test_actions.gd` |
 
-⚠️ These changes were reviewed statically: I couldn't run Godot in the cloud session. **Run `./run_tests.sh` and play one battle (attack, abandon mid-AI-turn, pause during the AI turn) before merging.**
+All of the above are covered by the headless suite (38 suites, run locally with Godot 4.6).
 
-## Findings not fixed (refactor backlog, by priority)
+## Review findings: status after the utility-AI merge (PR #4) and the follow-up pass
 
-### High: they will bite the next milestones
-1. **"Waited" is stored per tile** (`TurnManager.waited_coords`), not per legion. That's why there are `clear_wait()` patches in move, swap, teleport and cleanup, and why bug 7 existed. → Put `has_acted_this_turn` / `waited` on `Legion` and delete the coordinate bookkeeping. Small, contained refactor with good test coverage already.
-2. **Three combat models**: `CombatResolver` (truth), `BattleExpectationEstimator` (Monte Carlo over the resolver, good) and `AiActionScorer._estimate_combat_damage` (hand-rolled: no shields, front-target instead of random, no kills). Every 0.2 effect would need to be coded three times. → AI uses the estimator (or an expected-value pass built on the resolver). **Do this first in 0.1.**
-3. **Homogeneous-legion assumptions** block 0.4 mixing: `Legion.unit_type`; `ActionTargeting._legion_has_ranged/_legion_attack_range` read `units[0]`; action ids come from the legion's type; `unit_count` duplicates `units.size()`. → If mixing is coming, introduce "legion capabilities = union/aggregate of its units" **before** writing many effects that assume one type.
-4. **No status/modifier hooks in combat.** `CombatResolver.resolve_combat` is one loop with damage = `attack` or `ranged_attack`. → Add pre-strike / on-hit / on-death hooks + a `StatusEffect` model before 0.2 effects (see `design/combat.md`).
-5. **Global RNG** (`randi()` defaults in `ActionResolver`, `BattleHostWiring`, battle controller). → One seeded RNG per match, passed through; needed for replays, multiplayer and reproducible EA fitness.
+| # | Finding | Status |
+|---|---------|--------|
+| 1 | "Waited" stored per tile (`TurnManager.waited_coords`) → stale stains, swap exploit | ✅ **Fixed**: `Legion.waited`; `end_team_turn` clears every legion; tile bookkeeping deleted |
+| 2 | Three combat models (resolver / UI estimator / hand-rolled AI sim) | ✅ **Mostly fixed by PR #4**: the shipped `utility` brain scores fights via `CombatExpectation` over the real resolver. ✅ **Follow-up**: UI preview and AI now share one sampler (`CombatSampler`). ⚠️ The legacy `AiActionScorer` heuristic (no shields, front-target) remains, but only inside the `cascade`/`greedy` *baseline* brains used as benchmark opponents |
+| 3 | Homogeneous-legion assumptions (`units[0]` for range, single-type action ids, duplicated `unit_count`) | ✅ **Fixed for rules**: `Legion.has_ranged/max_attack_range/unit_types`, union of action ids, read-only `unit_count`. ⚠️ Still single-type by design: `Legion.unit_type` drives visuals, draft cost, SFX and the legion stats panel. That is the actual 0.4 mixing work |
+| 4 | No status/modifier hooks in combat | ⏸ **Deferred on purpose** to the first 0.2 effect. Designing the hook API without a single consumer means guessing it. Let the first status (attack buff) define `StatusEffect` + pre-strike / on-hit / on-death hooks in `CombatResolver`. UI and AI sample through the resolver, so they get it for free |
+| 5 | Global RNG | ✅ **Fixed**: `MatchSession.rng` / `match_seed`. The resolver default, battle controller, sandbox and the utility brain's softmax pick use it; AI duels seed it. The remaining global RNG is cosmetic only (formations, SFX variants, menu background, opponent names) |
+| 6 | AI moves legions on the live grid to evaluate hypotheticals | ✅ **Fixed**: 7 call sites (utility, cascade, legacy scorer) go through `HypotheticalPosition.evaluate`, which always restores |
+| 7 | AI magic numbers scattered | ✅ **Fixed by PR #4** for the utility brain (`AiProfile`, JSON profiles in `data/ai/profiles/`, GA / MAP-Elites tuning). Baseline brains keep their consts (intentionally frozen opponents) |
+| 8 | Heals truncate float HP to int | ✅ **Fixed** (float math + test) |
+| 9 | Per-hit combat prints; sims toggled the static `quiet` flag from worker threads | ✅ **Fixed**: quiet by default, no toggling in sims. The other prints were already behind debug flags |
+| 10 | Big files (log panel, tile info panel, cascade behaviour, interaction) | ⏸ **Not a defect**: split when next touched |
+| 11 | `minigame_root` / `sandbox_root` duplicate HUD wiring | ⏸ **Not a defect**: move into `BattleHostWiring` when the sandbox next needs a feature |
+| 12 | Pause menu is an overlay, not `get_tree().paused` | ✅ The AI now holds while paused; animations still run, which is fine |
+| 13 | `videos/` (2× identical 28 MB AVI) committed | ✅ **Untracked + ignored** (files kept on disk; still in git history) |
+| 14 | `assets/_archive/` is 142 MB | ⏸ **Waiting on your delete list** (see `assets_archive.md`) |
+| 15 | Run outputs committed | ✅ `data/ai_duel/` untracked (it was already ignored by PR #4). ❓ `data/ai/evolve/{cur,cur2,cur3,lon1,nice}` (~140k lines of CSV/JSON) are still tracked. Keep only `best_profile.json` + `history.jsonl`? Your call |
+| 16 | `.uid` policy contradictory / files missing | ✅ Every script has a tracked `.uid`; the cursor rule now says to commit them; missing asset `.import` files committed |
+| 17 | No CI | ✅ `.github/workflows/tests.yml` + `tools/get_godot.sh` (checksum-verified Godot 4.6). Verified from a fresh clone: 38/38 |
 
-### Medium
-6. AI evaluates teleports by **temporarily mutating the live grid** (`AiActionScorer._score_teleport`). Works today, but it's fragile (an early return leaves corrupted state). → Targeting helpers that take a hypothetical origin.
-7. AI magic numbers live in two files as consts and literals → one `AiParams` resource (prereq for the EA).
-8. HP is `float` while every stat in `data/units` is an integer, and heals cast to `int` (`mini(before + heal, int(max))`). If a fractional damage source ever appears, heals silently truncate. → Pick `int` everywhere (or float everywhere).
-9. `CombatResolver` prints every hit unless `quiet` is set; ~19 other bare `print`s. → Route through a debug logger; this matters for EA throughput.
-10. Big files: `tile_info_panel.gd` (894), `battle_action_log_panel.gd` (893), `attack_nearest_enemy.gd` (731), `battle_interaction.gd` (~680), `unit_visu.gd` (670). Not urgent; split when you next touch them (e.g. log panel → card builder + live-tick controller).
-11. `minigame_root.gd` and `sandbox_root.gd` still duplicate HUD wiring (pause, strip, vitals/AP handlers). `BattleHostWiring` covers part of it; move the rest when sandbox next needs a feature.
-12. The pause menu is a click-catcher overlay, not `get_tree().paused`. The AI is now held, but tweens/animations keep running. Probably fine; just be aware.
+### New observations from this pass
+- `tests/test_ai_evolution.gd` logs `eval job N returned no result (worker error)` on some runs, but the suite still passes. A worker in the parallel evaluator is failing silently; worth a look before the next long evolve run.
+- `CombatSimSnapshot.clone_legion` doesn't copy `waited`, cooldowns or statuses. That's fine for combat sims today; revisit when 0.2 statuses exist, because the sampler will need them.
+- Behaviour check: `utility` vs `cascade`, 20 mirrored pairs (seed offset 1e6), gave **identical** results on `main` and on this branch. The refactors didn't change how the AI plays.
 
-### Repo hygiene
-13. `videos/001_select_units.avi` and `videos/recording.avi` are **identical** 28 MB files, both committed (`project.godot` points the movie writer at `videos/recording.avi`). → Add `videos/` to `.gitignore`, remove them from git.
-14. `assets/_archive/` = 142 MB in the working tree; `.git` = 221 MB. → Once you approve the delete list, remove it (history keeps it; a full slim-down needs a history rewrite, only if you want it).
-15. `data/ai_duel/run_*` CSV outputs (+ `.import` files) are committed. → Ignore `data/ai_duel/run_*`.
-16. `.uid` policy is contradictory: `.cursor/rules/git-workflow.mdc` says don't commit `.uid`, yet 126 are tracked and 13 scripts have none (e.g. `battle_expectation_estimator.gd`, `legion_strip.gd`, `ui_stat_icons.gd`). Godot 4.4+ expects `.uid` files to be **committed** (scenes reference scripts by uid, e.g. `project.godot` autoloads). → Commit them all and update the rule.
-17. No CI. `run_tests.sh` needs a local `./godot_exe`. → A GitHub Action with a headless Godot 4.6 binary would catch regressions from agent sessions.
-
-## Where to start (suggested order for 0.1)
-1. Run tests + smoke the fixes above.
-2. Wait-per-legion refactor (#1). Small, and removes a whole class of bugs.
-3. Seeded match RNG (#5) + quiet logging (#9). Needed for any optimisation.
-4. AI on the shared estimator + `AiParams` (#2, #7), then add considerations and an EA loop.
+## Where to start next
+1. Smoke-test in the editor: attack (selection stays), pause during an AI turn, abandon mid-AI-turn.
+2. 0.2: build the first status effect (attack buff/debuff) together with the resolver hook API (#4).
+3. Decide on #15 (evolve run data) and #14 (archive delete list).
