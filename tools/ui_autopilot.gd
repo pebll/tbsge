@@ -27,6 +27,10 @@ func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
 	if not args.is_empty():
 		_out_dir = args[0]
+	# Optional second arg: global RNG seed (draft, map, combat) to replay a run.
+	var run_seed := int(args[1]) if args.size() > 1 else int(Time.get_unix_time_from_system()) % 100000
+	seed(run_seed)
+	_log("seed %d (replay: tools/run_ui_autopilot.sh OUT_DIR %d)" % [run_seed, run_seed])
 	DirAccess.make_dir_recursive_absolute(_out_dir)
 	_hex = load("res://scripts/ai/hex_pathfinder.gd")
 	_start.call_deferred()
@@ -313,7 +317,15 @@ func _play_human_turn(turn_no: int) -> void:
 			await _wait(0.3)
 		var selected: bool = g.battle_ui.interaction.has_selected and g.battle_ui.interaction.selected_coords == coords
 		_check(selected, "turn %d: clicking own legion selects it" % turn_no)
-		_check(g._legion_strip.visible and g._legion_strip.current_legion() == legion, "turn %d: legion strip shows the selection" % turn_no)
+		var strip_ok: bool = g._legion_strip.visible and g._legion_strip.current_legion() == legion
+		if not strip_ok:
+			var shown = g._legion_strip.current_legion()
+			_log("strip mismatch: selected %s %s@%s (already=%s) | strip visible=%s shows %s" % [
+				legion.team_id, legion.unit_type, coords, already, g._legion_strip.visible,
+				("%s %s@%s units=%d" % [shown.team_id, shown.unit_type, shown.tile_coords, shown.units.size()]) if shown else "none",
+			])
+			await _shot("turn%d_strip_mismatch" % turn_no)
+		_check(strip_ok, "turn %d: legion strip shows the selection" % turn_no)
 		if acted == 0:
 			await _shot("turn%d_selected" % turn_no)
 		if not selected:
@@ -345,6 +357,9 @@ func _do_attack(g, legion, from: Vector2i, action_id: String, target: Vector2i, 
 	await _move_mouse(tpos)
 	await _wait(0.6)
 	await _shot("turn%d_attack_preview_%s" % [turn_no, action_id])
+	# Hover state only refreshes on motion; nudge so a panel that popped up under a
+	# still cursor is detected (a real click there would land on it).
+	await _move_mouse(tpos + Vector2(1, 0))
 	if get_viewport().gui_get_hovered_control() != null:
 		# The hover preview popped up over the very tile being targeted.
 		_ux("attack preview panel covers the hovered target tile (click would hit the HUD)")
