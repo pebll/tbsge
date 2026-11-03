@@ -16,6 +16,13 @@ Legend: `[x]` done (bug fixes verified by tests; still give them one in-editor l
 - [x] **Pause menu didn't pause the AI**: the AI kept acting under the pause box. It now holds between actions while the menu is open.
 - [x] **Swap exploit:** wait a legion, then swap another legion with it → the waited legion could act again. It now stays waited (test added).
 
+Found by the click-through autopilot (`tools/run_ui_autopilot.sh`, 2026-11-03):
+- [x] **Draft panel script error**: `MinigameSetupPanel.show_for_team` set `.disabled` on a `GameButton` (it has `button_disabled`), which aborted the function on every draft refresh, so the Random team / Ready buttons were never disabled when they should be.
+- [ ] **Attack preview covers its own target**: hovering an enemy in the lower part of the screen opens the comparison bar (attacker | VS | defender) on top of that hex, so the click hits the panel instead of attacking. Options: put the preview at the top of the screen when the target is low, make the bar ignore the mouse (`MOUSE_FILTER_IGNORE`), or shrink it.
+- [ ] **Comparison bar runs under the battle log**: the 3-part preview is wider than the free space; its attacker strip slides under the left log panel.
+- [ ] **Battle log panel is wide and opaque** (~540 px of 1920) and starts empty. Consider a narrower/translucent panel or starting collapsed.
+- [ ] **Draft camera doesn't frame your deploy zone** at 1920×1080: after "Random team" most of your legions are off-screen.
+
 Carried over from the v0.1 board:
 - [ ] Turn clarity: whose turn it is and how to end it should be obvious (`TurnHud` + discoverable wait/pass).
 - [ ] Label **Dev Test** as "Advanced / Lab".

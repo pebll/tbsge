@@ -27,3 +27,4 @@ data/**/*.csv.import
 
 # Godot movie-writer captures (project.godot writes res://videos/recording.avi)
 videos/
+autopilot_shots/

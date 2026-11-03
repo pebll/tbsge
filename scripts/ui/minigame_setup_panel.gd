@@ -65,8 +65,8 @@ func show_for_team(team_id: String, draft_data: Dictionary, can_edit: bool = tru
 	var budget_total := int(draft_data.get("budget_total", 0))
 	gold_value.text = "%d" % remaining
 	gold_total.text = "/ %d gold left" % budget_total
-	random_team_button.disabled = not can_edit
-	ready_button.disabled = not can_edit
+	random_team_button.button_disabled = not can_edit
+	ready_button.button_disabled = not can_edit
 	show()
 
 func _apply_team_accent(team_id: String) -> void:
