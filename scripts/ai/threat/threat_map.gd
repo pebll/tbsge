@@ -51,6 +51,10 @@ func max_possible() -> float:
 func threat_frac(coords: Vector2i) -> float:
 	return clampf(threat_at(coords) / maxf(max_possible(), 1.0), 0.0, 1.0)
 
+## Public: how hard `enemy` could strike `hex` (now or after a walk), HP-scaled.
+func enemy_strike_on(enemy: Legion, hex: Vector2i) -> float:
+	return _enemy_threat_to(enemy, hex)
+
 ## One enemy's contribution to a hex: its best single strike (max over the stands it can
 ## attack from), scaled by its remaining HP fraction.
 func _enemy_threat_to(enemy: Legion, hex: Vector2i) -> float:

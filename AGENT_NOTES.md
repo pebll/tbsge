@@ -40,6 +40,12 @@
 - `Unit` stats come from the DB; keep safe defaults if definition missing.
 - Resource loading must work headless; `.tres` should be compatible with script-attached resources.
 
+### AI (utility + whole-turn planning)
+- In-game utility opponents (`utility`, `utility_hand`, `utility_evolved`) **plan whole turns** (`scripts/ai/planning/turn_planner.gd`). `*_greedy`, `utility_v0`, `utility:<file>` and evolution brains don't (fast, for tuning).
+- The planner runs on `TurnSimSession` copies (`turn_sim_session.gd`). In the game, `BattlePhaseController._ai_sort_actionable` scores a copy on a `WorkerThreadPool` task with an 800 ms cap. Never mutate the live session from AI code that may run there.
+- `UtilityBrain` caches (`_cache`, `_planned`) are keyed by **tile coords + board signature**, not object ids, so a copy's result applies to the live board. Keep the signature complete: anything scoring reads must be in `_board_signature`.
+- Benchmark play strength with `./run_ai_duel.sh --draft mirror --play-sims --brain-a X --brain-b utility_v0`. Random drafts make about 85% of pairs split on the draft.
+
 ### Combat logic (current rules)
 - Attacking legion **hits first**.
 - Each unit **hits at most once per combat**.

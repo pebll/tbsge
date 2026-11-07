@@ -10,6 +10,7 @@ const CombatExpectation = preload("res://scripts/ai/expectation/combat_expectati
 const AiUtilityScorer = preload("res://scripts/ai/utility/ai_utility_scorer.gd")
 const AiProfileScript = preload("res://scripts/ai/utility/ai_profile.gd")
 const AiDuelTraceScript = preload("res://scripts/ai/evolution/ai_duel_trace.gd")
+const TurnPlannerScript = preload("res://scripts/ai/planning/turn_planner.gd")
 
 var profile: AiProfile
 ## When true (default for EA / duels), always argmax. Softmax uses profile.temperature.
@@ -25,11 +26,19 @@ var sim_count: int = CombatExpectation.PLAY_SIM_COUNT
 ## including move-then-shoot, lost clearly (ranged legions walked into the melee's
 ## stands); only stationary support first leans positive. See doc/design/ai.md.
 var role_ordering: bool = true
+## Whole-turn planning: before each activation, try the strongest first moves on a copy of
+## the board, let this brain's policy finish the turn there, keep the best (TurnPlanner).
+var turn_planning: bool = false
+var planner = null
+## Per-decision thinking cap for the planner in ms (0 = none; the game sets one).
+var plan_time_budget_ms: int = 0
+## Chosen by the planner in sort_actionable: {"coords", "sig", "row"}; decide() plays it.
+var _planned: Dictionary = {}
 ## Decisions answered from the sort_actionable cache (diagnostics / tests).
 var cache_hits: int = 0
 ## Combat estimates for the board snapshot being scored; per brain, so parallel duels never share it.
 var _memo: Dictionary = {}
-## legion instance id -> {"sig": String, "scored": Array} from the last sort_actionable pass.
+## legion tile -> {"sig": String, "scored": Array} from the last sort_actionable pass.
 var _cache: Dictionary = {}
 
 func _init(p_profile: AiProfile = null) -> void:
@@ -45,7 +54,10 @@ func decide(session, legion: Legion) -> Dictionary:
 		return {"type": "pass", "coords": legion.tile_coords, "reason": "no candidates"}
 
 	var chosen: Dictionary = scored[0]
-	if not force_argmax and profile.temperature > 0.0:
+	var planned := _planned_row_for(session, legion)
+	if not planned.is_empty():
+		chosen = planned
+	elif not force_argmax and profile.temperature > 0.0:
 		chosen = _softmax_pick(scored, profile.temperature, session.get("rng"))
 
 	var best_cand: AiCandidate = chosen["cand"]
@@ -74,7 +86,7 @@ func decide(session, legion: Legion) -> Dictionary:
 ## Candidates scored best-first (stable tie-break). Reuses the sort_actionable result when the
 ## board is unchanged since, so the chosen legion is not scored twice per activation.
 func _scored_for(session, legion: Legion) -> Array:
-	var entry = _cache.get(legion.get_instance_id())
+	var entry = _cache.get(legion.tile_coords)
 	if entry != null and String(entry["sig"]) == _board_signature(session):
 		cache_hits += 1
 		return entry["scored"]
@@ -109,20 +121,22 @@ static func _row_before(a: Dictionary, b: Dictionary) -> bool:
 	return ca.to.y < cb.to.y
 
 ## Everything scoring reads that can change between two decisions: every legion's position,
-## unit HP/shields, AP and cooldowns, plus the sim count and the profile identity.
+## unit HP/shields, AP, cooldowns and wait state, plus the sim count and the profile
+## identity. Legions are identified by tile, not object, so a TurnSimSession copy of the
+## board has the same signature (the game scores on a copy in a worker thread).
 func _board_signature(session) -> String:
 	var parts: PackedStringArray = PackedStringArray()
 	parts.append("%d|%d" % [sim_count, profile.get_instance_id()])
 	for L in session.legions:
-		if L == null:
+		if L == null or L.units.is_empty():
 			continue
 		var hp: PackedStringArray = PackedStringArray()
 		for u in L.units:
 			if u:
 				hp.append("%s/%s/%d" % [u.current_health, u.max_health, u.shield_remaining])
-		parts.append("%d@%s:%s:%d/%d:%s:%s" % [
-			L.get_instance_id(), L.tile_coords, L.team_id, L.current_ap, L.max_ap,
-			",".join(hp), str(L.action_cooldowns),
+		parts.append("%s:%s:%d/%d:%s:%s:%s" % [
+			L.tile_coords, L.team_id, L.current_ap, L.max_ap,
+			",".join(hp), str(L.action_cooldowns), L.waited,
 		])
 	return ";".join(parts)
 
@@ -158,7 +172,7 @@ func sort_actionable(session, actionable: Array[Vector2i]) -> Array[Vector2i]:
 			scored.append({"coords": coords, "score": -INF})
 			continue
 		var rows: Array = _score_legion(session, legion)
-		_cache[legion.get_instance_id()] = {"sig": sig, "scored": rows}
+		_cache[legion.tile_coords] = {"sig": sig, "scored": rows}
 		var best := -INF if rows.is_empty() else float(rows[0]["score"])
 		var tier := ORDER_TIER_OTHER
 		if role_ordering and not rows.is_empty():
@@ -183,7 +197,62 @@ func sort_actionable(session, actionable: Array[Vector2i]) -> Array[Vector2i]:
 	var out: Array[Vector2i] = []
 	for row in scored:
 		out.append(row["coords"])
+	_planned = {}
+	if turn_planning:
+		out = _plan_first_move(session, out, sig)
 	return out
+
+func _planned_row_for(session, legion: Legion) -> Dictionary:
+	if _planned.is_empty() or _planned["coords"] != legion.tile_coords:
+		return {}
+	if String(_planned["sig"]) != _board_signature(session):
+		return {}
+	return _planned["row"]
+
+## Options = top candidates of every legion that can act, the greedy pick first. The
+## planner's choice goes to the front of the order and is what decide() then plays.
+func _plan_first_move(session, order: Array[Vector2i], sig: String) -> Array[Vector2i]:
+	var options: Array = []
+	for coords in order:
+		var legion: Legion = session.get_legion_at(coords)
+		if legion == null:
+			continue
+		var entry = _cache.get(legion.tile_coords)
+		if entry == null:
+			continue
+		var taken := 0
+		for row in entry["scored"]:
+			if taken >= _get_planner().options_per_legion:
+				break
+			if row["cand"].action_id == "pass" and taken > 0:
+				continue
+			options.append({"legion": legion, "row": row, "coords": coords})
+			taken += 1
+	if options.size() <= 1:
+		return order
+	var greedy: Dictionary = options[0]
+	var rest := options.slice(1)
+	rest.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return float(a["row"]["score"]) > float(b["row"]["score"])
+	)
+	options = [greedy] + rest.slice(0, _get_planner().max_options - 1)
+	var pick: Dictionary = options[_get_planner().choose(session, options)]
+	_planned = {"coords": pick["coords"], "sig": sig, "row": pick["row"]}
+	var out: Array[Vector2i] = [pick["coords"]]
+	for c in order:
+		if c != pick["coords"]:
+			out.append(c)
+	return out
+
+func _get_planner():
+	if planner == null:
+		var policy = load("res://scripts/ai/brains/utility_brain.gd").new(profile)
+		policy.role_ordering = role_ordering
+		policy.turn_planning = false
+		planner = TurnPlannerScript.new(policy)
+		policy.sim_count = planner.rollout_sims
+	planner.time_budget_ms = plan_time_budget_ms
+	return planner
 
 func _softmax_pick(
 	scored: Array[Dictionary],

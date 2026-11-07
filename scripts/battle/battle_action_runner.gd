@@ -150,7 +150,8 @@ func _play_combat(
 	return true
 
 ## Scene may be freed mid-playback (e.g. abandon to menu); stop touching UI then.
-static func _host_alive(host: Node) -> bool:
+## Untyped on purpose: a typed Node parameter rejects a freed object before the check runs.
+static func _host_alive(host) -> bool:
 	return is_instance_valid(host) and host.is_inside_tree()
 
 func _call_hook(hooks: Dictionary, key: String, arg = null) -> void:

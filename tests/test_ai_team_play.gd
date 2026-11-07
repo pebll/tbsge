@@ -82,7 +82,7 @@ func _test_focus_fire_picks_finishable_target() -> bool:
 	var L: Array[Legion] = b["legions"]
 	# 1 AP: shoot from here, so both brains compare the same two direct shots.
 	L[0].current_ap = 1
-	var cmd: Dictionary = AiBrainRegistry.create("utility_hand").decide(session, L[0])
+	var cmd: Dictionary = AiBrainRegistry.create("utility_hand_greedy").decide(session, L[0])
 	if _strike(cmd) != ["ranged_attack", Vector2i(2, -1)]:
 		push_error("Archer should shoot the target the goblins can finish, got %s" % cmd)
 		return false
@@ -106,7 +106,7 @@ func _test_ranged_acts_before_melee() -> bool:
 	])
 	var session = b["session"]
 	var L: Array[Legion] = b["legions"]
-	var brain = AiBrainRegistry.create("utility_hand")
+	var brain = AiBrainRegistry.create("utility_hand_greedy")
 	var order: Array[Vector2i] = brain.sort_actionable(
 		session, [L[0].tile_coords, L[1].tile_coords] as Array[Vector2i]
 	)
