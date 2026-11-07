@@ -5,6 +5,7 @@ const CombatResolver = preload("res://scripts/core/combat_resolver.gd")
 const CombatSimSnapshot = preload("res://scripts/battle/combat_sim_snapshot.gd")
 const HexPathfinder = preload("res://scripts/ai/hex_pathfinder.gd")
 const ActionParams = preload("res://scripts/actions/action_params.gd")
+const CombatSampler = preload("res://scripts/battle/combat_sampler.gd")
 
 const CACHE_MAX := 128
 
@@ -53,24 +54,12 @@ static func estimate(
 	var enemy_loss_samples: Array[int] = []
 	var own_loss_samples: Array[int] = []
 
-	var prev_quiet := CombatResolver.quiet
-	CombatResolver.quiet = true
 	var start_us := Time.get_ticks_usec()
-	for i in sim_count:
-		var sim_attacker := CombatSimSnapshot.clone_legion(attacker)
-		var sim_defender := CombatSimSnapshot.clone_legion(defender)
-		var combat: Dictionary = CombatResolver.resolve_combat(
-			sim_attacker,
-			sim_defender,
-			10007 + i * 7919,
-			{"mode": mode, "distance": distance}
-		)
-		var metrics := _metrics_from_sim(attacker, defender, sim_attacker, sim_defender, combat)
-		enemy_damage_samples.append(metrics["enemy_damage"])
-		own_damage_samples.append(metrics["own_damage"])
-		enemy_loss_samples.append(metrics["enemy_losses"])
-		own_loss_samples.append(metrics["own_losses"])
-	CombatResolver.quiet = prev_quiet
+	for row in CombatSampler.sample(attacker, defender, mode, distance, sim_count):
+		enemy_damage_samples.append(int(round(float(row["enemy_hp_lost"]))))
+		own_damage_samples.append(int(round(float(row["own_hp_lost"]))))
+		enemy_loss_samples.append(int(row["enemy_deaths"]))
+		own_loss_samples.append(int(row["own_deaths"]))
 
 	var elapsed_ms := float(Time.get_ticks_usec() - start_us) / 1000.0
 	var result := {
@@ -210,33 +199,6 @@ static func _pick_lowest_hp_wounded_snapshot(legion: Legion) -> Unit:
 			best_hp = hp
 			best = unit
 	return best
-
-static func _metrics_from_sim(
-	orig_attacker: Legion,
-	orig_defender: Legion,
-	sim_attacker: Legion,
-	sim_defender: Legion,
-	_combat: Dictionary
-) -> Dictionary:
-	var enemy_damage := int(round(_legion_hp_total(orig_defender) - _legion_hp_total(sim_defender)))
-	var own_damage := int(round(_legion_hp_total(orig_attacker) - _legion_hp_total(sim_attacker)))
-	enemy_damage = maxi(0, enemy_damage)
-	own_damage = maxi(0, own_damage)
-	var enemy_losses := maxi(0, orig_defender.units.size() - sim_defender.units.size())
-	var own_losses := maxi(0, orig_attacker.units.size() - sim_attacker.units.size())
-	return {
-		"enemy_damage": enemy_damage,
-		"own_damage": own_damage,
-		"enemy_losses": enemy_losses,
-		"own_losses": own_losses,
-	}
-
-static func _legion_hp_total(legion: Legion) -> float:
-	var total := 0.0
-	for unit in legion.units:
-		if unit:
-			total += maxf(0.0, float(unit.current_health))
-	return total
 
 static func _cache_key(
 	attacker: Legion,

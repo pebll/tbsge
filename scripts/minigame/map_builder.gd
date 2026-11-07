@@ -13,7 +13,8 @@ static func build_grid(radius: int, rng_seed: int = -1, team_ids: Array[String] 
 	if rng_seed >= 0:
 		rng.seed = rng_seed
 	else:
-		rng.randomize()
+		# Global RNG (randomised at startup) so a test can reproduce maps with seed().
+		rng.seed = randi()
 
 	for q in range(-radius, radius + 1):
 		for r in range(-radius, radius + 1):

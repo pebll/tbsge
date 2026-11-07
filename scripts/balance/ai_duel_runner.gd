@@ -309,6 +309,8 @@ static func _run_one_impl(
 	tracker.begin(session)
 	var combat_rng := RandomNumberGenerator.new()
 	combat_rng.seed = combat_seed
+	# Brains (softmax picks) and unseeded commands draw from the match RNG.
+	session.set_match_seed(combat_seed ^ 0x5eed)
 
 	var gold_start_green := AiMatchScore.team_living_gold(session, "GREEN")
 	var gold_start_blue := AiMatchScore.team_living_gold(session, "BLUE")

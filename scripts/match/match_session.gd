@@ -16,11 +16,24 @@ var team_ids: Array[String] = []
 var action_log: BattleActionLogScript
 ## False for headless simulation (AI duels run on worker threads): skip EventBus autoload emits.
 var emit_global_events: bool = true
+## One RNG per match: every combat roll and AI tie-break draws from it, so a match
+## is reproducible from match_seed (replays, multiplayer, A/B evaluation).
+var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+var match_seed: int = 0
 
 func _init(p_team_ids: Array[String]) -> void:
 	team_ids = p_team_ids.duplicate()
 	turn_manager = TurnManagerRes.new(team_ids)
 	action_log = BattleActionLogScript.new()
+	set_match_seed(randi())
+
+func set_match_seed(p_seed: int) -> void:
+	match_seed = p_seed
+	rng.seed = p_seed
+
+## Seed for one combat resolution (or any other roll), drawn from the match RNG.
+func next_rng_seed() -> int:
+	return int(rng.randi())
 
 func battle_state() -> BattleStateScript:
 	return BattleStateScript.from_session(self)
@@ -31,8 +44,13 @@ func can_act_legion(legion: Legion) -> bool:
 		and _is_legion_on_grid(legion)
 		and turn_manager.is_legion_active(legion)
 		and legion.has_ap()
-		and legion.tile_coords not in turn_manager.waited_coords
+		and not legion.waited
 	)
+
+## True if a legion stands at coords and is done for this turn.
+func is_waited_at(coords: Vector2i) -> bool:
+	var legion := _legion_at(coords)
+	return legion != null and legion.waited
 
 func get_legion_at(coords: Vector2i) -> Legion:
 	return _legion_at(coords)
@@ -62,7 +80,7 @@ func get_actionable_coords() -> Array[Vector2i]:
 			continue
 		if not legion.has_ap():
 			continue
-		if legion.tile_coords in turn_manager.waited_coords:
+		if legion.waited:
 			continue
 		if not _is_legion_on_grid(legion):
 			continue
@@ -129,7 +147,7 @@ func apply_pass_legion(coords: Vector2i) -> Dictionary:
 	var legion: Legion = tile.legion
 	if not can_act_legion(legion):
 		return _fail("Legion cannot pass")
-	turn_manager.wait_legion(coords)
+	turn_manager.wait_legion(legion)
 	# Wait/pass is silent in the battle log (same boot icon as Move was confusing).
 	return _ok(["legion_passed"], {"coords": coords})
 
@@ -179,8 +197,7 @@ func _cleanup_empty_legion(coords: Vector2i) -> void:
 	if tile.legion != null:
 		legions.erase(tile.legion)
 		tile.legion = null
-	# Resolver may already have nulled the tile; still drop wait stain + prune empties.
-	turn_manager.clear_wait(coords)
+	# Resolver may already have nulled the tile; still prune empties.
 	for legion in legions.duplicate():
 		if legion.units.is_empty():
 			legions.erase(legion)

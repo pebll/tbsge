@@ -19,7 +19,6 @@ static func clone_legion(legion: Legion) -> Legion:
 	for unit in legion.units:
 		if unit:
 			copy.units.append(clone_unit(unit))
-	copy.unit_count = copy.units.size()
 	copy.max_ap = legion.max_ap
 	copy.current_ap = legion.current_ap
 	return copy

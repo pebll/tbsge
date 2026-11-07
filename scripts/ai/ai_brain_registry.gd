@@ -12,12 +12,15 @@ const AiProfileScript = preload("res://scripts/ai/utility/ai_profile.gd")
 
 ## Profile the in-game "utility" brain ships with; hand_v1 when absent.
 const DEFAULT_UTILITY_PROFILE := "res://data/ai/profiles/utility_default.json"
+## Best GA-evolved weights, shipped for the in-game "Utility (evolved)" opponent.
+const EVOLVED_UTILITY_PROFILE := "res://data/ai/profiles/utility_evolved.json"
 const UTILITY_FILE_PREFIX := "utility:"
 
 const KNOWN_IDS: Array[String] = [
 	"cascade",
 	"utility",
 	"utility_hand",
+	"utility_evolved",
 	"curriculum_pass",
 	"curriculum_heal",
 	"curriculum_heal_ranged",
@@ -38,6 +41,8 @@ static func create(brain_id: String) -> AiBrain:
 			return UtilityBrainScript.new(default_utility_profile())
 		"utility_hand", "hand_v1":
 			return UtilityBrainScript.new(AiProfileScript.hand_v1())
+		"utility_evolved":
+			return _utility_from_file(EVOLVED_UTILITY_PROFILE)
 		"curriculum_pass", "pass":
 			return PassBrainScript.new()
 		"curriculum_heal", "heal_only":

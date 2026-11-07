@@ -51,7 +51,7 @@ func _test_actionable_and_wait() -> bool:
 		push_error("Expected active + waited legions with AP in actionable list")
 		return false
 
-	tm.wait_legion(Vector2i(2, 0))
+	tm.wait_legion(waited)
 	actionable = tm.get_actionable_coords(legions)
 	if actionable.size() != 1 or actionable[0] != Vector2i(0, 0):
 		push_error("Waited legion should be excluded from actionable list")
@@ -85,22 +85,25 @@ func _test_clear_wait_and_end_turn_clears_waits() -> bool:
 	a.current_ap = 0
 	var legions: Array[Legion] = [a, b]
 
-	tm.wait_legion(Vector2i(0, 0))
-	tm.wait_legion(Vector2i(3, 3))
-	if Vector2i(0, 0) not in tm.waited_coords:
-		push_error("wait_legion should record coords")
+	var c := Legion.new("GOBLIN", 1, Vector2i(3, 3), "GREEN")
+	legions.append(c)
+	tm.wait_legion(a)
+	tm.wait_legion(c)
+	if not tm.is_waited(a):
+		push_error("wait_legion should mark the legion")
 		return false
 
-	tm.clear_wait(Vector2i(0, 0))
-	if Vector2i(0, 0) in tm.waited_coords:
-		push_error("clear_wait should remove coords")
+	tm.clear_wait(a)
+	if tm.is_waited(a):
+		push_error("clear_wait should unmark the legion")
 		return false
-	if Vector2i(3, 3) not in tm.waited_coords:
-		push_error("clear_wait should only remove the given coords")
+	if not tm.is_waited(c):
+		push_error("clear_wait should only unmark the given legion")
 		return false
 
 	tm.end_team_turn(legions)
-	if not tm.waited_coords.is_empty():
-		push_error("end_team_turn should clear all waited coords")
-		return false
+	for legion in legions:
+		if tm.is_waited(legion):
+			push_error("end_team_turn should clear every legion's wait")
+			return false
 	return true

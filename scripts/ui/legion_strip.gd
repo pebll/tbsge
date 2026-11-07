@@ -315,9 +315,5 @@ func _show_unit_tooltip(source: Object, payload) -> void:
 		_hover_tooltip.present(title, String(data.get("body", "")), source as Control)
 
 func _on_settings_changed() -> void:
-	for key in _cells.keys():
-		var cell: LegionUnitCell = _cells[key]
-		if cell:
-			cell.set_hp_style(GameSettings.legion_strip_hp_style)
 	if visible and _legion:
 		_rebuild_aggregates(_legion)

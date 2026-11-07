@@ -169,7 +169,7 @@ func use_battle_action(
 		"to": to_coords,
 		"skip_action_log": skip_action_log,
 	}
-	cmd.merge(BattleHostWiringScript.rng_seed_for_action(action_id))
+	cmd.merge(BattleHostWiringScript.rng_seed_for_action(action_id, session))
 	return await _perform_use_action(cmd, from_coords)
 
 func _perform_use_action(cmd: Dictionary, from_coords: Vector2i) -> Dictionary:

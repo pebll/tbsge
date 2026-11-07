@@ -139,7 +139,6 @@ func set_unit_count(new_count: int) -> void:
 			_unit_to_visu.erase(removed)
 			units.remove_child(unit_visu)
 			unit_visu.free()
-	legion.unit_count = new_count
 	_apply_unit_layout()
 	for child in units.get_children():
 		child.start_idle_animation()

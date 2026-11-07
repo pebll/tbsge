@@ -141,7 +141,7 @@ func handle_random_team() -> void:
 	deps.unit_picker.hide()
 	_clear_all_draft_placements()
 	var rng := RandomNumberGenerator.new()
-	rng.randomize()
+	rng.seed = randi()  # global RNG: random in play, reproducible under seed()
 	for cmd in AiDrafter.build_draft_commands(deps.session, viewing_team, rng):
 		if String(cmd.get("type", "")) == "draft_ready":
 			continue
@@ -321,7 +321,7 @@ func _auto_draft_all_ai_teams() -> void:
 
 func _apply_ai_draft(team_id: String) -> void:
 	var rng := RandomNumberGenerator.new()
-	rng.randomize()
+	rng.seed = randi()  # global RNG: random in play, reproducible under seed()
 	for cmd in AiDrafter.build_draft_commands(deps.session, team_id, rng):
 		var draft_result: Dictionary = deps.session.apply(cmd)
 		if not draft_result["ok"]:

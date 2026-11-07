@@ -7,6 +7,8 @@ extends RefCounted
 ## - session: MatchSession (cleanup after combat)
 ## - clear_overlays / deselect / refresh_after_action: UI Callables
 ## - deselect_before_combat / deselect_after_combat / deselect_after_heal: bools
+## - keep_selection_in_combat: bool — keep the attacker inspected during and after
+##   combat (prepare_playback / reselect hooks) instead of deselecting
 ## - on_ap_changed(legion) / on_finished(): optional callbacks
 
 const BattleContextScript = preload("res://scripts/battle/battle_context.gd")
@@ -24,6 +26,9 @@ static func action_hooks(
 		"deselect_before_combat": bool(opts.get("deselect_before_combat", false)),
 		"deselect_after_combat": bool(opts.get("deselect_after_combat", false)),
 		"deselect_after_heal": bool(opts.get("deselect_after_heal", true)),
+		"keep_selection_in_combat": bool(opts.get("keep_selection_in_combat", false)),
+		"prepare_playback": battle_ui.prepare_for_playback,
+		"reselect": battle_ui.reselect_or_deselect,
 		"on_ap_changed": opts.get(
 			"on_ap_changed",
 			func(legion: Legion) -> void: EventBus.legion_ap_changed.emit(legion)
@@ -68,7 +73,7 @@ static func wire_core_context(
 	if overlay_ui_fn.is_valid():
 		context.overlay_ui_fn = overlay_ui_fn
 
-static func rng_seed_for_action(action_id: String) -> Dictionary:
+static func rng_seed_for_action(action_id: String, session = null) -> Dictionary:
 	if action_id == "melee_attack" or action_id == "ranged_attack":
-		return {"rng_seed": randi()}
+		return {"rng_seed": session.next_rng_seed() if session != null else randi()}
 	return {}

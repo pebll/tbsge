@@ -7,9 +7,16 @@ var unit_type: String
 var team_id: String
 var units: Array[Unit] = []
 var tile_coords: Vector2i
-var unit_count: int
+## Living units in this legion (always units.size(); read-only).
+var unit_count: int:
+	get:
+		return units.size()
 var max_ap: int = DEFAULT_MAX_AP
 var current_ap: int = DEFAULT_MAX_AP
+## Done for this turn (wait/pass or a terminal action). Lives on the legion — not the
+## tile — so moves, swaps, teleports and wipes never leave stale state behind.
+## Cleared for every legion by TurnManager.end_team_turn.
+var waited: bool = false
 ## action_id -> remaining own-turns until ready (ticked on refresh_ap).
 var action_cooldowns: Dictionary = {}
 ## Skip one tick after start so cooldown 1 blocks the next full turn.
@@ -17,13 +24,12 @@ var _cooldown_skip_tick: Dictionary = {}
 ## False for headless simulation: skip EventBus autoload emits (unsafe off the main thread).
 var emit_global_events: bool = true
 
-func _init(unit_type: String, unit_count: int, tile_coords: Vector2i, team_id: String) -> void:
+func _init(unit_type: String, count: int, tile_coords: Vector2i, team_id: String) -> void:
 	self.unit_type = unit_type
-	self.unit_count = unit_count
 	self.tile_coords = tile_coords
 	self.team_id = team_id
 	_apply_unit_type_defaults()
-	for i in range(unit_count):
+	for i in range(count):
 		var unit = Unit.new(self.unit_type)
 		units.append(unit)
 
@@ -34,6 +40,32 @@ func _apply_unit_type_defaults() -> void:
 	else:
 		max_ap = DEFAULT_MAX_AP
 	current_ap = max_ap
+
+## Capabilities aggregate over the legion's units, so rules never depend on which
+## unit happens to be first (prerequisite for mixed legions).
+func has_ranged() -> bool:
+	for unit in units:
+		if unit != null and unit.has_ranged():
+			return true
+	return false
+
+## Longest shot any ranged-capable unit in the legion can take (0 = none).
+func max_attack_range() -> int:
+	var best := 0
+	for unit in units:
+		if unit != null and unit.has_ranged():
+			best = maxi(best, unit.attack_range)
+	return best
+
+## Distinct unit types present, in first-seen order (falls back to unit_type).
+func unit_types() -> Array[String]:
+	var out: Array[String] = []
+	for unit in units:
+		if unit != null and unit.unit_type not in out:
+			out.append(unit.unit_type)
+	if out.is_empty() and not unit_type.is_empty():
+		out.append(unit_type)
+	return out
 
 func has_ap() -> bool:
 	return current_ap > 0

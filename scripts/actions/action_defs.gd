@@ -25,7 +25,16 @@ func default_action_ids() -> Array[String]:
 func legion_action_ids(legion: Legion) -> Array[String]:
 	if legion == null:
 		return []
-	var unit_def: UnitDefinition = UnitDefs.get_def(legion.unit_type)
+	# Union over the unit types present (one type today; mixed legions later).
+	var out: Array[String] = []
+	for type_id in legion.unit_types():
+		for id in _unit_type_action_ids(type_id):
+			if id not in out:
+				out.append(id)
+	return out
+
+func _unit_type_action_ids(type_id: String) -> Array[String]:
+	var unit_def: UnitDefinition = UnitDefs.get_def(type_id)
 	if unit_def and not unit_def.action_ids.is_empty():
 		return unit_def.action_ids.duplicate()
 	var ids := default_action_ids()

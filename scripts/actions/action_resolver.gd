@@ -66,9 +66,7 @@ static func _execute_move(
 	to_tile.legion = legion
 	legion.tile_coords = to_coords
 	legion.spend_ap(action.ap_cost)
-	_apply_terminal(state, legion, action, from_coords)
-	# Moving onto a tile must not inherit a wait left by a destroyed previous occupant.
-	state.turn_manager.clear_wait(to_coords)
+	_apply_terminal(state, legion, action)
 	return _ok(["legion_moved"], {
 		"action_id": action.id,
 		"from": from_coords,
@@ -87,16 +85,14 @@ static func _execute_swap(
 	var legion_a: Legion = from_tile.legion
 	var legion_b: Legion = to_tile.legion
 
+	# Waits live on the legion, so a waited partner stays waited after the swap.
 	from_tile.legion = legion_b
 	to_tile.legion = legion_a
 	legion_a.tile_coords = to_coords
 	legion_b.tile_coords = from_coords
 	legion_a.spend_ap(action.ap_cost)
 	legion_b.spend_ap(action.ap_cost)
-	_apply_terminal(state, legion_a, action, from_coords)
-	# Wait stains are per-tile; swapping must not strand either legion under a stale wait.
-	state.turn_manager.clear_wait(from_coords)
-	state.turn_manager.clear_wait(to_coords)
+	_apply_terminal(state, legion_a, action)
 	return _ok(["legions_swapped"], {
 		"action_id": action.id,
 		"from": from_coords,
@@ -115,9 +111,9 @@ static func _execute_melee_attack(
 	if defender == null:
 		return _fail("No defender")
 
-	var rng_seed: int = int(cmd.get("rng_seed", randi()))
+	var rng_seed: int = int(cmd["rng_seed"]) if cmd.has("rng_seed") else state.next_rng_seed()
 	attacker.spend_ap(action.ap_cost)
-	_apply_terminal(state, attacker, action, from_coords)
+	_apply_terminal(state, attacker, action)
 	var result: Dictionary = CombatResolver.resolve_combat(
 		attacker,
 		defender,
@@ -146,9 +142,9 @@ static func _execute_ranged_attack(
 		return _fail("No defender")
 
 	var distance := HexPathfinder.hex_distance(from_coords, to_coords)
-	var rng_seed: int = int(cmd.get("rng_seed", randi()))
+	var rng_seed: int = int(cmd["rng_seed"]) if cmd.has("rng_seed") else state.next_rng_seed()
 	attacker.spend_ap(action.ap_cost)
-	_apply_terminal(state, attacker, action, from_coords)
+	_apply_terminal(state, attacker, action)
 	var result: Dictionary = CombatResolver.resolve_combat(
 		attacker,
 		defender,
@@ -173,7 +169,7 @@ static func _execute_self_heal(
 	var heal_amount := ActionParams.resolve_int(legion, action, "heal_amount", action.heal_amount)
 	var heal_result := _apply_focused_heal(legion, legion, heal_amount)
 	legion.spend_ap(action.ap_cost)
-	_apply_terminal(state, legion, action, coords)
+	_apply_terminal(state, legion, action)
 	return _ok(["legion_healed"], {
 		"action_id": action.id,
 		"coords": coords,
@@ -202,7 +198,7 @@ static func _execute_ally_heal(
 	var heal_amount := ActionParams.resolve_int(caster, action, "heal_amount", action.heal_amount)
 	var heal_result := _apply_focused_heal(caster, target, heal_amount)
 	caster.spend_ap(action.ap_cost)
-	_apply_terminal(state, caster, action, from_coords)
+	_apply_terminal(state, caster, action)
 	return _ok(["legion_healed"], {
 		"action_id": action.id,
 		"coords": to_coords,
@@ -230,8 +226,7 @@ static func _execute_teleport(
 	to_tile.legion = legion
 	legion.tile_coords = to_coords
 	legion.spend_ap(action.ap_cost)
-	_apply_terminal(state, legion, action, from_coords)
-	state.turn_manager.clear_wait(to_coords)
+	_apply_terminal(state, legion, action)
 	return _ok(["legion_teleported"], {
 		"action_id": action.id,
 		"from": from_coords,
@@ -242,7 +237,7 @@ static func _execute_teleport(
 
 ## Each caster unit applies heal_amount once to the current lowest-HP wounded unit.
 static func _apply_focused_heal(caster: Legion, target: Legion, heal_amount: int) -> Dictionary:
-	var healed := 0
+	var healed := 0.0
 	var unit_heals: Array = []
 	if caster == null or target == null or heal_amount <= 0:
 		return {"healed_total": 0, "unit_heals": unit_heals}
@@ -252,12 +247,13 @@ static func _apply_focused_heal(caster: Legion, target: Legion, heal_amount: int
 		var focus := _pick_lowest_hp_wounded(target)
 		if focus == null:
 			break
-		var before := int(focus.current_health)
-		focus.current_health = mini(before + heal_amount, int(focus.max_health))
-		var after := int(focus.current_health)
+		# HP is float (damage can be fractional); never truncate when healing.
+		var before: float = focus.current_health
+		focus.current_health = minf(before + float(heal_amount), focus.max_health)
+		var after: float = focus.current_health
 		if after <= before:
 			continue
-		var gained := after - before
+		var gained: float = after - before
 		healed += gained
 		unit_heals.append({
 			"caster": caster_unit,
@@ -270,12 +266,12 @@ static func _apply_focused_heal(caster: Legion, target: Legion, heal_amount: int
 
 static func _pick_lowest_hp_wounded(legion: Legion) -> Unit:
 	var best: Unit = null
-	var best_hp := 2147483647
+	var best_hp := INF
 	for unit in legion.units:
 		if unit == null:
 			continue
-		var hp := int(unit.current_health)
-		if hp >= int(unit.max_health):
+		var hp: float = unit.current_health
+		if hp >= unit.max_health:
 			continue
 		if hp < best_hp:
 			best_hp = hp
@@ -291,13 +287,12 @@ static func _start_action_cooldown(legion: Legion, action: ActionDefinitionScrip
 static func _apply_terminal(
 	state: BattleStateScript,
 	legion: Legion,
-	action: ActionDefinitionScript,
-	coords: Vector2i
+	action: ActionDefinitionScript
 ) -> void:
 	if not action.terminal:
 		return
 	legion.spend_all_ap()
-	state.finish_legion_turn(coords)
+	state.finish_legion_turn(legion)
 
 static func _cleanup_empty_legion(state: BattleStateScript, coords: Vector2i) -> void:
 	var tile: Tile = state.tile_at(coords)
@@ -305,8 +300,6 @@ static func _cleanup_empty_legion(state: BattleStateScript, coords: Vector2i) ->
 		return
 	if tile.legion and tile.legion.units.is_empty():
 		tile.legion = null
-		# Don't leave a wait stain on a vacated tile — another ally may move in.
-		state.turn_manager.clear_wait(coords)
 
 static func _ok(events: Array, payload: Dictionary = {}) -> Dictionary:
 	return {"ok": true, "events": events, "payload": payload}

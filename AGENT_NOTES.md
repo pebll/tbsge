@@ -5,10 +5,10 @@
 - **Minigame** (`scenes/runnables/minigame.tscn`) is the primary product (draft + battle). Main scene in `project.godot`.
 - **Sandbox** (`unit_preview` / `sandbox_root`) is a second mode for spawn/fight — keep it so the engine stays modular and not overfit to minigame.
 - Mode-specific code lives under `scripts/minigame/` (draft, deploy rules, AI drafter, win conditions) and sandbox session/root.
-- Living mission board: **`MISSIONS.md`** (short-term polish vs next features).
+- Living board: **`doc/roadmap.md`** (bugs + milestones). Design docs in `doc/` (index: `doc/README.md`); open decisions in `doc/open_questions.md`. The old v0.1 board is frozen at `doc/archive/missions_v0.1.md`.
 
 ### Workflow
-- **Always run unit tests** after code changes: `./run_tests.sh`.
+- **Always run unit tests** after code changes: `./run_tests.sh`. No Godot binary yet? `tools/get_godot.sh` downloads the official 4.6 build (SHA-512 checked), links `./godot_exe` and does the first import. CI runs the same suite on every push/PR (`.github/workflows/tests.yml`).
 - Balance sims: `./run_balance.sh` (not part of the main unit suite).
 - **Add tests first** when implementing new behavior (especially combat rules / edge cases).
 - Prefer **headless, CLI-only** workflows for CI.
@@ -47,19 +47,26 @@
 - Hit order is **alternate-then-drain**:
   - alternate hits between legions while both have eligible attackers;
   - once one side is out of eligible attackers, the other side continues with remaining attackers.
-- Print each hit for terminal inspection.
+- Per-hit trace: set `CombatResolver.quiet = false` (off by default; sims run thousands of combats).
 - Combat resolver returns ordered hit/death logs for driving visuals.
 - Melee and ranged are separate actions (`melee_attack`, `ranged_attack`). Counter-fire only if defender `attack_range` covers engagement distance.
-- **Move is non-terminal** (does not `wait_legion`); combat/heal terminal actions do. Wait stains are per-tile — move/swap onto a stained tile clears that wait.
+- **Move is non-terminal** (does not `wait_legion`); combat/heal terminal actions do. "Done this turn" is `Legion.waited` (set by wait/pass and terminal actions, cleared for all legions on `end_team_turn`) — never track it by tile.
+- Randomness in battle comes from the match RNG (`MatchSession.rng` / `next_rng_seed()`, seeded by `set_match_seed`). Don't call global `randi()`/`randf()` in rules or AI.
+- Legion capabilities (`has_ranged`, `max_attack_range`, `unit_types`, `ActionDefs.legion_action_ids`) aggregate over all units — never read `units[0]` for rules.
+- **Reference other scripts through `const X = preload("res://...")`, never only by global `class_name`.** A stale `.godot` class cache (branch pulled while the editor is open) makes bare class names fail to compile — that once froze every AI turn.
+- AI "what if this legion stood there" queries go through `HypotheticalPosition.evaluate` (always restores the grid).
+- Combat expectation (UI preview and AI) both sample via `CombatSampler` — one Monte Carlo loop over `CombatResolver`.
 
 ### Combat visuals requirements (current)
-- Animations are **sequential** with a fixed delay between hits (currently **0.3s**).
+- Animations are **sequential** with a fixed delay between hits (`ActionPlayback.COMBAT_HIT_BEAT`, currently **0.4s**; 0.6s on a kill).
+- Human attacks keep the attacker selected during playback (legion strip mirrors vitals live); AI turns deselect.
+- Playback/AI coroutines must bail out if the host scene was freed (`is_instance_valid(host)`) — never touch nodes after an `await` without that check.
 - Only the **attacking unit** animates attack and only the **target unit** animates being hit.
 - Before combat begins, **both legions face each other**.
 - When a unit dies, update the **legion visu immediately** (remove unit visu, re-pack).
 - After combat, remaining units should **tween** into their re-packed positions (no snapping).
 
 ### Assets
-- Runtime art lives under `assets/`. Unused / pipeline piles live under `assets/_archive/` — see `ASSETS_ARCHIVE.md`.
+- Runtime art lives under `assets/`. Unused / pipeline piles live under `assets/_archive/` — see `doc/assets_archive.md`.
 - Prefer archiving over deleting until explicitly approved (speeches were an exception).
 - Menu music: `assets/music/bgmusic_menu.wav`.

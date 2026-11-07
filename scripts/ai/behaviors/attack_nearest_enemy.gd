@@ -6,6 +6,7 @@ const Utils = preload("res://scripts/core/utils.gd")
 const MatchSessionScript = preload("res://scripts/match/match_session.gd")
 const AiActionScorer = preload("res://scripts/ai/ai_action_scorer.gd")
 const ActionParams = preload("res://scripts/actions/action_params.gd")
+const HypotheticalPosition = preload("res://scripts/ai/hypothetical_position.gd")
 
 static var debug_enabled: bool = false
 
@@ -183,31 +184,21 @@ static func _best_combat_score_from(
 	enemies: Array[Legion],
 	threatened: Array[Vector2i]
 ) -> float:
-	var old := legion.tile_coords
-	var tile_old: Tile = session.grid.get(old)
-	var tile_new: Tile = session.grid.get(at_coords)
-	if tile_new == null:
+	if session.grid.get(at_coords) == null:
 		return -INF
-	var prev_new = tile_new.legion
-	legion.tile_coords = at_coords
-	if tile_old and tile_old.legion == legion:
-		tile_old.legion = null
-	tile_new.legion = legion
-	var best := -INF
-	for action_id in ["melee_attack", "ranged_attack"]:
-		if action_id not in ActionDefs.legion_action_ids(legion):
-			continue
-		for to_coords in session.get_action_targets(legion, action_id):
-			if to_coords not in threatened:
+	var best_from_here := func() -> float:
+		var best := -INF
+		for action_id in ["melee_attack", "ranged_attack"]:
+			if action_id not in ActionDefs.legion_action_ids(legion):
 				continue
-			var score := AiActionScorer.score_action(session, legion, action_id, to_coords)
-			score += _focus_bonus_at(session, to_coords, enemies)
-			best = maxf(best, score)
-	legion.tile_coords = old
-	if tile_old:
-		tile_old.legion = legion
-	tile_new.legion = prev_new
-	return best
+			for to_coords in session.get_action_targets(legion, action_id):
+				if to_coords not in threatened:
+					continue
+				var score := AiActionScorer.score_action(session, legion, action_id, to_coords)
+				score += _focus_bonus_at(session, to_coords, enemies)
+				best = maxf(best, score)
+		return best
+	return float(HypotheticalPosition.evaluate(session.grid, legion, at_coords, best_from_here, -INF))
 
 ## Max reduction in soft path cost for a teammate trying to reach an engage hex.
 static func _flank_path_benefit(
@@ -257,24 +248,14 @@ static func _soft_path_cost_after_fighter_flank(
 	ally_start: Vector2i,
 	goal: Vector2i
 ) -> float:
-	var old := fighter.tile_coords
-	var tile_from: Tile = session.grid.get(from_coords)
-	var tile_to: Tile = session.grid.get(to_coords)
-	if tile_from == null or tile_to == null:
+	if session.grid.get(from_coords) == null or session.grid.get(to_coords) == null:
 		return INF
-	var prev_to = tile_to.legion
-	fighter.tile_coords = to_coords
-	if tile_from.legion == fighter:
-		tile_from.legion = null
-	tile_to.legion = fighter
-	var path := HexPathfinder.find_path(session.grid, ally_start, goal, {}, true)
-	var cost := INF
-	if path.size() >= 2:
-		cost = _path_soft_cost(session.grid, path)
-	fighter.tile_coords = old
-	tile_from.legion = fighter
-	tile_to.legion = prev_to
-	return cost
+	var ally_cost := func() -> float:
+		var path := HexPathfinder.find_path(session.grid, ally_start, goal, {}, true)
+		if path.size() >= 2:
+			return _path_soft_cost(session.grid, path)
+		return INF
+	return float(HypotheticalPosition.evaluate(session.grid, fighter, to_coords, ally_cost, INF))
 
 ## Ally is relevant if they still need to reach the fight and aren't already striking.
 static func _ally_needs_lane_through(
@@ -316,29 +297,16 @@ static func _still_threatens_from(
 	from_coords: Vector2i,
 	threatened: Array[Vector2i]
 ) -> bool:
-	var old := legion.tile_coords
-	var tile_old: Tile = session.grid.get(old)
 	var tile_new: Tile = session.grid.get(from_coords)
 	if tile_new == null or tile_new.has_legion():
 		return false
-	var prev_new = tile_new.legion
-	legion.tile_coords = from_coords
-	if tile_old and tile_old.legion == legion:
-		tile_old.legion = null
-	tile_new.legion = legion
-	var still := false
-	for action_id in ["melee_attack", "ranged_attack"]:
-		for to_coords in session.get_action_targets(legion, action_id):
-			if to_coords in threatened:
-				still = true
-				break
-		if still:
-			break
-	legion.tile_coords = old
-	if tile_old:
-		tile_old.legion = legion
-	tile_new.legion = prev_new
-	return still
+	var threatens_from_here := func() -> bool:
+		for action_id in ["melee_attack", "ranged_attack"]:
+			for to_coords in session.get_action_targets(legion, action_id):
+				if to_coords in threatened:
+					return true
+		return false
+	return bool(HypotheticalPosition.evaluate(session.grid, legion, from_coords, threatens_from_here, false))
 
 static func _decide_internal(session: MatchSessionScript, legion: Legion, combat_only: bool = false) -> Dictionary:
 	if legion == null:
@@ -535,22 +503,12 @@ static func _teleport_enables_melee(
 	legion: Legion,
 	to_coords: Vector2i
 ) -> bool:
-	var old := legion.tile_coords
-	var tile_old: Tile = session.grid.get(old)
 	var tile_new: Tile = session.grid.get(to_coords)
 	if tile_new == null or tile_new.has_legion():
 		return false
-	var prev_new = tile_new.legion
-	legion.tile_coords = to_coords
-	if tile_old and tile_old.legion == legion:
-		tile_old.legion = null
-	tile_new.legion = legion
-	var melee_targets: Array = session.get_action_targets(legion, "melee_attack")
-	legion.tile_coords = old
-	if tile_old:
-		tile_old.legion = legion
-	tile_new.legion = prev_new
-	return not melee_targets.is_empty()
+	var melee_from_there := func() -> bool:
+		return not session.get_action_targets(legion, "melee_attack").is_empty()
+	return bool(HypotheticalPosition.evaluate(session.grid, legion, to_coords, melee_from_there, false))
 
 static func _cmd_pass(legion: Legion, reason: String) -> Dictionary:
 	return {
@@ -704,11 +662,7 @@ static func _legion_shoot_range(legion: Legion) -> int:
 		return 0
 	if "ranged_attack" not in ActionDefs.legion_action_ids(legion):
 		return 0
-	var best := 0
-	for u in legion.units:
-		if u and u.attack_range > best and u.ranged_attack > 0:
-			best = u.attack_range
-	return best
+	return legion.max_attack_range()
 
 ## Walk the soft path only onto empty tiles, up to `max_steps` AP.
 static func _legal_move_prefix(

@@ -4,7 +4,9 @@ extends RefCounted
 const MODE_MELEE := "melee"
 const MODE_RANGED := "ranged"
 
-static var quiet: bool = false
+## Per-hit stdout trace. Off by default (sims run thousands of combats, some on worker
+## threads); set CombatResolver.quiet = false while debugging a fight.
+static var quiet: bool = true
 
 static func _pick_next_attacker(
 	legion: Legion,
@@ -130,7 +132,6 @@ static func resolve_combat(
 		if target_unit.current_health <= 0:
 			# Dies immediately and will never attack later.
 			current_defender_legion.units.erase(target_unit)
-			current_defender_legion.unit_count = current_defender_legion.units.size()
 			deaths.append({
 				"hit_index": hit_index,
 				"legion": current_defender_legion,

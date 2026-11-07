@@ -3,6 +3,7 @@ extends RefCounted
 const MinigameConfigScript = preload("res://scripts/minigame/minigame_config.gd")
 const MinigameSessionScript = preload("res://scripts/minigame/minigame_session.gd")
 const AttackNearestEnemyBehavior = preload("res://scripts/ai/behaviors/attack_nearest_enemy.gd")
+const AiBrainRegistry = preload("res://scripts/ai/ai_brain_registry.gd")
 
 func run(_tree: SceneTree) -> bool:
 	if not _test_budget_for_team():
@@ -20,6 +21,8 @@ func run(_tree: SceneTree) -> bool:
 	if not _test_ai_vs_ai_match_config():
 		return false
 	if not _test_ai_vs_ai_display_names():
+		return false
+	if not _test_match_ai_choice():
 		return false
 	print("Success: Match setup / settings tests")
 	return true
@@ -254,3 +257,35 @@ func _restore_ai_debug(flag: bool, behavior: bool) -> void:
 	AttackNearestEnemyBehavior.debug_enabled = behavior
 	# Persist the restored preference so we don't leave test pollution ON.
 	GameSettings._save_settings()
+
+func _test_match_ai_choice() -> bool:
+	## Every selectable opponent builds a brain; the evolved one loads its shipped
+	## profile (not the hand_v1 fallback); unknown ids are ignored.
+	var prev: String = GameSettings.match_ai_brain
+	for id in GameSettings.MATCH_AI_IDS:
+		if not AiBrainRegistry.is_known(id):
+			push_error("AI choice '%s' unknown to the registry" % id)
+			return false
+		if AiBrainRegistry.create(id) == null:
+			push_error("AI choice '%s' failed to build" % id)
+			return false
+		if not GameSettings.MATCH_AI_LABELS.has(id):
+			push_error("AI choice '%s' has no label" % id)
+			return false
+	var evolved = AiBrainRegistry.create("utility_evolved")
+	if evolved.profile == null or evolved.profile.id == "hand_v1":
+		push_error("utility_evolved should load data/ai/profiles/utility_evolved.json")
+		return false
+	if GameSettings.MATCH_AI_DEFAULT != "utility_hand":
+		push_error("Default opponent should stay the hand-tuned utility AI")
+		return false
+	GameSettings.set_match_ai_brain("cascade", false)
+	if GameSettings.match_ai_brain != "cascade":
+		push_error("set_match_ai_brain should accept cascade")
+		return false
+	GameSettings.set_match_ai_brain("not_a_brain", false)
+	if GameSettings.match_ai_brain != "cascade":
+		push_error("set_match_ai_brain must ignore unknown ids")
+		return false
+	GameSettings.set_match_ai_brain(prev, false)
+	return true

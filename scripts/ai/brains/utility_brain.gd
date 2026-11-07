@@ -39,7 +39,7 @@ func decide(session, legion: Legion) -> Dictionary:
 
 	var chosen: Dictionary = scored[0]
 	if not force_argmax and profile.temperature > 0.0:
-		chosen = _softmax_pick(scored, profile.temperature)
+		chosen = _softmax_pick(scored, profile.temperature, session.get("rng"))
 
 	var best_cand: AiCandidate = chosen["cand"]
 	if AiDuelTraceScript.enabled and AiDuelTraceScript.log_utility:
@@ -159,7 +159,11 @@ func sort_actionable(session, actionable: Array[Vector2i]) -> Array[Vector2i]:
 		out.append(row["coords"])
 	return out
 
-func _softmax_pick(scored: Array[Dictionary], temperature: float) -> Dictionary:
+func _softmax_pick(
+	scored: Array[Dictionary],
+	temperature: float,
+	pick_rng: RandomNumberGenerator = null
+) -> Dictionary:
 	var t := maxf(0.05, temperature)
 	var max_s := float(scored[0]["score"])
 	var weights: Array[float] = []
@@ -170,7 +174,7 @@ func _softmax_pick(scored: Array[Dictionary], temperature: float) -> Dictionary:
 		sum += w
 	if sum <= 0.0:
 		return scored[0]
-	var r := randf() * sum
+	var r := (pick_rng.randf() if pick_rng != null else randf()) * sum
 	var acc := 0.0
 	for i in range(scored.size()):
 		acc += weights[i]

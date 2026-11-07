@@ -279,9 +279,6 @@ func _test_can_act_after_move_onto_wiped_tile() -> bool:
 		push_error("Ally move failed: %s" % move.get("error"))
 		return false
 
-	if atk_coords in session.turn_manager.waited_coords:
-		push_error("Move onto wiped tile must clear wait stain")
-		return false
 	if not session.can_act_legion(ally):
 		push_error("Ally must be able to act after moving onto wipe tile")
 		return false
@@ -487,7 +484,7 @@ func _test_activation_order_closest_first() -> bool:
 	near.refresh_ap()
 	mid.refresh_ap()
 	far.refresh_ap()
-	session.turn_manager.waited_coords.clear()
+	session.turn_manager.clear_all_waits(session.legions)
 
 	# Shuffle input order so we don't accidentally depend on append order.
 	var shuffled: Array[Vector2i] = [far_coords, near_coords, mid_coords]
@@ -511,7 +508,7 @@ func _test_activation_order_closest_first() -> bool:
 	near.refresh_ap()
 	mid.refresh_ap()
 	far.refresh_ap()
-	session.turn_manager.waited_coords.clear()
+	session.turn_manager.clear_all_waits(session.legions)
 
 	var d_fight := HexPathfinder.hex_distance(mid.tile_coords, enemy.tile_coords)
 	var d_move := HexPathfinder.hex_distance(far.tile_coords, enemy.tile_coords)
@@ -591,7 +588,7 @@ func _test_ally_blocks_direct_approach_flank_or_pass() -> bool:
 	session.grid[ally_coords].legion = ally
 	session.legions.append(ally)
 	green.refresh_ap()
-	session.turn_manager.waited_coords.clear()
+	session.turn_manager.clear_all_waits(session.legions)
 
 	var before := HexPathfinder.hex_distance(from_coords, enemy_coords)
 	var cmd: Dictionary = AttackNearestEnemyBehavior.decide(session, green)
@@ -630,7 +627,7 @@ func _test_ally_wall_does_not_shuffle_backward() -> bool:
 		session.grid[wc].legion = ally
 		session.legions.append(ally)
 	rear.refresh_ap()
-	session.turn_manager.waited_coords.clear()
+	session.turn_manager.clear_all_waits(session.legions)
 
 	var before := HexPathfinder.hex_distance(rear_coords, enemy_coords)
 	var cmd: Dictionary = AttackNearestEnemyBehavior.decide(session, rear)
@@ -670,7 +667,7 @@ func _test_side_step_when_front_ally_blocks_closer() -> bool:
 	session.grid[ally_coords].legion = ally
 	session.legions.append(ally)
 	green.refresh_ap()
-	session.turn_manager.waited_coords.clear()
+	session.turn_manager.clear_all_waits(session.legions)
 
 	var before := HexPathfinder.hex_distance(from_coords, enemy_coords)
 	var cmd: Dictionary = AttackNearestEnemyBehavior.decide(session, green)
@@ -719,7 +716,7 @@ func _test_pass_when_only_useless_lateral_moves() -> bool:
 			session.legions.append(blocker)
 
 	green.refresh_ap()
-	session.turn_manager.waited_coords.clear()
+	session.turn_manager.clear_all_waits(session.legions)
 	var movable := session.get_movable_coords(from_coords)
 	for m in movable:
 		if HexPathfinder.hex_distance(m, enemy_coords) < before:
@@ -810,7 +807,7 @@ func _test_activation_order_uses_path_not_bird() -> bool:
 	session.legions.append(clear)
 	blocked.refresh_ap()
 	clear.refresh_ap()
-	session.turn_manager.waited_coords.clear()
+	session.turn_manager.clear_all_waits(session.legions)
 
 	var d_bird_blocked := HexPathfinder.hex_distance(blocked_coords, enemy_coords)
 	var d_bird_clear := HexPathfinder.hex_distance(clear_coords, enemy_coords)
@@ -862,7 +859,7 @@ func _test_fighter_flank_repositions_for_allies() -> bool:
 	fighter.max_ap = 2
 	fighter.current_ap = 2
 	rear.refresh_ap()
-	session.turn_manager.waited_coords.clear()
+	session.turn_manager.clear_all_waits(session.legions)
 
 	# Sanity: rear must route through the fighter tile to reach a melee stand hex.
 	var choke_ok := false
@@ -913,7 +910,7 @@ func _test_no_flank_without_path_choke() -> bool:
 	fighter.max_ap = 2
 	fighter.current_ap = 2
 	far_ally.refresh_ap()
-	session.turn_manager.waited_coords.clear()
+	session.turn_manager.clear_all_waits(session.legions)
 
 	# Confirm ally's soft path to an engage tile does not require the fighter's hex.
 	var focus_path_ok := false

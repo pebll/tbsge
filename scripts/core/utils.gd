@@ -90,7 +90,7 @@ static func _legion_needs_heal(legion: Legion) -> bool:
 	if legion == null:
 		return false
 	for unit in legion.units:
-		if unit != null and int(unit.current_health) < int(unit.max_health):
+		if unit != null and unit.current_health < unit.max_health:
 			return true
 	return false
 
