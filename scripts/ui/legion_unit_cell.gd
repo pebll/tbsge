@@ -1,7 +1,8 @@
 class_name LegionUnitCell
 extends Control
 
-## One unit tile pasted over the legion strip board.
+## One unit tile pasted over the legion strip board. HP (and shield) show as a thin
+## sidebar on the cell's right edge so the unit art stays fully visible.
 
 const UiTheme = preload("res://scripts/ui/ui_theme.gd")
 const UnitFootprintScript = preload("res://scripts/ui/interact/unit_footprint.gd")
@@ -10,6 +11,7 @@ const COLOR_HP := Color(0.82, 0.18, 0.14, 1.0)
 const COLOR_SHIELD := Color(0.55, 0.72, 0.86, 1.0)
 const COLOR_BAR_BG := Color(0.78, 0.70, 0.58, 0.55)
 const UNIT_BORDER := 4
+const SIDEBAR_W := 8.0
 
 var unit: Unit = null
 var legion: Legion = null
@@ -17,9 +19,6 @@ var cell_scale: float = 64.0
 
 var _frame: Panel
 var _icon: TextureRect
-var _hp_bg: ColorRect
-var _hp_fill: ColorRect
-var _shield_fill: ColorRect
 var _edge_bar_bg: ColorRect
 var _edge_hp: ColorRect
 var _edge_shield: ColorRect
@@ -55,7 +54,6 @@ func setup(
 	_apply_icon()
 	_display_hp = u.current_health if u else 0.0
 	_display_shield = float(u.shield_remaining) if u else 0.0
-	_apply_hp_style()
 	_refresh_vitals(false)
 	if _interact == null:
 		_interact = UiInteractable.new()
@@ -74,10 +72,6 @@ func _force_pixel_size(pixel_size: Vector2) -> void:
 func apply_vitals(hp: float, shield: float, animate: bool = true) -> void:
 	_refresh_vitals(animate, hp, shield)
 
-func set_hp_style(_style: int) -> void:
-	_apply_hp_style()
-	_refresh_vitals(false)
-
 func _build_if_needed() -> void:
 	if _built:
 		return
@@ -94,21 +88,6 @@ func _build_if_needed() -> void:
 	)
 	add_child(_frame)
 
-	_hp_bg = ColorRect.new()
-	_hp_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_hp_bg.color = COLOR_BAR_BG
-	add_child(_hp_bg)
-
-	_shield_fill = ColorRect.new()
-	_shield_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_shield_fill.color = COLOR_SHIELD
-	add_child(_shield_fill)
-
-	_hp_fill = ColorRect.new()
-	_hp_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_hp_fill.color = COLOR_HP
-	add_child(_hp_fill)
-
 	_icon = TextureRect.new()
 	_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -116,7 +95,7 @@ func _build_if_needed() -> void:
 	_icon.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_icon.offset_left = UNIT_BORDER + 2
 	_icon.offset_top = UNIT_BORDER + 2
-	_icon.offset_right = -(UNIT_BORDER + 2)
+	_icon.offset_right = -(UNIT_BORDER + SIDEBAR_W + 2)
 	_icon.offset_bottom = -(UNIT_BORDER + 2)
 	add_child(_icon)
 
@@ -140,19 +119,6 @@ func _apply_icon() -> void:
 		return
 	if unit.definition and unit.definition.icon:
 		_icon.texture = unit.definition.icon
-
-func _apply_hp_style() -> void:
-	if not _built:
-		return
-	var style_b := GameSettings.legion_strip_hp_style == 1
-	_hp_bg.visible = not style_b
-	_hp_fill.visible = not style_b
-	_shield_fill.visible = not style_b
-	_edge_bar_bg.visible = style_b
-	_edge_hp.visible = style_b
-	_edge_shield.visible = style_b
-	if _icon:
-		_icon.offset_right = -(UNIT_BORDER + 10) if style_b else -(UNIT_BORDER + 2)
 
 func _refresh_vitals(animate: bool, hp: float = -1.0, shield: float = -1.0) -> void:
 	if unit == null or not _built:
@@ -186,7 +152,7 @@ func _content_rect() -> Rect2:
 func _layout_vitals() -> void:
 	if not _built or unit == null or size.x <= 1.0 or size.y <= 1.0:
 		return
-	if _hp_bg == null or _hp_fill == null:
+	if _edge_bar_bg == null:
 		return
 	var hp_max := maxf(1.0, float(unit.max_health))
 	var sh_max := maxf(0.0, float(unit.shield_max))
@@ -195,36 +161,17 @@ func _layout_vitals() -> void:
 	if sh_max > 0.0:
 		sh_ratio = clampf(_display_shield / sh_max, 0.0, 1.0)
 	var inner := _content_rect()
-
-	if GameSettings.legion_strip_hp_style == 1:
-		var bar_w := 8.0
-		var x0 := inner.position.x + inner.size.x - bar_w
-		_edge_bar_bg.position = Vector2(x0, inner.position.y)
-		_edge_bar_bg.size = Vector2(bar_w, inner.size.y)
-		var usable := inner.size.y
-		var hp_h := usable * hp_ratio
-		_edge_hp.position = Vector2(x0, inner.position.y + usable - hp_h)
-		_edge_hp.size = Vector2(bar_w, hp_h)
-		if sh_max > 0.0:
-			var sh_h := usable * sh_ratio * 0.35
-			_edge_shield.visible = true
-			_edge_shield.position = Vector2(x0, inner.position.y)
-			_edge_shield.size = Vector2(bar_w, sh_h)
-		else:
-			_edge_shield.visible = false
-	else:
-		_hp_bg.position = inner.position
-		_hp_bg.size = inner.size
-		var hp_h := inner.size.y * hp_ratio
-		_hp_fill.position = Vector2(inner.position.x, inner.position.y + inner.size.y - hp_h)
-		_hp_fill.size = Vector2(inner.size.x, hp_h)
-		if sh_max > 0.0:
-			_shield_fill.visible = true
-			var sh_h := inner.size.y * sh_ratio * 0.28
-			_shield_fill.position = inner.position
-			_shield_fill.size = Vector2(inner.size.x, sh_h)
-		else:
-			_shield_fill.visible = false
+	var x0 := inner.position.x + inner.size.x - SIDEBAR_W
+	_edge_bar_bg.position = Vector2(x0, inner.position.y)
+	_edge_bar_bg.size = Vector2(SIDEBAR_W, inner.size.y)
+	var usable := inner.size.y
+	var hp_h := usable * hp_ratio
+	_edge_hp.position = Vector2(x0, inner.position.y + usable - hp_h)
+	_edge_hp.size = Vector2(SIDEBAR_W, hp_h)
+	_edge_shield.visible = sh_max > 0.0
+	if sh_max > 0.0:
+		_edge_shield.position = Vector2(x0, inner.position.y)
+		_edge_shield.size = Vector2(SIDEBAR_W, usable * sh_ratio * 0.35)
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_RESIZED:

@@ -47,8 +47,6 @@ const AI_FUNNY_NAMES: Array[String] = [
 var show_battle_log_moves: bool = false
 var show_battle_log_end_turns: bool = false
 var ai_debug_enabled: bool = false
-## Debug: legion strip unit HP — 0 = full-width background bar, 1 = narrow right bar.
-var legion_strip_hp_style: int = 0
 ## Monte Carlo sims for battle expectation preview (attack-target hover).
 var battle_expectation_sim_count: int = 50
 ## Print timing / bounds for battle expectation Monte Carlo runs.
@@ -100,17 +98,6 @@ func is_ai_debug_enabled() -> bool:
 func toggle_ai_debug(persist: bool = true) -> bool:
 	set_ai_debug_enabled(not ai_debug_enabled, persist)
 	return is_ai_debug_enabled()
-
-func set_legion_strip_hp_style(value: int, persist: bool = true) -> void:
-	var style := clampi(value, 0, 1)
-	if legion_strip_hp_style == style:
-		return
-	legion_strip_hp_style = style
-	_emit_and_maybe_save(persist)
-
-func toggle_legion_strip_hp_style(persist: bool = true) -> int:
-	set_legion_strip_hp_style(1 - legion_strip_hp_style, persist)
-	return legion_strip_hp_style
 
 func set_battle_expectation_sim_count(value: int, persist: bool = true) -> void:
 	if value not in BATTLE_EXPECTATION_SIM_OPTIONS:
@@ -314,7 +301,6 @@ func _load_settings() -> void:
 	show_battle_log_moves = bool(cfg.get_value(SETTINGS_SECTION, "show_battle_log_moves", false))
 	show_battle_log_end_turns = bool(cfg.get_value(SETTINGS_SECTION, "show_battle_log_end_turns", false))
 	ai_debug_enabled = bool(cfg.get_value(SETTINGS_SECTION, "ai_debug", false))
-	legion_strip_hp_style = clampi(int(cfg.get_value(SETTINGS_SECTION, "legion_strip_hp_style", 0)), 0, 1)
 	var expect_sims := int(cfg.get_value(SETTINGS_SECTION, "battle_expectation_sim_count", 50))
 	if expect_sims in BATTLE_EXPECTATION_SIM_OPTIONS:
 		battle_expectation_sim_count = expect_sims
@@ -344,7 +330,6 @@ func _save_settings() -> void:
 	cfg.set_value(SETTINGS_SECTION, "show_battle_log_moves", show_battle_log_moves)
 	cfg.set_value(SETTINGS_SECTION, "show_battle_log_end_turns", show_battle_log_end_turns)
 	cfg.set_value(SETTINGS_SECTION, "ai_debug", ai_debug_enabled)
-	cfg.set_value(SETTINGS_SECTION, "legion_strip_hp_style", legion_strip_hp_style)
 	cfg.set_value(SETTINGS_SECTION, "battle_expectation_sim_count", battle_expectation_sim_count)
 	cfg.set_value(SETTINGS_SECTION, "battle_expectation_log_timing", battle_expectation_log_timing)
 	cfg.set_value(MATCH_SECTION, "map_size", match_map_size)
