@@ -32,60 +32,63 @@ Carried over from the v0.1 board:
 
 ## Milestones
 
-### 0.1 — AI overhaul
-Goal: the AI feels smart and isn't easy to exploit. See [`design/ai.md`](design/ai.md) and the task log [`utility-ai-quality.md`](../odd/tasks/utility-ai-quality.md).
-- [x] Utility AI: candidates scored by named, weighted features (`AiProfile`, JSON profiles) — PR #4
-- [x] Uses Monte Carlo expectation over the real resolver; values trades by gold and wipe chance — PR #4
-- [x] Threat map / safety, walking-distance focus — PR #4
-- [x] GA + MAP-Elites tuning, held-out gating bench with Wilson CI — PR #4
-- [ ] Beat `greedy` with statistical significance (needs structure, not weights: 1-ply enemy reply, team focus fire within a turn, ranged kiting)
-- [ ] Stall-breaker for draws the baseline converts
-- [ ] Define "not exploitable" as tests: tactical puzzles + known-cheese list
+Decisions behind this order: `open_questions.md` → Decided (2026-11-07). Skirmish ships first; the economy mode comes after the beta.
+
+### 0.1 — AI overhaul (finish)
+Goal: the AI feels smart in battle. See [`design/ai.md`](design/ai.md) and [`utility-ai-quality.md`](../odd/tasks/utility-ai-quality.md).
+- [x] Utility AI with weighted features, Monte Carlo expectation over the real resolver, threat map, GA/MAP-Elites tuning, held-out benchmark (PR #4)
+- [x] Opponent choice in Play setup: Evolved / Hand-tuned / Cascade (PR #5)
+- [ ] **Focus fire within a turn**: legions coordinate on one target until it's wiped
+- [ ] **Legion ordering within a turn**: ranged/support act first, melee finishes, tank swaps forward
+- *Later (not 0.1):* smart AI draft (after balance), enemy-reply lookahead, ranged kiting, stall-breaker, exploit tests
+
+### 0.1.5 — Foundations before effects
+- [ ] **Mixed-legion data model**: a legion is any set of units; visuals, draft cost, SFX, stats and the legion strip read per-unit identity instead of `Legion.unit_type` (UI to create mixed legions stays in 0.4)
+- [ ] **Counter tags** on every unit (fixed list: armored, flyer, swarm, shielded, ranged, support, …), shown in tooltips
+- [ ] Status-effect framework: `StatusEffect` model + pre-strike / on-hit / on-death / turn-start hooks in `CombatResolver`, icons on legion and strip, tooltip, battle-log line
 
 ### 0.2 — More effects
-Follow the per-effect dev flow (effect → legion → test → AI → AI test). See [`design/combat.md`](design/combat.md).
-- [ ] Status-effect framework + visualisation (icons on legion and strip, tooltip, battle log).
-- [ ] Flying
+Per-effect dev flow: effect → legion → test → AI → AI test. See [`design/combat.md`](design/combat.md).
 - [ ] Regeneration
 - [ ] Lifesteal
 - [ ] Pierce (break shield)
 - [ ] Attack buff / debuff
-- [ ] Poison
+- [ ] Poison (ticks at the poisoned legion's turn start, N turns)
 
 ### 0.3 — Terrain
 - [ ] More terrains: swamp, hill?, badlands, flower grass, jungle, tundra
 - [ ] Better map generation
-- [ ] Line of sight helper (mountains block ranged + heal_ally) — from the old T3 plan
-- [ ] Fog of war (decide: does the AI cheat? see open questions)
-- [ ] Forest: shield/defence + slower + lower vision
-- [ ] Swamp: slower
+- [ ] Line of sight (mountains block ranged + heal_ally)
+- [ ] **Flying** (moved here from 0.2 so it ships complete with terrain; exact rules to design then)
+- [ ] Fog of war (AI sees through fog at first)
+- [ ] Forest: defence + slower + lower vision · Swamp: slower
 - [ ] Unit terrain affinities (e.g. scorpion faster on desert)
-- [ ] Right-click an empty tile → terrain name + effects (old U3)
+- [ ] Right-click an empty tile → terrain name + effects
 - [ ] Water units?
 
-### 0.4 — Legion mixing
-- [ ] Allow mixed legions + all UI/UX and logic (big refactor: see `codebase.md` → "Homogeneous-legion assumptions")
+### 0.4 — Legion mixing (UI/UX)
+- [ ] Build mixed legions in the draft + all UX (data model already done in 0.1.5)
 - [ ] New effects: Freeze, Scare, Summon, Merge
 
-### 0.5 — Skirmish polish
-Goal: release a working and fun skirmish mode.
-- [ ] Better drafting (pick 1 of 3, or a random set of legions to draft from)
-- [ ] Polish all UX
-- [ ] Polish AI
-- [ ] Polish UI / tooltips / clarity / rules
-- [ ] Balance
+### 0.5 — Skirmish polish → beta
+- [ ] Balance pass (uses the duel stats + counter tags)
+- [ ] **Smart AI draft** (value/role/counter-based, needs the balance pass first)
+- [ ] Better drafting for players (pick 1 of 3, or a random set to draft from)
+- [ ] Polish UX / UI / tooltips / rules (see the autopilot findings above)
+- [ ] Real difficulty levels? (see open question 3)
 - [ ] Save / load
 - [ ] Performance pass (if needed)
+- [ ] Release **Realmrise Tactics** beta on itch (desktop) + a testing & feedback setup
+
+### After the beta
+- [ ] Economy mode prototype: fixed capital, builders + map-placed buildings, gold/food/science (see `design/economy.md`, `progression.md`, `exploration.md`)
+- [ ] Sounds & music
+
+### Parked (no work until after the beta)
+- Battle royale / walking factory · Factions · Campaign & tutorial · Online multiplayer (1v1 with clock)
 
 ### Release checklist (when an export preset exists)
 - [ ] Add `*.json` to the export include filter, or `data/ai/profiles/*.json` won't ship and "Evolved" silently falls back to hand-tuned.
-
-### Later (unordered)
-- [ ] First beta on itch + a testing & feedback setup
-- [ ] Economy / battle royale mode: capital/factory, production, science (see `design/economy.md`, `progression.md`, `modes.md`)
-- [ ] Sounds & music
-- [ ] Multiplayer (1v1 first, with a clock)
-- [ ] Content: more units, campaign?, tutorial?
 
 ### Tech/infra backlog (no milestone yet)
 - [x] CI that runs `./run_tests.sh` headless (`.github/workflows/tests.yml`, `tools/get_godot.sh`)

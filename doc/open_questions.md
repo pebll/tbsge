@@ -1,51 +1,51 @@
 # Open questions
 
-Critical questions to answer before (or during) the next milestones. Each has the reason it matters. Move answered ones to **Decided** with a date.
+Decisions still to make, each with why it matters. When one is answered, move it to **Decided** with the date.
 
-## Direction & scope
+## Still open
 
-1. **Is the skirmish the product, or a test bed for the economy game?** Milestones 0.1–0.5 polish the draft skirmish (AI tuned to it, balance for it, save/load for it), but every journal entry since August describes a different core loop (capital, production, science, builders). Balance and AI tuned for a no-economy draft only partly carry over. If the skirmish is a stepping stone, consider cutting 0.5 down to "fun enough to playtest" and moving to a minimal economy prototype sooner.
-2. **What is the smallest prototype that proves the economy loop is fun?** E.g. capital + 1 builder type + 2 buildings + gold only + a 3-node science tree, no food, no exploration. Without this you could spend months on effects for a game whose structure isn't validated.
-3. **Solo dev vs scope.** KingdomHex has two people and is still in development. Which half of the long list are you willing to cut? (Candidates: battle royale, factions, water units, mind control, campaign.)
-4. **Working title**: FableQuest / Fable Quest / Realmrise Tactics / tbsge? It affects the itch page, the save paths and the project name.
-5. **What's the differentiator from KingdomHex, in one sentence a player would understand?** "Civ-style multi-legion combat" is the claim. Is that visible in a 2-minute video of the game today?
+### Product
+1. **What's the differentiator from KingdomHex, in one sentence a player would understand?** The claim is "Civ-style multi-legion combat". Is that visible in a 2-minute video of the game today? It matters for the itch page and for deciding which features earn their place.
 
-## Combat & content
+### AI
+2. **EA fitness: against whom?** Self-play alone tends to cycle. A hall of fame of older champions plus the scripted baselines is the usual fix. Only relevant when weight tuning resumes.
+3. **Real difficulty levels.** Difficulty only scales the AI's draft gold today, and you said to leave it like that for now. Revisit before the beta: randomness in choices (temperature), fewer sims per fight, weaker profiles.
 
-6. **Will legions mix? Decide now, not in 0.4.** The code assumes one unit type per legion in targeting, range, actions and cost. Every effect written in 0.2 and 0.3 under that assumption is more rework later. If yes, do the data-model change before 0.2.
-7. **Random targets vs player control.** Combat targets are random within a legion. That's good for "big armies clash", but it fights against "outplay with less value" (you can't focus the healer inside a stack). Do you want snipe-style effects to be the only way to target, or some deterministic rule (front row first)?
-8. **Counters and hard counters need a vocabulary.** Do legions get tags (armored, flyer, swarm, shielded, ranged, support) so the draft, the tech generator and the AI can reason about counters? That's cheap to add now and very useful later.
-9. **Flying** (0.2) before **terrain** (0.3): flying is mostly defined by terrain (ignores water/mountains, LOS?). Should the order be swapped, or flying limited to "can only be melee'd by flyers/ranged" for now?
-10. **Poison**: per turn or per move? (They lead to very different play: per-move punishes kiting.)
+### Economy & progression (decide during the economy prototype)
+4. **Is "production" a fourth resource or just gold?** (The mine gives "+prod".) *Parked: "we will need to think about that more later".*
+5. **Food deficit formula**: linear or percentage, can production reach 0, does it slow science? *Decide in the prototype.*
+6. **Science tree size and generator rules**: how many nodes per tier, and what guarantees that every random pool can answer every archetype? The counter tags (decided below) are the tool for this.
+7. **Smallest economy prototype**: capital + 1 builder + 2 buildings + gold + a 3-node tree? Decide when the skirmish beta is out.
 
-## AI
-
-11. **What does "not exploitable" mean concretely?** Proposal: a growing list of known cheese, each with a test; a new AI must beat the old one on win rate over N seeded mirrored matches.
-12. **With fog of war (0.3), does the AI cheat** (sees everything) or does it get a memory model? Honest fog AI is much more work.
-13. **EA fitness:** against whom? (Self-play alone tends to cycle; keep a hall of fame of older champions plus scripted baselines.)
-14. **How strong should the AI be at each difficulty?** Weight tuning gives one "best" AI; difficulties need deliberate handicaps (noise, shorter look-ahead, fewer considerations).
-
-## Economy & progression
-
-15. **Fixed capital with a farm ring vs walking factory**: these two ideas pull in opposite directions (20/08 vs 11/08). Is the walking factory only for battle royale, or still a candidate for the main mode?
-16. **Map-placed vs player-built economy**: the 11/08 notes lean towards HoMM-style pre-placed outposts (no founding); the 20/08 notes add builders that construct. Both, or one? Builders add a whole unit class plus build UX.
-17. **Is "production" a fourth resource** or the same as gold? (The mine gives "+prod".)
-18. **Food deficit formula**: linear reduction? Can production reach 0? Does it slow science too? What stops a player from going far over the cap for one all-in?
-19. **Science tree size and generator rules**: how many nodes per tier, and what guarantees that every random pool can answer every archetype?
-20. **Tier naming**: are science tiers (0–III) the same as the UX complexity tiers (I–IV in `design/combat.md`)? Aligning them would make "tier" mean one thing.
-
-## Competitive / multiplayer
-
-21. **Determinism**: online 1v1 with a clock implies lockstep or server-authoritative play. The command model already fits; the RNG must be seeded per match. Who rolls the dice: the server or a shared seed?
-22. **Out-of-turn economy commands** ("their turn: economy"): applied immediately or queued for your turn start? Immediate is simpler to reason about only if economy can never affect the board during the opponent's turn.
-23. **Target platform**: `project.godot` uses the **Mobile** renderer. Desktop / itch only, or mobile too? This affects UI scale and input (right-click inspect, hover previews).
+### Competitive / multiplayer (parked until after the beta)
+8. **Determinism**: lockstep or server-authoritative? The match already has a seeded RNG (`MatchSession.rng`); who owns the seed?
+9. **Out-of-turn economy commands** ("their turn: economy"): applied immediately, or queued for your turn start?
 
 ---
 
 ## Decided
 
+### 2026-11-07
+- **Skirmish ships first.** Polish the draft skirmish through 0.5 and release a beta on itch; the economy mode comes after.
+- **Legions will mix unit types.** Do the *data-model* part (legion = any units; per-unit identity for visuals, cost and SFX) **before 0.2**, so effects are written mix-aware. The mixing UI/UX stays in 0.4.
+- **Targeting stays random** inside a legion. Control comes from effects (Snipe, First strike, …), not from a deterministic rule or a player-chosen focus.
+- **Fixed capital is the main mode** (capital + builders + raidable territory). The walking factory is a battle-royale experiment for much later.
+- **Counter tags now.** Every unit gets tags from a small fixed list (armored, flyer, swarm, shielded, ranged, support, …), shown in tooltips; draft, tech generator and AI use them later.
+- **Flying moves to 0.3** (with terrain), so it's complete from day one.
+- **Poison ticks at the start of the poisoned legion's turn**, for N turns.
+- **Fog of war: the AI sees through fog at first.** An honest fog AI comes later, maybe as a difficulty option.
+- **AI scope for 0.1:** coordinated focus fire within a turn + legion ordering (ranged/support first, melee finishes, tank swaps forward). **Smart AI draft later**: it needs balance first, and a deterministic draft isn't interesting yet.
+- **Economy will have both** map-placed buildings to capture and builders that construct.
+- **Title: Realmrise Tactics** (window title, menu, itch page, save folder).
+- **Desktop only** (mouse + keyboard). No touch constraints on UI.
+- **No separate "complexity tiers".** An earlier agent proposal (unit kit complexity I–IV for tutorial pacing) is dropped; "tier" means science tier only.
+- **Parked until after the skirmish beta:** battle royale / walking factory, factions (random tech trees only), campaign & tutorial, online multiplayer (hotseat + AI until then).
+- Difficulty keeps scaling only the AI's gold for now (see open question 3).
+- The player can choose the opponent AI in Play setup: Evolved / Hand-tuned (default) / Cascade.
+
+### Earlier
 - *(2026-08-11)* AI = utility AI with optimised weights; no RL.
 - *(2026-08-11)* Science accumulates over time; no buying research with gold.
-- *(2026-08-20)* Online multiplayer will be 1v1.
+- *(2026-08-20)* Online multiplayer will be 1v1 (with a chess-like clock).
 - *(2026-08-20)* Food is a soft cap (production penalty), not a hard cap.
 - *(2026-08-20)* Enemy buildings: Claim (2 AP, terminal) or Burn (1 AP, terminal).

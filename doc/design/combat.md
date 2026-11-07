@@ -26,20 +26,11 @@
 **Action data model**
 - One `ActionDefinition` per verb (`data/actions/*.tres`) with defaults; per-unit overrides through `ActionParams` (`override ?? default`). Don't create per-unit action variants unless the verb itself changes.
 
-## Unit complexity tiers (UX guidance)
-
-| Tier | Kit |
-|------|-----|
-| I Basic | Move, melee (maybe self-heal). One job. |
-| II Specialty | + ranged **or** shield **or** one simple skill |
-| III Tactical | Cooldown skill, terrain-aware kit, 1 status |
-| IV Complex | Several skills, buffs/debuffs, keywords matter |
-
-Note: these UX tiers are not the same thing as the **science tiers** in `progression.md`. Consider aligning them.
-
 ## Effects catalogue
 
 Status: ✅ done · 🎯 scheduled (milestone) · 💡 idea
+
+Targeting inside a legion stays **random** (decided 2026-11-07); effects such as Snipe or First strike are the way to add control.
 
 | Effect | Status | Notes / open design |
 |--------|--------|---------------------|
@@ -47,17 +38,17 @@ Status: ✅ done · 🎯 scheduled (milestone) · 💡 idea
 | Shield | ✅ | Absorbs the first hit per turn |
 | Teleport | ✅ | |
 | Status-effect visualisation | 🎯 0.2 | Prerequisite for every status below |
-| Flying | 🎯 0.2 | Ignores terrain blocking? Can only be hit by ranged / flyers? Decide before terrain (0.3) |
+| Flying | 🎯 0.3 | Moved to terrain milestone (decided 2026-11-07); rules designed with terrain |
 | Regeneration | 🎯 0.2 | Heal X at the start of own turn |
 | Lifesteal | 🎯 0.2 | % of HP damage dealt → heal own lowest unit |
 | Pierce / shieldbreak | 🎯 0.2 | Ignores or destroys the shield |
 | Attack buff / debuff | 🎯 0.2 | First real status with a duration |
-| Poison | 🎯 0.2 | Ticks each turn or on move? Pick one |
+| Poison | 🎯 0.2 | Ticks at the start of the poisoned legion's turn, for N turns (decided 2026-11-07) |
 | Freeze | 🎯 0.4 | Skip next turn / no move |
 | Scare | 🎯 0.4 | Target must move away; needs pathing rules |
-| Summon | 🎯 0.4 | Needs free slots in a legion → depends on mixing |
+| Summon | 🎯 0.4 | Needs free slots in a legion → depends on mixing (data model done in 0.1.5) |
 | Merge (slimes) | 🎯 0.4 | Depends on mixing |
-| Stealth | 💡 | Needs fog of war (0.3) |
+| Stealth | 💡 | Needs fog of war (0.3; the AI sees through fog at first) |
 | Silence | 💡 | Disable actions/effects |
 | Set trap | 💡 | Tile objects |
 | Necromancy | 💡 | Raise dead units → needs a death record per tile |
