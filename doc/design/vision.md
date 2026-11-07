@@ -4,7 +4,7 @@
 
 **Realmrise Tactics**: fast-paced, deep, multi-legion tactical battles on a hex map, with just enough economy, science and exploration to make every match a different strategic puzzle. It's the tactical core that a fuller *Realmrise* (diplomacy, deep economy) could one day be built on.
 
-> Naming: the Godot project is called **FableQuest**, the repo is `tbsge`, and the notes say *Fable Quest*, *Realmrise* and *Realmrise Tactics*. Pick one working title (see `open_questions.md`).
+> Title: **Realmrise Tactics** (decided 2026-11-07). Older names you may still see: FableQuest (previous project name), `tbsge` (repo). Platform: desktop (mouse + keyboard).
 
 ## What makes it fun (the two pillars we know work)
 
@@ -37,7 +37,7 @@ Every feature should feed at least one of these. If a feature only adds bookkeep
 
 1. **Skirmish** (now → 0.5): draft legions with gold, fight to the last unit. Pure tactics.
 2. **Economy mode**: one capital (lose it = lose), production, builders, map buildings, science tree, food soft cap. Ideally 1v1 competitive with a clock.
-3. **Battle royale / walking factory**: a mobile capital-factory and a shrinking map. An experiment.
-4. Later: multiplayer, campaign, tutorial, sounds/music.
+3. **Battle royale / walking factory**: a mobile capital-factory and a shrinking map. An experiment, parked until after the skirmish beta.
+4. Parked until after the beta: online multiplayer, factions, campaign, tutorial. Sounds/music after the beta.
 
 See `modes.md`, `economy.md`, `progression.md`, `exploration.md`.

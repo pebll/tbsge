@@ -1,4 +1,4 @@
-# FableQuest / Realmrise Tactics docs
+# Realmrise Tactics docs
 
 Start here. Everything design-related lives in `doc/`. Agent conventions stay in `/AGENT_NOTES.md`.
 

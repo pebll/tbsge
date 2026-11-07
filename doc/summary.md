@@ -1,44 +1,44 @@
-# Summary
+# Realmrise Tactics: summary
 
-## The project
+*Updated 2026-11-07 after the planning session. Details: [`roadmap.md`](roadmap.md), decisions: [`open_questions.md`](open_questions.md).*
 
-**FableQuest** (working toward *Realmrise Tactics*): an isometric, turn-based hex strategy game in Godot 4.6. Players command **legions** (stacks of units on a 6×2 footprint board) and fight Civ-style multi-legion battles. The long-term idea is a fast tactical game with a light, raidable economy, a time-gated science tree, and exploration (ruins, neutrals, mercenaries). It's the tactical core of a possible future full *Realmrise*.
+## The game in one paragraph
 
-## Where it stands (Nov 2026)
+**Realmrise Tactics** is a turn-based hex strategy game for desktop (Godot 4.6). You command **legions** (stacks of units) and fight Civ-style battles where many legions manoeuvre on one map. The fun is **outplaying the opponent with less value on the board** and **watching big armies clash**. It's the tactical core of a possible future full *Realmrise* (diplomacy, deep economy).
 
-**Playable v0.1 skirmish loop**: main menu → setup (Vs AI / hotseat, names, map size, difficulty) → draft legions with gold onto deploy slots → battle → victory/defeat → rematch.
+## The plan
 
-- **Combat**: alternating strikes with draining, random targets, immediate deaths, shields, melee vs ranged with counter-fire by range, AP + terminal actions, swap-moves, cooldowns.
-- **Actions**: move, melee, ranged, self-heal, heal-ally, teleport. Data-driven with per-unit overrides.
-- **15 unit types** (8 in the draft pool, each with a distinct role).
-- **UX**: legion strip HUD, action bar with disabled reasons, expectation preview (Monte Carlo), live battle log, tooltips and glossary.
-- **AI**: greedy heuristic (net-HP scoring, flanking, heal gating, teleport-to-engage) + AI-vs-AI duel runner + headless balance sim.
-- **Engine**: model-first command API (`MatchSession.apply`), visual playback afterwards; shared by the minigame and the sandbox mode; a large headless test suite.
+**1. Ship the skirmish first.** Draft an army with gold, fight to the last unit, against a good AI or a friend (hotseat). Release it as a beta on itch.
 
-## What's next (roadmap)
+**2. Then the economy mode.** A fixed capital (lose it, lose the game) that produces units. Builders construct farms and mines, and there are neutral buildings on the map to capture. Enemy buildings can be claimed or burned. Resources are gold, food (a soft cap: an oversized army slows production instead of being blocked) and science (time-gated, a randomised tree where higher nodes need both parents).
 
-| Milestone | Focus |
-|-----------|-------|
-| **0.1** | AI overhaul: utility AI on the real combat estimator, value kills, manoeuvring, weights in one resource tuned by an evolutionary algorithm |
-| **0.2** | Effects: status framework + visuals, flying, regeneration, lifesteal, pierce, attack buff/debuff, poison |
-| **0.3** | Terrain: new terrains, better map gen, LOS, fog of war, terrain modifiers and unit affinities |
-| **0.4** | Legion mixing + freeze, scare, summon, merge |
-| **0.5** | Skirmish polish: better draft, UX, AI, balance, save/load → beta on itch |
-| Later | Economy mode (capital, builders, science), 1v1 multiplayer with a clock, battle royale experiment, sound/music, content |
+**Parked until after the beta:** battle royale / walking factory, factions, campaign & tutorial, online multiplayer (1v1 with a chess clock).
 
-## The design in brief (from your notes)
+## Where it stands
 
-- **Fun** = outplaying the opponent with less value + the spectacle of big armies.
-- **Progression** = a 3-tier science lattice: higher nodes need *both* parents, are visible once you have *one*. Researches are randomised (shared, per player, or later factions). Each one unlocks a legion.
-- **Economy** = gold / food / science. One capital (lose it, lose the game). The economy is spread over the map: pre-placed buildings and builder-built farms/mines. Claim or burn enemy buildings. A **soft food cap** penalises over-sized armies instead of blocking them.
-- **Exploration** = ruins, barbarians, neutrals, mercenaries, statues, spawners, special tiles, mostly guarded.
-- **Competitive** = 1v1 with a chess-like clock (bank + delay + increment). Economy management allowed during the opponent's turn.
-- **Battle royale idea** = walking factory-cities and a crumbling map to force engagement.
-- **AI** = utility scoring with optimised weights; per-effect dev flow (effect → legion → test → AI → AI test).
+A complete, playable skirmish loop: menu → setup (Vs AI / Hotseat / AI vs AI, map size, difficulty, **choice of opponent AI**) → draft → battle → victory screen → rematch. The game has 15 unit types, six actions (move, melee, ranged, self-heal, heal ally, teleport) with cooldowns, a live battle log, attack previews, tooltips, and a legion strip with sidebar HP bars.
 
-## This pass
+- **AI:** a utility AI that judges fights by simulating them with the real combat code. It beats the old cascade AI. Three selectable opponents: Evolved, Hand-tuned (default), Cascade. **Weak spot:** the AI drafts its army at random, and the draft decides most games. That's a known item for the balance milestone.
+- **Engine:** game state updates first and animations replay it afterwards. One seeded RNG per match. 38 headless test suites, CI on GitHub, and a click-through UI test that plays real matches on a virtual screen.
 
-- Docs reorganised into `doc/` (this folder). The original notes are preserved in `journal.md`.
-- 7 fixes: the 4 listed bugs, the likely crash, the AI not pausing, a swap/wait exploit. Not yet run in Godot.
-- Code review with a prioritised refactor backlog → `codebase.md`.
-- 23 open questions → `open_questions.md`. The top 3: is the skirmish the product or a test bed? Will legions mix (decide before 0.2)? What's the smallest economy prototype that proves the fun?
+## Roadmap
+
+| Milestone | Content |
+|---|---|
+| **0.1 AI (finish)** | Focus fire within a turn · legion ordering (ranged/support first, melee finishes, tank swaps forward) |
+| **0.1.5 Foundations** | Mixed-legion data model · counter tags on every unit · status-effect framework (model, combat hooks, icons, log) |
+| **0.2 Effects** | Regeneration · lifesteal · pierce · attack buff/debuff · poison (ticks at turn start) |
+| **0.3 Terrain** | New terrains · map generation · line of sight · **flying** · fog of war (AI sees through it at first) · terrain affinities |
+| **0.4 Mixing UI** | Building mixed legions in the draft · freeze, scare, summon, merge |
+| **0.5 Beta** | Balance · **smart AI draft** · better player draft · UX polish · save/load · itch release |
+| **After the beta** | Economy prototype · sounds & music |
+
+**Open UX bugs from the autopilot** (in the roadmap): the attack preview covers the target tile; the comparison bar runs under the battle log; the battle log is wide; the draft camera doesn't show your deploy zone.
+
+## Key decisions (2026-11-07)
+
+Skirmish first · legions will mix (data model before effects) · random targeting inside a legion, with control from effects · fixed capital is the main mode · counter tags now · flying moves to 0.3 · poison ticks at turn start · fog: AI cheats at first · AI: focus fire + ordering now, smart draft after balance · economy has map buildings *and* builders · title Realmrise Tactics · desktop only · no separate "complexity tiers".
+
+## Still open
+
+Differentiator vs KingdomHex in one sentence · real difficulty levels (before the beta) · production as a 4th resource? · food-deficit formula · science-tree size/generator rules · smallest economy prototype · multiplayer determinism and out-of-turn economy (after the beta).

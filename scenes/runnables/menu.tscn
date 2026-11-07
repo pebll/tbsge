@@ -46,7 +46,7 @@ theme_override_constants/separation = 20
 [node name="TitleLabel" type="Label" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "FableQuest"
+text = "Realmrise Tactics"
 horizontal_alignment = 1
 
 [node name="MainButtons" type="VBoxContainer" parent="UI/MainMenu/CenterContainer/MenuPanel/VBox"]

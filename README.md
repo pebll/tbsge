@@ -1,4 +1,4 @@
-# FableQuest
+# Realmrise Tactics
 
 Isometric turn-based strategy built in Godot 4. The repo is structured as a small **battle engine** plus **game modes** that reuse it.
 
