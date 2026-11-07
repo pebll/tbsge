@@ -18,6 +18,8 @@ var _out_dir := "user://autopilot"
 var _hex = null
 ## "vs_ai" (default): play as a human vs the AI. "ai_vs_ai": watch AI-only turns advance.
 var _scenario := "vs_ai"
+## Opponent to pick in the setup "AI" row (button text), e.g. "Cascade". Empty = keep.
+var _ai_choice := ""
 const PHASE_BATTLE := 1
 const PHASE_ENDED := 2
 var _shot_index := 0
@@ -40,6 +42,9 @@ func _ready() -> void:
 		GameSettings.set_show_battle_log_moves(true, false)
 	if "turns" in flags:
 		GameSettings.set_show_battle_log_end_turns(true, false)
+	for f in flags.split(","):
+		if f.begins_with("ai="):
+			_ai_choice = f.substr(3)
 	_log("scenario %s flags [%s]" % [_scenario, flags])
 	seed(run_seed)
 	_log("seed %d (replay: tools/run_ui_autopilot.sh OUT_DIR %d)" % [run_seed, run_seed])
@@ -254,9 +259,13 @@ func _run() -> void:
 	_check(await _click_button("Play"), "main menu Play opens setup")
 	await _wait(0.6)
 	await _shot("setup")
-	if _scenario == "ai_vs_ai":
-		await _click_button("AI vs AI")
+	# Mode is persisted between runs: always pick it explicitly.
+	await _click_button("AI vs AI" if _scenario == "ai_vs_ai" else "Vs AI")
+	await _wait(0.3)
+	if not _ai_choice.is_empty():
+		_check(await _click_button(_ai_choice), "setup: pick AI '%s'" % _ai_choice)
 		await _wait(0.3)
+		await _shot("setup_ai_%s" % _ai_choice)
 	_check(await _click_button("Start"), "setup Start launches the match")
 	if _scenario == "ai_vs_ai":
 		await _run_ai_vs_ai()
@@ -270,6 +279,9 @@ func _run() -> void:
 	_check(await _click_button("Ready for battle"), "draft Ready for battle")
 	var in_battle: bool = await _wait_until(_is_battle, 20.0)
 	_check(in_battle, "battle phase starts")
+	if in_battle:
+		var brain = _game().battle.ai_brain
+		_log("opponent brain: %s (setting %s)" % [brain.get("id") if brain else "none", GameSettings.match_ai_brain])
 	if not in_battle:
 		return _finish()
 	await _wait(1.5)

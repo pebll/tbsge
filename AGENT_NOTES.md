@@ -53,6 +53,7 @@
 - **Move is non-terminal** (does not `wait_legion`); combat/heal terminal actions do. "Done this turn" is `Legion.waited` (set by wait/pass and terminal actions, cleared for all legions on `end_team_turn`) — never track it by tile.
 - Randomness in battle comes from the match RNG (`MatchSession.rng` / `next_rng_seed()`, seeded by `set_match_seed`). Don't call global `randi()`/`randf()` in rules or AI.
 - Legion capabilities (`has_ranged`, `max_attack_range`, `unit_types`, `ActionDefs.legion_action_ids`) aggregate over all units — never read `units[0]` for rules.
+- **Reference other scripts through `const X = preload("res://...")`, never only by global `class_name`.** A stale `.godot` class cache (branch pulled while the editor is open) makes bare class names fail to compile — that once froze every AI turn.
 - AI "what if this legion stood there" queries go through `HypotheticalPosition.evaluate` (always restores the grid).
 - Combat expectation (UI preview and AI) both sample via `CombatSampler` — one Monte Carlo loop over `CombatResolver`.
 

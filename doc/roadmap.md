@@ -77,6 +77,9 @@ Goal: release a working and fun skirmish mode.
 - [ ] Save / load
 - [ ] Performance pass (if needed)
 
+### Release checklist (when an export preset exists)
+- [ ] Add `*.json` to the export include filter, or `data/ai/profiles/*.json` won't ship and "Evolved" silently falls back to hand-tuned.
+
 ### Later (unordered)
 - [ ] First beta on itch + a testing & feedback setup
 - [ ] Economy / battle royale mode: capital/factory, production, science (see `design/economy.md`, `progression.md`, `modes.md`)

@@ -24,6 +24,8 @@ func _init(phase_deps: MinigamePhaseDeps) -> void:
 	deps = phase_deps
 
 func enter() -> void:
+	# Opponent chosen in Play setup (Vs AI / AI vs AI).
+	ai_brain = AiBrainRegistry.create(GameSettings.match_ai_brain)
 	deps.tile_info_panel.set_draft_mode(false)
 	deps.tile_info_panel.hide()
 	if deps.legion_strip:

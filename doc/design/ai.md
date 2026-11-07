@@ -9,6 +9,7 @@
 ## Where it stands (code, after PR #4)
 
 - **Shipped brain: `utility`** (`scripts/ai/brains/utility_brain.gd`): candidate generation → feature extraction → linear score with an `AiProfile`. The game loads `data/ai/profiles/utility_default.json` if present, but no tuned profile has been shipped, so **in-game it plays the hand-tuned `hand_v1` weights**, argmax (temperature 0), 12 Monte Carlo sims per fight.
+- **Opponent choice** (Play setup → "AI"): *Evolved* (`utility_evolved`, weights from GA run `cur2`, shipped in `data/ai/profiles/utility_evolved.json`), *Hand-tuned* (`utility_hand`, default), *Cascade* (the older rule-based AI). Benchmarks 2026-11-07 (held-out seeds): evolved vs hand 50.0% over 30 mirrored pairs (28 pairs split, the draft decides); vs cascade: hand 57.5%, evolved 55.6% over 40 pairs. The evolved profile is a curiosity, not a stronger AI.
 - **Difficulty** only scales the AI's draft gold (Easy ×0.75 … Impossible ×2); tactics are identical on every level. Real difficulty levels (temperature, fewer sims, weaker profiles) are still to do.
 - **Combat features** come from `CombatExpectation`, Monte Carlo over the real `CombatResolver` via the shared `CombatSampler` (same sampler as the UI preview). Shields, random targets, kills and wipe odds are all included.
 - **Threat map** + safety features, walking-distance focus field.

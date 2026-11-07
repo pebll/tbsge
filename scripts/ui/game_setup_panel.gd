@@ -1,7 +1,7 @@
 class_name GameSetupPanel
 extends VBoxContainer
 
-## Play setup: mode, names, map size + difficulty, then Start / Back.
+## Play setup: mode, names, map size, difficulty + opponent AI, then Start / Back.
 
 signal back_pressed
 signal start_pressed
@@ -15,6 +15,7 @@ const MENU_BTN_WIDTH := 360
 var _mode_row: SegmentOptionRow
 var _map_row: SegmentOptionRow
 var _diff_row: SegmentOptionRow
+var _ai_row: SegmentOptionRow
 var _name_label: Label
 var _name_edit: LineEdit
 var _p2_label: Label
@@ -36,6 +37,7 @@ func sync_from_settings() -> void:
 	_mode_row.set_selected(GameSettings.match_mode, false)
 	_map_row.set_selected(str(GameSettings.match_map_size), false)
 	_diff_row.set_selected(GameSettings.match_difficulty, false)
+	_ai_row.set_selected(GameSettings.match_ai_brain, false)
 	_name_edit.text = GameSettings.player_name
 	_p2_edit.text = GameSettings.player2_name
 	_refresh_mode_visibility()
@@ -85,6 +87,12 @@ func _build() -> void:
 	_diff_row.configure_buttons(0, 18, 46)
 	add_child(_diff_row)
 	_diff_row.setup("Difficulty", _difficulty_options(), GameSettings.match_difficulty)
+
+	_ai_row = SegmentOptionRowScript.new()
+	_ai_row.name = "AiRow"
+	_ai_row.configure_buttons(0, 18, 46)
+	add_child(_ai_row)
+	_ai_row.setup("AI", _ai_options(), GameSettings.match_ai_brain)
 
 	_summary = Label.new()
 	_summary.name = "Summary"
@@ -165,6 +173,28 @@ func _difficulty_options() -> Array:
 		},
 	]
 
+func _ai_options() -> Array:
+	return [
+		{
+			"id": "utility_evolved",
+			"text": "Evolved",
+			"tooltip": "Utility AI with weights tuned by the genetic algorithm.",
+			"width": 120,
+		},
+		{
+			"id": "utility_hand",
+			"text": "Hand-tuned",
+			"tooltip": "Utility AI with hand-tuned weights (the default).",
+			"width": 170,
+		},
+		{
+			"id": "cascade",
+			"text": "Cascade",
+			"tooltip": "The older rule-based AI: attack nearest, flank, heal when hurt.",
+			"width": 120,
+		},
+	]
+
 func _make_name_edit(node_name: String, text: String) -> LineEdit:
 	var edit := LineEdit.new()
 	edit.name = node_name
@@ -228,6 +258,8 @@ func _connect_signals() -> void:
 		_map_row.selection_changed.connect(_on_map_changed)
 	if _diff_row and not _diff_row.selection_changed.is_connected(_on_diff_changed):
 		_diff_row.selection_changed.connect(_on_diff_changed)
+	if _ai_row and not _ai_row.selection_changed.is_connected(_on_ai_changed):
+		_ai_row.selection_changed.connect(_on_ai_changed)
 	if _name_edit and not _name_edit.text_changed.is_connected(_on_name_changed):
 		_name_edit.text_changed.connect(_on_name_changed)
 	if _p2_edit and not _p2_edit.text_changed.is_connected(_on_p2_changed):
@@ -250,6 +282,10 @@ func _on_diff_changed(id: String) -> void:
 	GameSettings.set_match_difficulty(id)
 	_refresh_summary()
 
+func _on_ai_changed(id: String) -> void:
+	GameSettings.set_match_ai_brain(id)
+	_refresh_summary()
+
 func _on_name_changed(new_text: String) -> void:
 	GameSettings.set_player_name(new_text)
 	_refresh_summary()
@@ -263,6 +299,8 @@ func _refresh_mode_visibility() -> void:
 	var ai_vs_ai := GameSettings.is_ai_vs_ai_mode()
 	if _diff_row:
 		_diff_row.visible = not hotseat and not ai_vs_ai
+	if _ai_row:
+		_ai_row.visible = not hotseat
 	if _name_label:
 		_name_label.visible = not ai_vs_ai
 	if _name_edit:
@@ -277,8 +315,9 @@ func _refresh_summary() -> void:
 		return
 	var gold := GameSettings.player_budget_for_map_size()
 	var p1 := GameSettings.player_name
+	var ai_label := String(GameSettings.MATCH_AI_LABELS.get(GameSettings.match_ai_brain, ""))
 	if GameSettings.is_ai_vs_ai_mode():
-		_summary.text = "AI vs AI · %d gold each" % gold
+		_summary.text = "AI vs AI · %s · %d gold each" % [ai_label, gold]
 		return
 	if GameSettings.is_hotseat_mode():
 		var p2 := GameSettings.player2_name
@@ -287,7 +326,7 @@ func _refresh_summary() -> void:
 	var mult := GameSettings.ai_budget_mult_for_difficulty()
 	var enemy_gold := int(round(float(gold) * mult))
 	var diff_label := String(GameSettings.DIFFICULTY_LABELS.get(GameSettings.match_difficulty, "Normal"))
-	_summary.text = "%s: %d gold · Enemy (%s): %d gold" % [p1, gold, diff_label, enemy_gold]
+	_summary.text = "%s: %d gold · %s (%s): %d gold" % [p1, gold, ai_label, diff_label, enemy_gold]
 
 func _on_start() -> void:
 	var p1 := _name_edit.text if _name_edit else GameSettings.player_name
