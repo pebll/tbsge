@@ -13,6 +13,18 @@
 - **Difficulty** only scales the AI's draft gold (Easy ×0.75 … Impossible ×2); tactics are identical on every level. Real difficulty levels (temperature, fewer sims, weaker profiles) are still to do.
 - **Combat features** come from `CombatExpectation`, Monte Carlo over the real `CombatResolver` via the shared `CombatSampler` (same sampler as the UI preview). Shields, random targets, kills and wipe odds are all included.
 - **Threat map** + safety features, walking-distance focus field.
+- **Team play (0.1):**
+  - *Focus fire*: the `team_finish` feature. For an attack, it measures how much of what the attack leaves of the target (HP + shields) the other allies that can still act this turn could deal (`scripts/ai/utility/ai_team_plan.gd`: reachable strike stands, raw strike power, melee ×0.8). It is 0 when the attack wipes the target alone, since `wipe_prob` covers that case.
+  - *Legion ordering*: `UtilityBrain.role_ordering`. A legion whose best move is a shot or heal **from where it stands** acts first; everyone else follows best score first.
+  - *Cover*: the `cover_ally` feature. It rewards a swap that pulls a softer ally (wounded, or ranged/support) out of enemy reach and puts a sturdier legion there.
+  - `utility_v0` is the brain from before these changes, kept as the version-ladder reference.
+  - **Measured (2026-11-07)**: `./run_ai_duel.sh --draft mirror --play-sims` (same army on both sides) against `utility_v0`.
+    - Small maps (r3, 75 gold, 360 pairs): 14–15 decisive, survivor margin −0.07 per pair.
+    - Large maps (r4, 150 gold, 200 pairs): 17–13 decisive, margin +0.6 per pair (z ≈ 1).
+    - Neutral to a slight lean, not a measurable gain.
+    - Strict role tiers (all ranged, then melee, then moves) **lost** on large maps (10–18 decisive, margin −1.8), so only stationary support goes first.
+  - **Why so little:** the brain already re-scores after every action, so a wounded target's kill odds rise and the next legion tends to follow up. `team_finish` was non-zero in about 5% of decisions and never changed the chosen action in a 132-decision sample.
+  - **Next step for real coordination:** plan the whole turn. Try a few legion orders and target assignments on a cloned session, and keep the sequence with the best total outcome.
 - **Tuning:** GA + MAP-Elites + curriculum (`scripts/ai/evolution`, `run_ai_evolve.sh`), held-out gating bench (`run_ai_bench.sh`, Wilson CI, paired sign test).
 - **Baselines:** `cascade` (the old `AttackNearestEnemyBehavior`), `greedy`, `heal_only`, `pass`, used as fixed opponents.
 - Results so far and next steps: see `odd/tasks/utility-ai-quality.md`. Utility beats cascade significantly; vs greedy it's not yet significant. The proposed next step is structural (1-ply enemy reply, focus fire within a turn, kiting), not more weight tuning.

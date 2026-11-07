@@ -38,8 +38,10 @@ Decisions behind this order: `open_questions.md` → Decided (2026-11-07). Skirm
 Goal: the AI feels smart in battle. See [`design/ai.md`](design/ai.md) and [`utility-ai-quality.md`](../odd/tasks/utility-ai-quality.md).
 - [x] Utility AI with weighted features, Monte Carlo expectation over the real resolver, threat map, GA/MAP-Elites tuning, held-out benchmark (PR #4)
 - [x] Opponent choice in Play setup: Evolved / Hand-tuned / Cascade (PR #5)
-- [ ] **Focus fire within a turn**: legions coordinate on one target until it's wiped
-- [ ] **Legion ordering within a turn**: ranged/support act first, melee finishes, tank swaps forward
+- [x] **Focus fire within a turn**: legions coordinate on one target until it's wiped (`team_finish` feature; benchmark: neutral to a slight lean, see `design/ai.md`)
+- [x] **Legion ordering within a turn**: ranged/support act first, melee finishes, tank swaps forward (stationary shots/heals first, `cover_ally` feature; strict role tiers measured worse)
+- [ ] Proposed: **whole-turn planning** (try legion orders / target assignments on a cloned session); the per-legion features above barely change decisions
+- [x] `--draft mirror` for `run_ai_duel.sh` (same army both sides; measures play, not the draft) + `utility_v0` reference brain
 - *Later (not 0.1):* smart AI draft (after balance), enemy-reply lookahead, ranged kiting, stall-breaker, exploit tests
 
 ### 0.1.5 — Foundations before effects

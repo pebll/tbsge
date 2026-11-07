@@ -18,6 +18,13 @@ var debug_enabled: bool = false
 var probe = null
 ## Monte Carlo rollouts per combat estimate made by this brain.
 var sim_count: int = CombatExpectation.PLAY_SIM_COUNT
+## Order legions within a turn: legions whose best move is a shot or heal from where they
+## stand act first (soften / patch up without retaliation, then melee finishes); everyone
+## else follows best score first. Off = pure best-score-first (pre-0.1, kept for benchmarks).
+## Benchmarked 2026-11-07 (mirror drafts): putting *every* ranged/melee plan in role tiers,
+## including move-then-shoot, lost clearly (ranged legions walked into the melee's
+## stands); only stationary support first leans positive. See doc/design/ai.md.
+var role_ordering: bool = true
 ## Decisions answered from the sort_actionable cache (diagnostics / tests).
 var cache_hits: int = 0
 ## Combat estimates for the board snapshot being scored; per brain, so parallel duels never share it.
@@ -126,6 +133,18 @@ func _probe_action_id(cand: AiCandidate) -> String:
 		return cand.followup_action_id
 	return cand.action_id
 
+const ORDER_TIER_SUPPORT := 0
+const ORDER_TIER_OTHER := 1
+
+## Ordering tier of a legion's best candidate (see role_ordering): a ranged shot or heal
+## from the current tile goes first; plans that move first, melee and moves follow.
+static func order_tier(cand: AiCandidate) -> int:
+	if cand == null or not cand.followup_action_id.is_empty():
+		return ORDER_TIER_OTHER
+	if cand.action_id in ["ranged_attack", "heal_ally", "self_heal"]:
+		return ORDER_TIER_SUPPORT
+	return ORDER_TIER_OTHER
+
 func sort_actionable(session, actionable: Array[Vector2i]) -> Array[Vector2i]:
 	if actionable.is_empty():
 		return actionable
@@ -141,9 +160,16 @@ func sort_actionable(session, actionable: Array[Vector2i]) -> Array[Vector2i]:
 		var rows: Array = _score_legion(session, legion)
 		_cache[legion.get_instance_id()] = {"sig": sig, "scored": rows}
 		var best := -INF if rows.is_empty() else float(rows[0]["score"])
-		scored.append({"coords": coords, "score": best})
+		var tier := ORDER_TIER_OTHER
+		if role_ordering and not rows.is_empty():
+			tier = order_tier(rows[0]["cand"])
+		scored.append({"coords": coords, "score": best, "tier": tier})
 	_memo = {}
 	scored.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var ta: int = int(a.get("tier", ORDER_TIER_OTHER))
+		var tb: int = int(b.get("tier", ORDER_TIER_OTHER))
+		if ta != tb:
+			return ta < tb
 		var sa: float = float(a["score"])
 		var sb: float = float(b["score"])
 		if not is_equal_approx(sa, sb):
