@@ -1,6 +1,7 @@
 extends RefCounted
 
 const MinigameTestHelpersScript = preload("res://tests/minigame_test_helpers.gd")
+const HypotheticalPosition = preload("res://scripts/ai/hypothetical_position.gd")
 
 ## AI "what if" queries must see the legion at the new tile and restore the board exactly.
 

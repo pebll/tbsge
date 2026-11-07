@@ -7,6 +7,7 @@ extends RefCounted
 const CombatResolver = preload("res://scripts/core/combat_resolver.gd")
 const CombatSimSnapshot = preload("res://scripts/battle/combat_sim_snapshot.gd")
 const HexPathfinder = preload("res://scripts/ai/hex_pathfinder.gd")
+const CombatSampler = preload("res://scripts/battle/combat_sampler.gd")
 
 ## Default N for EA / headless fitness evaluation.
 const TRAIN_SIM_COUNT := 2

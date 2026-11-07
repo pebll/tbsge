@@ -2,6 +2,7 @@ extends RefCounted
 
 const MinigameTestHelpersScript = preload("res://tests/minigame_test_helpers.gd")
 const BattleExpectationEstimator = preload("res://scripts/battle/battle_expectation_estimator.gd")
+const CombatSampler = preload("res://scripts/battle/combat_sampler.gd")
 
 ## UI preview and AI expectation share CombatSampler, so they must agree.
 

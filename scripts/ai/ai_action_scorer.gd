@@ -7,6 +7,7 @@ extends RefCounted
 const HexPathfinder = preload("res://scripts/ai/hex_pathfinder.gd")
 const ActionParams = preload("res://scripts/actions/action_params.gd")
 const CombatResolver = preload("res://scripts/core/combat_resolver.gd")
+const HypotheticalPosition = preload("res://scripts/ai/hypothetical_position.gd")
 
 static func score_action(
 	session,

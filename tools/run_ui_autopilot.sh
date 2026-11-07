@@ -10,12 +10,14 @@ set -eu
 ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 OUT_DIR="$(realpath -m "${1:-autopilot_shots}")"
-SEED="${2:-}"
+SEED="${2:-random}"
+SCENARIO="${3:-vs_ai}"
+FLAGS="${4:-}"
 mkdir -p "$OUT_DIR"
 [ -x ./godot_exe ] || tools/get_godot.sh
 
 set -- ./godot_exe --path . --rendering-driver opengl3 --audio-driver Dummy \
-  --resolution 1920x1080 res://tools/ui_autopilot.tscn -- "$OUT_DIR" $SEED
+  --resolution 1920x1080 res://tools/ui_autopilot.tscn -- "$OUT_DIR" "$SEED" "$SCENARIO" "$FLAGS"
 
 if [ -n "${DISPLAY:-}" ]; then
   exec "$@"

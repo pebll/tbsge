@@ -5,6 +5,7 @@ extends RefCounted
 
 const AiCandidateScript = preload("res://scripts/ai/utility/ai_candidate.gd")
 const MoveReachability = preload("res://scripts/battle/move_reachability.gd")
+const HypotheticalPosition = preload("res://scripts/ai/hypothetical_position.gd")
 
 const COMBAT_ACTIONS: Array[String] = ["melee_attack", "ranged_attack"]
 const HEAL_ACTIONS: Array[String] = ["self_heal", "heal_ally"]

@@ -9,6 +9,7 @@ const CombatExpectation = preload("res://scripts/ai/expectation/combat_expectati
 const AiMatchScore = preload("res://scripts/ai/evolution/ai_match_score.gd")
 const MinigameRulesScript = preload("res://scripts/minigame/minigame_rules.gd")
 const ActionParams = preload("res://scripts/actions/action_params.gd")
+const HypotheticalPosition = preload("res://scripts/ai/hypothetical_position.gd")
 
 ## Combat estimate for one (attacker, defender, action, from, to). `sim_count` < 0 falls back to the
 ## global default. A non-null `memo` (owned by the caller, one board snapshot) caches estimates;

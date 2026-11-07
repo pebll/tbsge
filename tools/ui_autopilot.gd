@@ -16,6 +16,8 @@ const MAX_HUMAN_TURNS := 8
 
 var _out_dir := "user://autopilot"
 var _hex = null
+## "vs_ai" (default): play as a human vs the AI. "ai_vs_ai": watch AI-only turns advance.
+var _scenario := "vs_ai"
 const PHASE_BATTLE := 1
 const PHASE_ENDED := 2
 var _shot_index := 0
@@ -28,7 +30,17 @@ func _ready() -> void:
 	if not args.is_empty():
 		_out_dir = args[0]
 	# Optional second arg: global RNG seed (draft, map, combat) to replay a run.
-	var run_seed := int(args[1]) if args.size() > 1 else int(Time.get_unix_time_from_system()) % 100000
+	var run_seed := int(args[1]) if args.size() > 1 and args[1].is_valid_int() else int(Time.get_unix_time_from_system()) % 100000
+	_scenario = args[2] if args.size() > 2 else "vs_ai"
+	# Optional 4th arg: comma list of settings to force for this run (not persisted).
+	var flags: String = args[3] if args.size() > 3 else ""
+	if "aidebug" in flags:
+		GameSettings.set_ai_debug_enabled(true, false)
+	if "moves" in flags:
+		GameSettings.set_show_battle_log_moves(true, false)
+	if "turns" in flags:
+		GameSettings.set_show_battle_log_end_turns(true, false)
+	_log("scenario %s flags [%s]" % [_scenario, flags])
 	seed(run_seed)
 	_log("seed %d (replay: tools/run_ui_autopilot.sh OUT_DIR %d)" % [run_seed, run_seed])
 	DirAccess.make_dir_recursive_absolute(_out_dir)
@@ -242,7 +254,13 @@ func _run() -> void:
 	_check(await _click_button("Play"), "main menu Play opens setup")
 	await _wait(0.6)
 	await _shot("setup")
+	if _scenario == "ai_vs_ai":
+		await _click_button("AI vs AI")
+		await _wait(0.3)
 	_check(await _click_button("Start"), "setup Start launches the match")
+	if _scenario == "ai_vs_ai":
+		await _run_ai_vs_ai()
+		return _finish()
 	await _wait(2.5)
 	await _shot("draft_empty")
 
@@ -298,6 +316,28 @@ func _run() -> void:
 		# Give any leftover coroutines time to (not) blow up.
 		await _wait(3.0)
 	_finish()
+
+## AI-only match: every turn must hand over to the other AI within a time budget.
+func _run_ai_vs_ai() -> void:
+	var started: bool = await _wait_until(_is_battle, 30.0)
+	_check(started, "AI vs AI: battle starts")
+	if not started:
+		await _shot("aivai_no_battle")
+		return
+	await _shot("aivai_start")
+	for i in 6:
+		if not _is_battle():
+			break
+		var tm = _game().session.turn_manager
+		var turn: int = tm.turn_index
+		var advanced: bool = await _wait_until(func() -> bool: return tm.turn_index != turn or not _is_battle(), 45.0)
+		_check(advanced, "AI vs AI: turn %d (%s) ends within 45s" % [turn, tm.active_team_id])
+		if not advanced:
+			var g = _game()
+			_log("stuck: ai_running=%s locked=%s actionable=%s" % [g.battle.ai_running, g.battle.is_input_locked(), g.session.get_actionable_coords()])
+			await _shot("aivai_stuck_turn%d" % turn)
+			return
+	await _shot("aivai_end")
 
 func _play_human_turn(turn_no: int) -> void:
 	var g = _game()

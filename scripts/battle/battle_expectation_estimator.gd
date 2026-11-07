@@ -5,6 +5,7 @@ const CombatResolver = preload("res://scripts/core/combat_resolver.gd")
 const CombatSimSnapshot = preload("res://scripts/battle/combat_sim_snapshot.gd")
 const HexPathfinder = preload("res://scripts/ai/hex_pathfinder.gd")
 const ActionParams = preload("res://scripts/actions/action_params.gd")
+const CombatSampler = preload("res://scripts/battle/combat_sampler.gd")
 
 const CACHE_MAX := 128
 

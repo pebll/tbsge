@@ -6,6 +6,7 @@ const Utils = preload("res://scripts/core/utils.gd")
 const MatchSessionScript = preload("res://scripts/match/match_session.gd")
 const AiActionScorer = preload("res://scripts/ai/ai_action_scorer.gd")
 const ActionParams = preload("res://scripts/actions/action_params.gd")
+const HypotheticalPosition = preload("res://scripts/ai/hypothetical_position.gd")
 
 static var debug_enabled: bool = false
 
