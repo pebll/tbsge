@@ -8,7 +8,8 @@
 
 ## Where it stands (code, after PR #4)
 
-- **Shipped brain: `utility`** (`scripts/ai/brains/utility_brain.gd`): candidate generation → feature extraction → linear score with an `AiProfile` (weights in `data/ai/profiles/utility_default.json`, fallback `hand_v1`).
+- **Shipped brain: `utility`** (`scripts/ai/brains/utility_brain.gd`): candidate generation → feature extraction → linear score with an `AiProfile`. The game loads `data/ai/profiles/utility_default.json` if present, but no tuned profile has been shipped, so **in-game it plays the hand-tuned `hand_v1` weights**, argmax (temperature 0), 12 Monte Carlo sims per fight.
+- **Difficulty** only scales the AI's draft gold (Easy ×0.75 … Impossible ×2); tactics are identical on every level. Real difficulty levels (temperature, fewer sims, weaker profiles) are still to do.
 - **Combat features** come from `CombatExpectation`, Monte Carlo over the real `CombatResolver` via the shared `CombatSampler` (same sampler as the UI preview). Shields, random targets, kills and wipe odds are all included.
 - **Threat map** + safety features, walking-distance focus field.
 - **Tuning:** GA + MAP-Elites + curriculum (`scripts/ai/evolution`, `run_ai_evolve.sh`), held-out gating bench (`run_ai_bench.sh`, Wilson CI, paired sign test).
