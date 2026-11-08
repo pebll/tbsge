@@ -20,6 +20,7 @@ static func clone_from(src) -> Object:
 	sim.turn_manager.active_team_id = src.turn_manager.active_team_id
 	sim.turn_manager.turn_index = src.turn_manager.turn_index
 	sim.set_match_seed(int(src.match_seed))
+	sim.fog_of_war = bool(src.get("fog_of_war"))
 	for coords in src.grid.keys():
 		var t: Tile = src.grid[coords]
 		var copy := Tile.new(t.cube_q, t.cube_r, t.terrain_type)

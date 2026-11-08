@@ -20,6 +20,7 @@ var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 func _init(p_config) -> void:
 	config = p_config
 	super._init(config.team_ids)
+	fog_of_war = bool(config.get("fog_of_war")) if config.get("fog_of_war") != null else false
 	grid = MapBuilderScript.build_grid(config.map_radius, -1, config.team_ids)
 	_rng.seed = 1337
 	for team_id in config.team_ids:

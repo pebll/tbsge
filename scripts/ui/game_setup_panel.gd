@@ -16,6 +16,7 @@ var _mode_row: SegmentOptionRow
 var _map_row: SegmentOptionRow
 var _diff_row: SegmentOptionRow
 var _ai_row: SegmentOptionRow
+var _fog_row: SegmentOptionRow
 var _name_label: Label
 var _name_edit: LineEdit
 var _p2_label: Label
@@ -38,6 +39,7 @@ func sync_from_settings() -> void:
 	_map_row.set_selected(str(GameSettings.match_map_size), false)
 	_diff_row.set_selected(GameSettings.match_difficulty, false)
 	_ai_row.set_selected(GameSettings.match_ai_brain, false)
+	_fog_row.set_selected("on" if GameSettings.match_fog_of_war else "off", false)
 	_name_edit.text = GameSettings.player_name
 	_p2_edit.text = GameSettings.player2_name
 	_refresh_mode_visibility()
@@ -93,6 +95,15 @@ func _build() -> void:
 	_ai_row.configure_buttons(0, 18, 46)
 	add_child(_ai_row)
 	_ai_row.setup("AI", _ai_options(), GameSettings.match_ai_brain)
+
+	_fog_row = SegmentOptionRowScript.new()
+	_fog_row.name = "FogRow"
+	_fog_row.configure_buttons(0, 18, 46)
+	add_child(_fog_row)
+	_fog_row.setup("Fog", [
+		{"id": "on", "text": "On", "tooltip": "Fog of war: you only see enemies near your legions (the AI still sees everything)."},
+		{"id": "off", "text": "Off", "tooltip": "The whole map is visible."},
+	], "on" if GameSettings.match_fog_of_war else "off")
 
 	_summary = Label.new()
 	_summary.name = "Summary"
@@ -260,6 +271,8 @@ func _connect_signals() -> void:
 		_diff_row.selection_changed.connect(_on_diff_changed)
 	if _ai_row and not _ai_row.selection_changed.is_connected(_on_ai_changed):
 		_ai_row.selection_changed.connect(_on_ai_changed)
+	if _fog_row and not _fog_row.selection_changed.is_connected(_on_fog_changed):
+		_fog_row.selection_changed.connect(_on_fog_changed)
 	if _name_edit and not _name_edit.text_changed.is_connected(_on_name_changed):
 		_name_edit.text_changed.connect(_on_name_changed)
 	if _p2_edit and not _p2_edit.text_changed.is_connected(_on_p2_changed):
@@ -284,6 +297,10 @@ func _on_diff_changed(id: String) -> void:
 
 func _on_ai_changed(id: String) -> void:
 	GameSettings.set_match_ai_brain(id)
+	_refresh_summary()
+
+func _on_fog_changed(id: String) -> void:
+	GameSettings.set_match_fog_of_war(id == "on")
 	_refresh_summary()
 
 func _on_name_changed(new_text: String) -> void:

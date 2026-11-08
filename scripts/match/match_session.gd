@@ -21,6 +21,8 @@ var emit_global_events: bool = true
 ## is reproducible from match_seed (replays, multiplayer, A/B evaluation).
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var match_seed: int = 0
+## Fog of war rules (MinigameConfig.fog_of_war): unseen enemies can't be targeted.
+var fog_of_war: bool = false
 
 func _init(p_team_ids: Array[String]) -> void:
 	team_ids = p_team_ids.duplicate()

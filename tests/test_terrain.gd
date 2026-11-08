@@ -19,6 +19,7 @@ func run(_tree: SceneTree) -> bool:
 		_test_map_is_mirrored_and_connected,
 		_test_ranged_targeting_needs_los,
 		_test_flyers,
+		_test_fog_vision_and_targeting,
 	]:
 		if not t.call():
 			return false
@@ -211,5 +212,37 @@ func _test_flyers() -> bool:
 	var res: Dictionary = CombatResolverS.resolve_combat(archer, target, 1, {"mode": "ranged", "distance": 2, "defender_terrain": "FOREST"})
 	if not is_equal_approx(float(res["hits"][0]["raw_damage"]), 4.0):
 		push_error("Forest cover doesn't apply to flyers, got %s" % res["hits"][0]["raw_damage"])
+		return false
+	return true
+
+func _test_fog_vision_and_targeting() -> bool:
+	var Visibility = load("res://scripts/terrain/visibility.gd")
+	var b := _board({Vector2i(-1, 0): "FOREST", Vector2i(1, -1): "MOUNTAIN"}, [
+		["a", "ARCHER", 2, Vector2i(0, 0)],
+		["a", "GOBLIN", 1, Vector2i(-1, 0)],
+		["b", "GOBLIN", 1, Vector2i(2, 0)],
+		["b", "GOBLIN", 1, Vector2i(0, -3)],
+	])
+	var session = b["session"]
+	var team: String = b["legions"][0].team_id
+	var seen: Dictionary = Visibility.visible_set(session.grid, team)
+	if not seen.has(Vector2i(2, 0)) or seen.has(Vector2i(0, -3)):
+		push_error("Vision 2 sees (2,0) but not (0,-3)")
+		return false
+	if Visibility.vision_range(b["legions"][1], session.grid[Vector2i(-1, 0)]) != 1:
+		push_error("Forest lowers vision to 1")
+		return false
+	if seen.has(Vector2i(2, -2)):
+		push_error("The mountain at (1,-1) blocks sight to (2,-2)")
+		return false
+	# Targeting: an archer with range 3 can't shoot what nobody sees.
+	b["legions"][0].units[0].attack_range = 3
+	b["legions"][0].units[1].attack_range = 3
+	session.fog_of_war = false
+	var open_t: Array = session.get_action_targets(b["legions"][0], "ranged_attack")
+	session.fog_of_war = true
+	var fog_t: Array = session.get_action_targets(b["legions"][0], "ranged_attack")
+	if not (Vector2i(0, -3) in open_t) or Vector2i(0, -3) in fog_t or not (Vector2i(2, 0) in fog_t):
+		push_error("Fog hides (0,-3) from targeting: open %s fog %s" % [open_t, fog_t])
 		return false
 	return true

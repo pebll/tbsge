@@ -11,6 +11,8 @@ extends Resource
 @export var team_ids: Array[String] = ["GREEN", "BLUE"]
 @export var ai_team_ids: Array[String] = ["BLUE"]
 @export var max_legion_fill: float = 12.0
+## Fog of war: enemies outside a team's vision are hidden and can't be targeted.
+@export var fog_of_war: bool = false
 
 func first_team_id() -> String:
 	return team_ids[0] if not team_ids.is_empty() else ""

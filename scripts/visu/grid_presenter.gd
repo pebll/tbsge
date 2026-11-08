@@ -4,12 +4,15 @@ extends Node2D
 const HexLayoutScript = preload("res://scripts/core/hex_layout.gd")
 const MatchSessionScript = preload("res://scripts/match/match_session.gd")
 const LEGION_SCENE := preload("res://scenes/legion.tscn")
+const VisibilityScript = preload("res://scripts/terrain/visibility.gd")
 const HEX_TILE_SCENE := preload("res://scenes/hextile.tscn")
 
 @export var tile_size: float = HexLayoutScript.DEFAULT_TILE_SIZE
 @export var tile_size_xy_ratio: float = HexLayoutScript.DEFAULT_XY_RATIO
 
 var grid_visu: Dictionary = {}
+## Team whose fog of war is drawn ("" = none: fog off, AI vs AI).
+var fog_viewer_team: String = ""
 var legion_to_visu: Dictionary = {}
 var tiles_container: Node
 
@@ -88,6 +91,32 @@ func sync_spent_visuals(session: MatchSessionScript) -> void:
 		if tile_visu.legion_visu:
 			tile_visu.legion_visu.set_spent_visual(spent)
 			tile_visu.legion_visu.sync_status_badges()
+	sync_fog(session)
+
+## Darken unseen tiles and hide enemy legions there, for fog_viewer_team.
+func sync_fog(session: MatchSessionScript) -> void:
+	var seen: Dictionary = {}
+	var fog := not fog_viewer_team.is_empty() and session != null and bool(session.get("fog_of_war"))
+	if fog:
+		seen = VisibilityScript.visible_set(session.grid, fog_viewer_team)
+	for coords in grid_visu.keys():
+		var tile_visu: TileVisu = grid_visu[coords]
+		if tile_visu == null:
+			continue
+		var hidden := fog and not seen.has(coords)
+		tile_visu.set_fogged(hidden)
+	for legion in legion_to_visu.keys():
+		var visu: LegionVisu = legion_to_visu[legion]
+		if visu == null or legion == null:
+			continue
+		var show_it: bool = not fog or legion.team_id == fog_viewer_team or seen.has(legion.tile_coords)
+		visu.visible = show_it
+
+## True if the viewing team can't see this hex (fog of war on).
+func is_hidden_from_viewer(session: MatchSessionScript, coords: Vector2i) -> bool:
+	if fog_viewer_team.is_empty() or session == null or not bool(session.get("fog_of_war")):
+		return false
+	return not VisibilityScript.visible_set(session.grid, fog_viewer_team).has(coords)
 
 func spawn_legion_visu(legion: Legion, formation_seed: int = -1) -> void:
 	var tile_visu: TileVisu = grid_visu.get(legion.tile_coords)

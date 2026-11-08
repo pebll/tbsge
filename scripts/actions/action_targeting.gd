@@ -5,6 +5,7 @@ const ActionDefinitionScript = preload("res://scripts/actions/action_definition.
 const BattleStateScript = preload("res://scripts/actions/battle_state.gd")
 const HexPathfinder = preload("res://scripts/ai/hex_pathfinder.gd")
 const TerrainRules = preload("res://scripts/terrain/terrain_rules.gd")
+const Visibility = preload("res://scripts/terrain/visibility.gd")
 
 static func available_actions(state: BattleStateScript, legion: Legion) -> Array[ActionDefinitionScript]:
 	var out: Array[ActionDefinitionScript] = []
@@ -75,6 +76,29 @@ static func can_use(state: BattleStateScript, legion: Legion, action: ActionDefi
 	return not get_targets(state, legion, action).is_empty()
 
 static func get_targets(
+	state: BattleStateScript,
+	legion: Legion,
+	action: ActionDefinitionScript
+) -> Array[Vector2i]:
+	var raw := _raw_targets(state, legion, action)
+	if not state.fog_of_war or raw.is_empty():
+		return raw
+	# Fog of war: enemies the team can't see can't be targeted.
+	var seen: Dictionary = {}
+	var computed := false
+	var out: Array[Vector2i] = []
+	for c in raw:
+		var t: Tile = state.tile_at(c)
+		if t != null and t.has_legion() and t.legion.team_id != legion.team_id:
+			if not computed:
+				seen = Visibility.visible_set(state.grid, legion.team_id)
+				computed = true
+			if not seen.has(c):
+				continue
+		out.append(c)
+	return out
+
+static func _raw_targets(
 	state: BattleStateScript,
 	legion: Legion,
 	action: ActionDefinitionScript

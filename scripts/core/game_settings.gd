@@ -68,6 +68,8 @@ var match_map_size: int = 3
 var match_difficulty: String = "normal"
 ## Which AI brain plays the AI side(s) (Vs AI and AI vs AI).
 var match_ai_brain: String = MATCH_AI_DEFAULT
+## Fog of war in Play matches (Play setup "Fog" row).
+var match_fog_of_war: bool = true
 var match_mode: String = MATCH_MODE_AI
 var player_name: String = DEFAULT_PLAYER_NAME
 var player2_name: String = DEFAULT_PLAYER2_NAME
@@ -163,6 +165,12 @@ func set_match_ai_brain(value: String, persist: bool = true) -> void:
 	match_ai_brain = value
 	_emit_and_maybe_save(persist)
 
+func set_match_fog_of_war(value: bool, persist: bool = true) -> void:
+	if match_fog_of_war == value:
+		return
+	match_fog_of_war = value
+	_emit_and_maybe_save(persist)
+
 func set_match_mode(value: String, persist: bool = true) -> void:
 	if value not in MATCH_MODE_IDS:
 		return
@@ -237,6 +245,7 @@ func build_match_config() -> MinigameConfigScript:
 	config.deploy_slot_count = 7
 	config.team_ids = ["GREEN", "BLUE"]
 	config.max_legion_fill = 12.0
+	config.fog_of_war = match_fog_of_war
 	if is_ai_vs_ai_mode():
 		config.ai_team_ids = ["GREEN", "BLUE"]
 		config.ai_budget_mult = 1.0
@@ -334,6 +343,7 @@ func _load_settings() -> void:
 	var ai_brain := String(cfg.get_value(MATCH_SECTION, "ai_brain", MATCH_AI_DEFAULT))
 	if ai_brain in MATCH_AI_IDS:
 		match_ai_brain = ai_brain
+	match_fog_of_war = bool(cfg.get_value(MATCH_SECTION, "fog_of_war", true))
 	var mode := String(cfg.get_value(MATCH_SECTION, "mode", MATCH_MODE_AI))
 	if mode in MATCH_MODE_IDS:
 		match_mode = mode
@@ -358,6 +368,7 @@ func _save_settings() -> void:
 	cfg.set_value(MATCH_SECTION, "difficulty", match_difficulty)
 	cfg.set_value(MATCH_SECTION, "mode", match_mode)
 	cfg.set_value(MATCH_SECTION, "ai_brain", match_ai_brain)
+	cfg.set_value(MATCH_SECTION, "fog_of_war", match_fog_of_war)
 	cfg.set_value(MATCH_SECTION, "player_name", player_name)
 	cfg.set_value(MATCH_SECTION, "player2_name", player2_name)
 	cfg.save(SETTINGS_PATH)

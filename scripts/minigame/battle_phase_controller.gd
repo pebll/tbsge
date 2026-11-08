@@ -33,6 +33,7 @@ func _init(phase_deps: MinigamePhaseDeps) -> void:
 func enter() -> void:
 	# Opponent chosen in Play setup (Vs AI / AI vs AI).
 	ai_brain = AiBrainRegistry.create(GameSettings.match_ai_brain)
+	_update_fog_viewer()
 	if bool(ai_brain.get("turn_planning")):
 		ai_brain.plan_time_budget_ms = AI_PLAN_TIME_BUDGET_MS
 	deps.tile_info_panel.set_draft_mode(false)
@@ -90,6 +91,7 @@ func handle_end_turn() -> void:
 	var result: Dictionary = deps.session.apply({"type": "end_turn"})
 	if result["ok"]:
 		deps.turn_hud.show_active_team(deps.session.turn_manager.active_team_id)
+		_update_fog_viewer()
 		deps.presenter.sync_spent_visuals(deps.session)
 		if not await _play_status_events(result):
 			return
@@ -293,12 +295,31 @@ func clear_battle_inspect() -> void:
 	if deps.legion_strip:
 		deps.legion_strip.hide_strip()
 
+## Whose fog is drawn: the human team vs the AI, the active team in hotseat, nobody in
+## AI vs AI (or with fog off).
+func _update_fog_viewer() -> void:
+	var team := ""
+	var cfg = deps.config()
+	if cfg != null and bool(deps.session.get("fog_of_war")):
+		var humans: Array = []
+		for t in cfg.team_ids:
+			if not deps.is_ai_team(t):
+				humans.append(t)
+		if humans.size() == 1:
+			team = humans[0]
+		elif humans.size() > 1:
+			team = deps.session.turn_manager.active_team_id
+	deps.presenter.fog_viewer_team = team
+	deps.presenter.sync_fog(deps.session)
+
 func _show_strip_for_coords(coords: Vector2i, sticky: bool) -> void:
 	if deps.tile_info_panel:
 		deps.tile_info_panel.hide()
 	if not deps.legion_strip:
 		return
 	var tile: Tile = deps.session.grid.get(coords)
+	if tile and tile.has_legion() and deps.presenter.is_hidden_from_viewer(deps.session, coords):
+		tile = null  # fog: nothing to inspect there
 	if tile and tile.has_legion():
 		deps.legion_strip.show_legion(tile.legion, sticky)
 	elif sticky or (deps.legion_strip and not deps.legion_strip.is_sticky()):
