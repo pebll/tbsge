@@ -14,6 +14,7 @@ extends Node
 const MENU_SCENE := "res://scenes/runnables/menu.tscn"
 const MAX_HUMAN_TURNS := 8
 
+var _status_demo := false
 var _out_dir := "user://autopilot"
 var _hex = null
 ## "vs_ai" (default): play as a human vs the AI. "ai_vs_ai": watch AI-only turns advance.
@@ -42,6 +43,7 @@ func _ready() -> void:
 		GameSettings.set_show_battle_log_moves(true, false)
 	if "turns" in flags:
 		GameSettings.set_show_battle_log_end_turns(true, false)
+	_status_demo = "status_demo" in flags
 	for f in flags.split(","):
 		if f.begins_with("ai="):
 			_ai_choice = f.substr(3)
@@ -51,6 +53,37 @@ func _ready() -> void:
 	DirAccess.make_dir_recursive_absolute(_out_dir)
 	_hex = load("res://scripts/ai/hex_pathfinder.gd")
 	_start.call_deferred()
+
+## status_demo flag: a demo debuff on every enemy legion and a demo buff on ours.
+func _apply_status_demo() -> void:
+	var SD = load("res://scripts/effects/status_defs.gd")
+	var SE = load("res://scripts/effects/status_effects.gd")
+	var Def = load("res://scripts/effects/status_definition.gd")
+	var burn = Def.new()
+	burn.id = "demo_burn"
+	burn.display_name = "Burn"
+	burn.description = "Demo: loses HP at the start of each of its turns."
+	burn.color = Color(0.85, 0.35, 0.15)
+	burn.stacking = "add"
+	burn.default_turns = 3
+	burn.behavior = load("res://tools/autopilot_demo_status.gd")
+	SD.register(burn)
+	var guard = Def.new()
+	guard.id = "demo_guard"
+	guard.display_name = "Guard"
+	guard.description = "Demo buff (no effect)."
+	guard.color = Color(0.25, 0.55, 0.85)
+	guard.is_debuff = false
+	guard.default_turns = 2
+	SD.register(guard)
+	var g = _game()
+	for L in g.session.legions:
+		if g.deps.is_ai_team(L.team_id):
+			SE.apply(L, "demo_burn", 2)
+		else:
+			SE.apply(L, "demo_guard")
+	g.deps.presenter.sync_spent_visuals(g.session)
+	_log("status demo: burn on AI legions, guard on ours")
 
 func _start() -> void:
 	var tree := get_tree()
@@ -285,6 +318,9 @@ func _run() -> void:
 	if not in_battle:
 		return _finish()
 	await _wait(1.5)
+	if _status_demo:
+		_apply_status_demo()
+		await _wait(0.3)
 	await _shot("battle_start")
 	await _wheel(_free_map_spot(), MOUSE_BUTTON_WHEEL_DOWN, 3)
 	await _wait(0.4)
@@ -305,6 +341,9 @@ func _run() -> void:
 			break
 		await _shot("turn%d_before_end" % human_turns)
 		await _click_button("Next turn")
+		if _status_demo and human_turns == 1:
+			await _wait(0.25)
+			await _shot("status_tick")
 		await _wait(0.5)
 
 	if _phase() == PHASE_ENDED:

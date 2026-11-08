@@ -12,6 +12,8 @@ const AiBrainCommand = preload("res://scripts/ai/ai_brain_command.gd")
 const TurnSimSession = preload("res://scripts/ai/planning/turn_sim_session.gd")
 
 const AI_LEGION_DELAY := 0.5
+## Pause after animating status ticks at a turn start.
+const STATUS_TICK_DELAY := 0.6
 ## Cap on whole-turn planning per AI step (it runs on a worker thread; see _ai_sort_actionable).
 const AI_PLAN_TIME_BUDGET_MS := 800
 
@@ -87,6 +89,11 @@ func handle_end_turn() -> void:
 	if result["ok"]:
 		deps.turn_hud.show_active_team(deps.session.turn_manager.active_team_id)
 		deps.presenter.sync_spent_visuals(deps.session)
+		if not await _play_status_events(result):
+			return
+		if deps.session.phase != MinigameSessionScript.Phase.BATTLE:
+			check_match_end()
+			return
 		if _maybe_show_hotseat_pass():
 			return
 		maybe_start_ai_turn()
@@ -311,6 +318,8 @@ func _run_ai_turn_async() -> void:
 			if end_result["ok"]:
 				deps.turn_hud.show_active_team(deps.session.turn_manager.active_team_id)
 				deps.presenter.sync_spent_visuals(deps.session)
+				if not await _play_status_events(end_result):
+					return
 			break
 
 		# After teleport/move, finish that legion's remaining AP before switching.
@@ -402,6 +411,36 @@ func _ai_sort_actionable() -> Array[Vector2i]:
 	for c in result.get("order", []):
 		order.append(c)
 	return order
+
+## Animate status ticks from an end_turn result (hits, heals, deaths), then drop wiped
+## legions and refresh badges. Returns false if the battle host went away meanwhile.
+func _play_status_events(result: Dictionary) -> bool:
+	var events: Array = result.get("payload", {}).get("status_events", [])
+	var played := false
+	for ev in events:
+		var kind := String(ev.get("kind", ""))
+		if kind != "damage" and kind != "heal":
+			continue
+		var legion: Legion = ev.get("legion")
+		var unit: Unit = ev.get("unit")
+		var visu = deps.presenter.get_legion_visu(legion)
+		if visu == null or unit == null:
+			continue
+		played = true
+		if kind == "heal":
+			visu.animate_unit_healed(unit, float(ev["hp_before"]), float(ev["hp_after"]), float(unit.max_health))
+		elif bool(ev.get("died", false)):
+			visu.animate_unit_death(unit, Vector2.DOWN)
+		else:
+			visu.animate_unit_hitted(
+				unit, Vector2.DOWN, float(ev["hp_before"]), float(ev["hp_after"]), float(unit.max_health)
+			)
+	if played:
+		if not await _ai_delay(STATUS_TICK_DELAY):
+			return false
+	deps.presenter.prune_gone_legions(deps.session)
+	deps.presenter.sync_spent_visuals(deps.session)
+	return _host_alive()
 
 func _host_alive() -> bool:
 	return is_instance_valid(deps.host) and deps.host.is_inside_tree()

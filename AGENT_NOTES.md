@@ -57,6 +57,11 @@
   - Max AP is the lowest among the types present.
 - Creating mixed legions in the draft UI is 0.4. The info panel still shows the first unit's attack/HP.
 
+### Status effects (framework, 0.1.5)
+- To add an effect, write a behaviour script extending `scripts/effects/status_behavior.gd` and a `data/status/<id>.tres` `StatusDefinition` pointing to it. Apply it with `StatusEffects.apply(legion, id, stacks, turns)`.
+- Put rule changes in behaviour hooks, never directly in `CombatResolver` or the AI. Previews and the AI then pick them up through the resolver. See `doc/design/combat.md`.
+- Anything that copies a legion must copy `statuses`. `CombatSimSnapshot.clone_legion` already does.
+
 ### Combat logic (current rules)
 - Attacking legion **hits first**.
 - Each unit **hits at most once per combat**.

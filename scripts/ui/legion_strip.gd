@@ -5,6 +5,8 @@ extends Control
 ## Chrome matches UiTheme parchment panels; team color = fat outer border only.
 
 const UnitTags = preload("res://scripts/core/unit_tags.gd")
+const StatusDefs = preload("res://scripts/effects/status_defs.gd")
+const StatusEffects = preload("res://scripts/effects/status_effects.gd")
 const UiTheme = preload("res://scripts/ui/ui_theme.gd")
 const UiStatIcons = preload("res://scripts/ui/ui_stat_icons.gd")
 const UnitFootprintScript = preload("res://scripts/ui/interact/unit_footprint.gd")
@@ -226,6 +228,60 @@ func _rebuild_aggregates(legion: Legion) -> void:
 			UiStatIcons.STRIP_AGG_FONT_SIZE,
 			UiStatIcons.STRIP_AGG_SEPARATION
 		))
+	for e in legion.statuses:
+		_agg_row.add_child(_make_status_badge(e))
+
+## One status effect in the stats row: coloured circle (or icon) + stacks; hover explains it.
+func _make_status_badge(effect: Dictionary) -> Control:
+	var id := String(effect["id"])
+	var def = StatusDefs.get_def(id)
+	var badge := PanelContainer.new()
+	badge.custom_minimum_size = Vector2(40, 40)
+	badge.mouse_filter = Control.MOUSE_FILTER_STOP
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = def.color if def != null else Color(0.5, 0.4, 0.7)
+	sb.set_corner_radius_all(20)
+	sb.set_border_width_all(3)
+	sb.border_color = UiTheme.COLOR_TEXT if (def == null or def.is_debuff) else UiTheme.COLOR_PANEL
+	badge.add_theme_stylebox_override("panel", sb)
+	if def != null and def.icon != null:
+		var tex := TextureRect.new()
+		tex.texture = def.icon
+		tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		badge.add_child(tex)
+	var stacks := int(effect.get("stacks", 1))
+	var lab := Label.new()
+	lab.text = str(stacks) if stacks > 1 else ("" if def != null and def.icon != null else StatusEffects.label(id).left(1))
+	lab.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lab.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lab.add_theme_color_override("font_color", Color.WHITE)
+	lab.add_theme_font_size_override("font_size", 22)
+	lab.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	badge.add_child(lab)
+	badge.mouse_entered.connect(func() -> void:
+		if _hover_tooltip:
+			_hover_tooltip.present(StatusEffects.label(id), status_tooltip_body(effect), badge)
+	)
+	badge.mouse_exited.connect(func() -> void:
+		if _hover_tooltip:
+			_hover_tooltip.dismiss()
+	)
+	return badge
+
+static func status_tooltip_body(effect: Dictionary) -> String:
+	var def = StatusDefs.get_def(String(effect["id"]))
+	var lines: PackedStringArray = PackedStringArray()
+	if def != null and not String(def.description).is_empty():
+		lines.append(def.description)
+	var meta: PackedStringArray = PackedStringArray()
+	if int(effect.get("stacks", 1)) > 1:
+		meta.append("Stacks: %d" % int(effect["stacks"]))
+	var t := int(effect.get("turns_left", -1))
+	meta.append("Until removed" if t < 0 else ("%d turn%s left" % [t, "" if t == 1 else "s"]))
+	lines.append(" · ".join(meta))
+	return "\n".join(lines)
 
 func _rebuild_cells() -> void:
 	_clear_cells()

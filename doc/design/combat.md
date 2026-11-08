@@ -61,4 +61,22 @@ Targeting inside a legion stays **random** (decided 2026-11-07); effects such as
 | First strike | 💡 | Strike order modifier |
 | Water units | 💡 | Siren, boat; needs water terrain to be walkable for some units |
 
-**Framework needs, before stacking many effects:** a single `StatusEffect` model (id, stacks, duration, source, tick timing: turn start / on hit / on move), modifier hooks in `CombatResolver` (pre-strike, on-hit, on-death), and one battle-log line shape for status events. If combat stays a hard-coded loop, each effect will touch the resolver, the estimator and the AI scorer separately (three copies of the same rule today).
+## Status-effect framework (0.1.5, implemented)
+
+- **Model:** `Legion.statuses`. Each entry is `{"id", "stacks", "turns_left", "source_team"}`, managed through `scripts/effects/status_effects.gd` (apply / remove / query).
+  - **Stacking:** each type uses `refresh` (keep the larger stacks and duration) or `add` (sum the stacks, refresh the duration), capped at `max_stacks`.
+  - **Duration:** N = N of the owner's turns, counting the current one. It counts down at the **end** of the owner's turn. `-1` means until removed.
+- **Types:** one `data/status/<id>.tres` per effect (`StatusDefinition`: name, description, icon or colour, debuff flag, stacking, default duration) plus a behaviour script that extends `scripts/effects/status_behavior.gd`.
+- **Hooks** (a behaviour overrides only what it needs):
+  - `outgoing_damage` and `incoming_damage`, applied per strike before shields.
+  - `on_hit_dealt`, `on_hit_taken` and `on_unit_death`.
+  - `on_turn_start`, at the start of the owner's turn after AP and shields refill. Poison goes here.
+  - `on_turn_end`.
+- **One source of truth:** the damage and hit hooks run inside `CombatResolver`. Previews, the AI's Monte Carlo and the turn planner all use the resolver, and every copy of the board carries the statuses, so a new effect reaches all of them without extra code.
+  - Two exceptions: the AI's threat map and the `team_finish` feature use raw stats, so add AI awareness per effect where it matters.
+- **Status damage** (`StatusEffects.damage_unit`) bypasses shields and kills at 0 HP. Deaths at turn start prune the legion and can end the match.
+- **UI:** badges on the map (`scripts/visu/status_badges_2d.gd`) and in the legion strip's stat row (hover shows the description, stacks and turns left).
+  - Battle log: one card per event (`status:<id>`). Expiries aren't logged.
+  - Turn-start ticks are animated (hit, heal or death).
+- **Testing:** test-only effect types in `tests/test_status_effects.gd`. The autopilot's `status_demo` flag shows a demo burn and guard in a real game.
+

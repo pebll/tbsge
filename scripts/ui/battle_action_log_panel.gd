@@ -763,7 +763,11 @@ func _make_action_well(action_id: String, entry: Dictionary) -> Control:
 	well.add_child(vbox)
 
 	var icon_wrap := CenterContainer.new()
-	icon_wrap.add_child(_make_texture_rect(_action_icon(action_id), ICON_ACTION))
+	var icon_tex := _action_icon(action_id)
+	if icon_tex == null and action_id.begins_with("status:"):
+		icon_wrap.add_child(_make_status_disc(action_id.substr(7)))
+	else:
+		icon_wrap.add_child(_make_texture_rect(icon_tex, ICON_ACTION))
 	vbox.add_child(icon_wrap)
 
 	if bool(entry.get("show_coords", false)):
@@ -775,6 +779,24 @@ func _make_action_well(action_id: String, entry: Dictionary) -> Control:
 		vbox.add_child(coord)
 
 	return well
+
+## Stand-in for a status effect without an icon: its colour with its first letter.
+func _make_status_disc(status_id: String) -> Control:
+	var def = StatusDefsScript.get_def(status_id)
+	var disc := PanelContainer.new()
+	disc.custom_minimum_size = ICON_ACTION
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = def.color if def != null else Color(0.5, 0.4, 0.7)
+	sb.set_corner_radius_all(int(ICON_ACTION.x * 0.5))
+	disc.add_theme_stylebox_override("panel", sb)
+	var lab := Label.new()
+	lab.text = StatusEffectsScript.label(status_id).left(1).to_upper()
+	lab.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lab.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lab.add_theme_color_override("font_color", Color.WHITE)
+	lab.add_theme_font_size_override("font_size", 30)
+	disc.add_child(lab)
+	return disc
 
 func _make_empty_side_spacer() -> Control:
 	var spacer := Control.new()

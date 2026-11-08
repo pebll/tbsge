@@ -11,6 +11,10 @@ var legion: Legion
 var _unit_to_visu: Dictionary = {}
 
 const HexLayoutScript = preload("res://scripts/core/hex_layout.gd")
+const StatusBadges2D = preload("res://scripts/visu/status_badges_2d.gd")
+## Above the units, right of the banner pole.
+const STATUS_BADGES_POS := Vector2(16, -44)
+var _status_badges: Node2D = null
 
 @onready var units: Node2D = $Units
 @onready var banner: Sprite2D = $Banner
@@ -49,6 +53,20 @@ func init(p_legion: Legion, formation_seed: int = -1) -> void:
 		child.start_idle_animation()
 	sync_all_unit_hp_bars()
 	_apply_team_banner()
+	sync_status_badges()
+
+func sync_status_badges() -> void:
+	if legion == null:
+		return
+	if _status_badges == null:
+		if legion.statuses.is_empty():
+			return
+		_status_badges = StatusBadges2D.new()
+		_status_badges.name = "StatusBadges"
+		_status_badges.position = STATUS_BADGES_POS
+		_status_badges.z_index = 6
+		add_child(_status_badges)
+	_status_badges.sync(legion)
 
 func sync_all_unit_hp_bars() -> void:
 	for uv in _unit_to_visu.values():

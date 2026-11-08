@@ -136,11 +136,17 @@ func apply_end_turn() -> Dictionary:
 		"ending_turn": ending_turn,
 		"status_events": status_events,
 	})
+	# Log order: the ending team's status events, the next turn's banner, then its ticks.
+	# Expiries are not logged (the badge disappearing says it).
+	for ev in status_events:
+		if not (ev in start_events) and String(ev.get("kind", "")) != "expired":
+			_append_action_log(BattleActionLogFormatterScript.from_status_event(self, ev))
 	_append_action_log(BattleActionLogFormatterScript.from_end_turn(
 		self, ending_team, ending_turn, next_team
 	))
-	for ev in status_events:
-		_append_action_log(BattleActionLogFormatterScript.from_status_event(self, ev))
+	for ev in start_events:
+		if String(ev.get("kind", "")) != "expired":
+			_append_action_log(BattleActionLogFormatterScript.from_status_event(self, ev))
 	# Status damage can kill units or whole legions at turn start.
 	if not start_events.is_empty():
 		prune_stale_legions()
