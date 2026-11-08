@@ -133,7 +133,7 @@ func _attach_price_tag(legion: Legion) -> void:
 		return
 	_remove_price_tag(legion)
 	var tag := DraftLegionPriceTag.new()
-	var cost := MinigameRulesScript.legion_cost(legion.unit_type, legion.units.size())
+	var cost := legion.gold_value()
 	tag.set_cost(cost)
 	visu.add_child(tag)
 	_draft_price_tags[legion] = tag

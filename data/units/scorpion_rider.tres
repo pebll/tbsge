@@ -13,5 +13,6 @@ ap = 3
 image_size = 1.08
 size = 2.0
 price = 8
+tags = Array[String](["armored", "striker", "mobile"])
 icon = ExtResource("2_icon")
 action_ids = Array[String](["move", "melee_attack", "self_heal"])

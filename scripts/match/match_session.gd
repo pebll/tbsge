@@ -8,6 +8,7 @@ const BattleStateScript = preload("res://scripts/actions/battle_state.gd")
 const ActionDefinitionScript = preload("res://scripts/actions/action_definition.gd")
 const BattleActionLogScript = preload("res://scripts/battle/battle_action_log.gd")
 const BattleActionLogFormatterScript = preload("res://scripts/battle/battle_action_log_formatter.gd")
+const StatusEffectsScript = preload("res://scripts/effects/status_effects.gd")
 
 var grid: Dictionary = {}
 var legions: Array[Legion] = []
@@ -123,15 +124,33 @@ func log_move_relocation(from: Vector2i, to: Vector2i, swapped: bool = false) ->
 func apply_end_turn() -> Dictionary:
 	var ending_team: String = turn_manager.active_team_id
 	var ending_turn: int = turn_manager.turn_index
+	# Status timing: the ending team's effects count down, then the next team's tick
+	# (after its AP and shields refill in end_team_turn).
+	var status_events: Array = StatusEffectsScript.turn_end(legions, ending_team)
 	var next_team: String = turn_manager.end_team_turn(typed_legions())
+	var start_events: Array = StatusEffectsScript.turn_start(legions, next_team)
+	status_events.append_array(start_events)
 	var ok_result := _ok(["turn_changed"], {
 		"active_team": next_team,
 		"ending_team": ending_team,
 		"ending_turn": ending_turn,
+		"status_events": status_events,
 	})
+	# Log order: the ending team's status events, the next turn's banner, then its ticks.
+	# Expiries are not logged (the badge disappearing says it).
+	for ev in status_events:
+		if not (ev in start_events) and String(ev.get("kind", "")) != "expired":
+			_append_action_log(BattleActionLogFormatterScript.from_status_event(self, ev))
 	_append_action_log(BattleActionLogFormatterScript.from_end_turn(
 		self, ending_team, ending_turn, next_team
 	))
+	for ev in start_events:
+		if String(ev.get("kind", "")) != "expired":
+			_append_action_log(BattleActionLogFormatterScript.from_status_event(self, ev))
+	# Status damage can kill units or whole legions at turn start.
+	if not start_events.is_empty():
+		prune_stale_legions()
+		ok_result["events"].append("status_ticked")
 	return ok_result
 
 func get_movable_coords(from_coords: Vector2i) -> Array[Vector2i]:

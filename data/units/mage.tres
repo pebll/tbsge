@@ -16,6 +16,7 @@ projectile_motion = 0
 image_size = 1.0
 size = 1.5
 price = 7
+tags = Array[String](["ranged", "support"])
 icon = ExtResource("2_icon")
 action_ids = Array[String](["move", "melee_attack", "ranged_attack", "self_heal", "heal_ally"])
 action_params = {

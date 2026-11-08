@@ -45,9 +45,9 @@ Goal: the AI feels smart in battle. See [`design/ai.md`](design/ai.md) and [`uti
 - *Later (not 0.1):* smart AI draft (after balance), enemy-reply lookahead, ranged kiting, stall-breaker, exploit tests
 
 ### 0.1.5 — Foundations before effects
-- [ ] **Mixed-legion data model**: a legion is any set of units; visuals, draft cost, SFX, stats and the legion strip read per-unit identity instead of `Legion.unit_type` (UI to create mixed legions stays in 0.4)
-- [ ] **Counter tags** on every unit (fixed list: armored, flyer, swarm, shielded, ranged, support, …), shown in tooltips
-- [ ] Status-effect framework: `StatusEffect` model + pre-strike / on-hit / on-death / turn-start hooks in `CombatResolver`, icons on legion and strip, tooltip, battle-log line
+- [x] **Mixed-legion data model**: a legion is any set of units; visuals, draft cost, SFX, stats and the legion strip read per-unit identity instead of `Legion.unit_type` (UI to create mixed legions stays in 0.4)
+- [x] **Counter tags** on every unit (ranged, support, shielded, armored, swarm, striker, mobile, flyer reserved): `scripts/core/unit_tags.gd`, `tags` in `data/units/*.tres`, glossary entries `tag_*`, shown under the legion name and in unit tooltips
+- [x] Status-effect framework: `Legion.statuses` + `scripts/effects/` (definition, registry, behaviour hooks: outgoing/incoming damage, on hit dealt/taken, on death, turn start/end), badges on the map and in the strip with tooltips, battle-log cards, turn-start tick playback. Demo: `tools/run_ui_autopilot.sh OUT 7 vs_ai status_demo`
 
 ### 0.2 — More effects
 Per-effect dev flow: effect → legion → test → AI → AI test. See [`design/combat.md`](design/combat.md).
@@ -69,6 +69,7 @@ Per-effect dev flow: effect → legion → test → AI → AI test. See [`design
 - [ ] Water units?
 
 ### 0.4 — Legion mixing (UI/UX)
+- [ ] Info panel for mixed legions: units header shows the first type's icon and the stat block shows the first unit's stats; show per-type rows instead
 - [ ] Build mixed legions in the draft + all UX (data model already done in 0.1.5)
 - [ ] New effects: Freeze, Scare, Summon, Merge
 

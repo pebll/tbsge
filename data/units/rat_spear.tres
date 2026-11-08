@@ -11,4 +11,5 @@ attack = 4
 image_size = 0.96
 size = 1.0
 price = 4
+tags = Array[String](["swarm"])
 icon = ExtResource("2_icon")

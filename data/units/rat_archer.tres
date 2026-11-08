@@ -14,4 +14,5 @@ ranged_attack = 3
 projectile_id = "arrow"
 size = 1.0
 price = 4
+tags = Array[String](["swarm", "ranged"])
 icon = ExtResource("2_icon")

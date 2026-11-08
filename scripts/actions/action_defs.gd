@@ -33,6 +33,10 @@ func legion_action_ids(legion: Legion) -> Array[String]:
 				out.append(id)
 	return out
 
+## Actions one unit type can perform (its own list, or the defaults).
+func unit_type_action_ids(type_id: String) -> Array[String]:
+	return _unit_type_action_ids(type_id)
+
 func _unit_type_action_ids(type_id: String) -> Array[String]:
 	var unit_def: UnitDefinition = UnitDefs.get_def(type_id)
 	if unit_def and not unit_def.action_ids.is_empty():

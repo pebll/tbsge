@@ -74,7 +74,7 @@ static func team_living_gold(session, team_id: String) -> float:
 			continue
 		if legion.team_id != team_id:
 			continue
-		total += float(MinigameRulesScript.legion_cost(legion.unit_type, legion.units.size()))
+		total += float(legion.gold_value())
 	return total
 
 static func step_dealt_damage(result: Dictionary) -> bool:

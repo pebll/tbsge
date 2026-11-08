@@ -264,7 +264,10 @@ func _battle_use_action(cmd: Dictionary) -> Dictionary:
 func _battle_end_turn() -> Dictionary:
 	if phase != Phase.BATTLE:
 		return _fail("Not in battle")
-	return apply_end_turn()
+	var result := apply_end_turn()
+	# Status ticks at turn start can wipe the last legion of a team.
+	result["events"].append_array(_check_victory_events())
+	return result
 
 func _battle_pass_legion(cmd: Dictionary) -> Dictionary:
 	return apply_pass_legion(cmd.get("coords", Vector2i.ZERO))
@@ -351,6 +354,7 @@ func _serialize_legions(for_team: String) -> Array:
 			"team_id": legion.team_id,
 			"unit_type": legion.unit_type,
 			"unit_count": legion.units.size(),
+			"composition": legion.composition(),
 			"coords": legion.tile_coords,
 			"current_ap": legion.current_ap,
 			"hidden": false,

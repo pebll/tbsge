@@ -87,6 +87,7 @@ func sync_spent_visuals(session: MatchSessionScript) -> void:
 		tile_visu.set_spent(spent)
 		if tile_visu.legion_visu:
 			tile_visu.legion_visu.set_spent_visual(spent)
+			tile_visu.legion_visu.sync_status_badges()
 
 func spawn_legion_visu(legion: Legion, formation_seed: int = -1) -> void:
 	var tile_visu: TileVisu = grid_visu.get(legion.tile_coords)
@@ -157,6 +158,13 @@ func _orient_legion_toward(legion_visu: LegionVisu, target_world_pos: Vector2) -
 func remove_dead_legions(session: MatchSessionScript) -> void:
 	for legion in legion_to_visu.keys():
 		if legion not in session.legions or legion.units.is_empty():
+			_remove_legion_visu(legion)
+
+## Drop visuals of legions that left the match outside combat playback (e.g. wiped by a
+## status tick at turn start).
+func prune_gone_legions(session: MatchSessionScript) -> void:
+	for legion in legion_to_visu.keys().duplicate():
+		if legion == null or legion.units.is_empty() or not (legion in session.legions):
 			_remove_legion_visu(legion)
 
 func _remove_legion_visu(legion: Legion) -> void:

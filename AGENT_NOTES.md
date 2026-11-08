@@ -46,6 +46,22 @@
 - `UtilityBrain` caches (`_cache`, `_planned`) are keyed by **tile coords + board signature**, not object ids, so a copy's result applies to the live board. Keep the signature complete: anything scoring reads must be in `_board_signature`.
 - Benchmark play strength with `./run_ai_duel.sh --draft mirror --play-sims --brain-a X --brain-b utility_v0`. Random drafts make about 85% of pairs split on the draft.
 
+### Mixed legions (data model, 0.1.5)
+- A legion is **any set of units**. Build one with `Legion.from_composition([[type, n], ...], coords, team)`.
+- `Legion.unit_type` is only a *label*: the most numerous type, ties go to the first seen. Use it for the title, icon and click sounds. Rules, cost and stats must read `units`.
+  - Helpers: `gold_value()`, `composition()`, `is_mixed()`, `count_of()`, `display_name()`.
+- Rules:
+  - Actions are the union over the unit types present.
+  - Per-unit actions use the unit's own type. Ranged: shooters only. Heals: healers only, each with its own amount (`ActionParams.unit_heal_amounts`).
+  - Legion-wide params take the largest value among the types that can perform the action.
+  - Max AP is the lowest among the types present.
+- Creating mixed legions in the draft UI is 0.4. The info panel still shows the first unit's attack/HP.
+
+### Status effects (framework, 0.1.5)
+- To add an effect, write a behaviour script extending `scripts/effects/status_behavior.gd` and a `data/status/<id>.tres` `StatusDefinition` pointing to it. Apply it with `StatusEffects.apply(legion, id, stacks, turns)`.
+- Put rule changes in behaviour hooks, never directly in `CombatResolver` or the AI. Previews and the AI then pick them up through the resolver. See `doc/design/combat.md`.
+- Anything that copies a legion must copy `statuses`. `CombatSimSnapshot.clone_legion` already does.
+
 ### Combat logic (current rules)
 - Attacking legion **hits first**.
 - Each unit **hits at most once per combat**.

@@ -9,6 +9,8 @@ signal draft_change_type_pressed
 signal draft_clear_slot_pressed
 signal draft_move_pressed
 
+const UnitTags = preload("res://scripts/core/unit_tags.gd")
+const UiTheme = preload("res://scripts/ui/ui_theme.gd")
 const MinigameRulesScript = preload("res://scripts/minigame/minigame_rules.gd")
 
 @onready var title_label: Label = %Title
@@ -17,6 +19,7 @@ const MinigameRulesScript = preload("res://scripts/minigame/minigame_rules.gd")
 @onready var team_name_label: Label = %TeamName
 @onready var team_footer: PanelContainer = %TeamFooter
 @onready var unit_icon: TextureRect = %UnitIcon
+var _tags_label: Label = null
 @onready var legion_name: Label = %LegionName
 @onready var attack_icon: TextureRect = %AttackIcon
 @onready var attack_value: Label = %AttackValue
@@ -290,7 +293,8 @@ func _can_add_draft_unit() -> bool:
 func _render_legion(legion: Legion) -> void:
 	_apply_team_accent(legion.team_id)
 	legion_block.show()
-	legion_name.text = _format_legion_title(legion.unit_type)
+	legion_name.text = legion.display_name().to_upper() if legion.is_mixed() else _format_legion_title(legion.unit_type)
+	_set_tags_line(UnitTags.labels_line(UnitTags.for_legion(legion)))
 
 	var unit0: Unit = legion.units[0] if legion.units.size() > 0 else null
 	if unit0:
@@ -324,7 +328,7 @@ func _render_legion(legion: Legion) -> void:
 		return a.get_instance_id() < b.get_instance_id()
 	)
 	for u in sorted_units:
-		units_list.add_child(_build_unit_row(legion.unit_type, u))
+		units_list.add_child(_build_unit_row(u.unit_type if u else legion.unit_type, u))
 
 func apply_unit_vitals_fx(unit: Unit, hp: float, shield: float) -> void:
 	if unit == null or not _unit_vitals.has(unit):
@@ -598,6 +602,21 @@ func _apply_team_accent(team_id: String) -> void:
 	footer_sb.corner_radius_bottom_left = 8
 	footer_sb.corner_radius_bottom_right = 8
 	team_footer.add_theme_stylebox_override("panel", footer_sb)
+
+## Counter tags under the legion name ("Ranged · Support"); built on first use.
+func _set_tags_line(text: String) -> void:
+	if _tags_label == null:
+		_tags_label = Label.new()
+		_tags_label.name = "LegionTags"
+		_tags_label.add_theme_color_override("font_color", UiTheme.COLOR_TEXT_MUTED)
+		_tags_label.add_theme_font_size_override("font_size", 22)
+		_tags_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_tags_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var parent := legion_name.get_parent()
+		parent.add_child(_tags_label)
+		parent.move_child(_tags_label, legion_name.get_index() + 1)
+	_tags_label.text = text
+	_tags_label.visible = not text.is_empty()
 
 func _render_unit_type_stats(unit0: Unit, unit_type: String) -> void:
 	var def: UnitDefinition = unit0.definition if unit0 and unit0.definition else UnitDefs.get_def(unit_type)

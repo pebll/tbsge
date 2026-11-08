@@ -39,8 +39,8 @@ static func estimate(
 	return est
 
 ## Expected gold destroyed minus gold lost, divided by a fixed team scale, in [-1, 1].
-## Gold per HP of a legion = legion_cost(unit_type, units.size()) / total max HP of its units,
-## i.e. its purchase price spread evenly over its hit points (cost is price * unit count).
+## Gold per HP of a legion = gold_value() (each unit at its own price) / total max HP of its
+## units, i.e. its purchase price spread evenly over its hit points.
 static func trade_value(est: Dictionary, attacker: Legion, defender: Legion, scale: float) -> float:
 	var gained := float(est.get("enemy_loss_mean", 0.0)) * _gold_per_hp(defender)
 	var lost := float(est.get("own_loss_mean", 0.0)) * _gold_per_hp(attacker)
@@ -49,7 +49,7 @@ static func trade_value(est: Dictionary, attacker: Legion, defender: Legion, sca
 static func _gold_per_hp(legion: Legion) -> float:
 	if legion == null or legion.units.is_empty():
 		return 0.0
-	return float(MinigameRulesScript.legion_cost(legion.unit_type, legion.units.size())) / _max_hp(legion)
+	return float(legion.gold_value()) / _max_hp(legion)
 
 ## Average living gold of the two teams in the fight; the same for every candidate in a decision.
 static func _trade_scale(session, attacker: Legion, defender: Legion) -> float:
@@ -261,7 +261,6 @@ static func _fill_heal(
 	var action = ActionDefs.get_def(action_id)
 	if action == null:
 		return
-	var heal_amount := ActionParams.resolve_int(legion, action, "heal_amount", action.heal_amount)
 	var missing := 0.0
 	var cur := 0.0
 	var mx := 0.0
@@ -276,7 +275,7 @@ static func _fill_heal(
 		missing += maxf(0.0, um - uh)
 		if um > 0.0:
 			worst_unit_frac = minf(worst_unit_frac, uh / um)
-	var potential := float(heal_amount * legion.units.size())
+	var potential := float(ActionParams.total_heal(legion, action))
 	var healed := minf(missing, potential)
 	feats[AiFeatureNames.HEAL_EFFICIENCY] = healed / maxf(1.0, mx)
 	var stack_frac := cur / maxf(1.0, mx)

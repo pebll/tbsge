@@ -134,9 +134,9 @@ func _board_signature(session) -> String:
 		for u in L.units:
 			if u:
 				hp.append("%s/%s/%d" % [u.current_health, u.max_health, u.shield_remaining])
-		parts.append("%s:%s:%d/%d:%s:%s:%s" % [
+		parts.append("%s:%s:%d/%d:%s:%s:%s:%s" % [
 			L.tile_coords, L.team_id, L.current_ap, L.max_ap,
-			",".join(hp), str(L.action_cooldowns), L.waited,
+			",".join(hp), str(L.action_cooldowns), L.waited, str(L.statuses),
 		])
 	return ";".join(parts)
 
