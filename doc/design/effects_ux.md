@@ -64,7 +64,7 @@ Plus the **tags** (ranged, armored, swarm…): hidden from players since 2026-11
 | Fog overlay | tiles are darkened with a tint; a cloud/fog texture would read better |
 
 ### Units
-- All 23 unit types have sprites. The Dragon Rider only has a front view (same as the other `base_uncut` units).
+- All 22 unit types have sprites. The Dragon Rider only has a front view (same as the other `base_uncut` units).
 
 ### Later
 - Sounds: status applied/tick, lifesteal, pierce, wings for flyers (Sounds milestone).
