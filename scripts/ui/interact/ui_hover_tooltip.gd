@@ -8,6 +8,8 @@ const UiStatIcons = preload("res://scripts/ui/ui_stat_icons.gd")
 
 var _panel: PanelContainer
 var _title: Label
+## Optional muted line under the title (e.g. a unit's counter tags).
+var _subtitle: Label
 var _body: Label
 var _stats_box: VBoxContainer
 var _anchor: Control = null
@@ -23,14 +25,16 @@ func _ready() -> void:
 func present(title: String, body: String = "", anchor: Control = null) -> void:
 	await _present_internal(title, body, [], anchor)
 
-func present_stat_rows(title: String, rows: Array, anchor: Control = null) -> void:
-	await _present_internal(title, "", rows, anchor)
+func present_stat_rows(title: String, rows: Array, anchor: Control = null, subtitle: String = "") -> void:
+	await _present_internal(title, "", rows, anchor, subtitle)
 
-func _present_internal(title: String, body: String, rows: Array, anchor: Control) -> void:
+func _present_internal(title: String, body: String, rows: Array, anchor: Control, subtitle: String = "") -> void:
 	if _panel == null:
 		_build()
 	_anchor = anchor
 	_title.text = title
+	_subtitle.text = subtitle
+	_subtitle.visible = not subtitle.is_empty()
 	if rows.is_empty():
 		_body.text = body
 		_body.visible = not body.is_empty()
@@ -75,6 +79,12 @@ func _build() -> void:
 	_title.add_theme_color_override("font_color", UiTheme.COLOR_TEXT)
 	_title.add_theme_font_size_override("font_size", UiStatIcons.TOOLTIP_TITLE_FONT_SIZE)
 	vbox.add_child(_title)
+
+	_subtitle = Label.new()
+	_subtitle.add_theme_color_override("font_color", UiTheme.COLOR_TEXT_MUTED)
+	_subtitle.add_theme_font_size_override("font_size", 22)
+	_subtitle.visible = false
+	vbox.add_child(_subtitle)
 
 	_stats_box = VBoxContainer.new()
 	_stats_box.add_theme_constant_override("separation", 6)

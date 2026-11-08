@@ -15,5 +15,6 @@ projectile_id = "spit"
 image_size = 0.75
 size = 0.75
 price = 3
+tags = Array[String](["swarm", "ranged"])
 icon = ExtResource("2_icon")
 action_ids = Array[String](["move", "melee_attack", "ranged_attack", "self_heal"])

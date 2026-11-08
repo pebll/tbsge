@@ -42,6 +42,7 @@ func _initialize() -> void:
 		"res://tests/test_ai_team_play.gd",
 		"res://tests/test_ai_turn_planner.gd",
 		"res://tests/test_mixed_legion.gd",
+		"res://tests/test_unit_tags.gd",
 		"res://tests/test_combat_expectation.gd",
 		"res://tests/test_ai_threat.gd",
 		"res://tests/test_ai_approach.gd",

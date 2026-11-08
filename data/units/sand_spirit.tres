@@ -13,3 +13,4 @@ ranged_attack = 4
 projectile_id = "magicball"
 projectile_motion = 1
 icon = ExtResource("2_icon")
+tags = Array[String](["ranged"])

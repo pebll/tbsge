@@ -12,4 +12,5 @@ attack = 8
 image_size = 1.1
 size = 3.0
 price = 9
+tags = Array[String](["armored", "striker"])
 icon = ExtResource("2_icon")

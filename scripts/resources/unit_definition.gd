@@ -30,6 +30,9 @@ enum ProjectileMotion {
 @export var size: float = 1.5
 ## Gold cost per individual unit (not per legion).
 @export var price: int = 5
+## Counter tags from the fixed list in UnitTags (scripts/core/unit_tags.gd): what this unit
+## is, so draft, tech-tree generator and AI can reason about counters. Shown in tooltips.
+@export var tags: Array[String] = []
 
 @export var icon: Texture2D
 ## Optional per-unit legion SFX; empty uses the global default for that action.

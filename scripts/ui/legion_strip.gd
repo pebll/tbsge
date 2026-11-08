@@ -4,6 +4,7 @@ extends Control
 ## Compact battle legion HUD: 6×2 size-grid under the action bar.
 ## Chrome matches UiTheme parchment panels; team color = fat outer border only.
 
+const UnitTags = preload("res://scripts/core/unit_tags.gd")
 const UiTheme = preload("res://scripts/ui/ui_theme.gd")
 const UiStatIcons = preload("res://scripts/ui/ui_stat_icons.gd")
 const UnitFootprintScript = preload("res://scripts/ui/interact/unit_footprint.gd")
@@ -299,6 +300,7 @@ func _unit_tooltip_payload_for(u: Unit) -> Dictionary:
 	var title := def.display_name if def and not def.display_name.is_empty() else u.unit_type
 	return {
 		"title": title,
+		"subtitle": UnitTags.labels_line(UnitTags.for_type(u.unit_type)),
 		"rows": UiStatIcons.unit_stat_rows(u, _legion),
 	}
 
@@ -310,7 +312,9 @@ func _show_unit_tooltip(source: Object, payload) -> void:
 		return
 	var title := String(data.get("title", ""))
 	if data.has("rows"):
-		_hover_tooltip.present_stat_rows(title, data.get("rows", []), source as Control)
+		_hover_tooltip.present_stat_rows(
+			title, data.get("rows", []), source as Control, String(data.get("subtitle", ""))
+		)
 	else:
 		_hover_tooltip.present(title, String(data.get("body", "")), source as Control)
 

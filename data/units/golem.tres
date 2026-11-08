@@ -14,6 +14,7 @@ shield = 3
 image_size = 1.12
 size = 3.0
 price = 10
+tags = Array[String](["armored", "shielded"])
 icon = ExtResource("2_icon")
 sfx_move = ExtResource("3_move")
 action_ids = Array[String](["move", "melee_attack", "self_heal"])

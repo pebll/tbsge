@@ -32,5 +32,37 @@ entries = {
 "ally": {
 "label": "Ally",
 "definition": "A legion on your own team."
+},
+"tag_ranged": {
+"label": "Ranged",
+"definition": "Can attack from a distance. Melee-only units can't strike back at range 2."
+},
+"tag_support": {
+"label": "Support",
+"definition": "Heals allied legions."
+},
+"tag_shielded": {
+"label": "Shielded",
+"definition": "Each unit's shield absorbs damage from the first hit it takes every turn."
+},
+"tag_armored": {
+"label": "Armored",
+"definition": "Lots of health per unit: hard to wear down."
+},
+"tag_swarm": {
+"label": "Swarm",
+"definition": "Many cheap units: spreads damage and hits many times."
+},
+"tag_striker": {
+"label": "Striker",
+"definition": "A damage dealer: hits hard for its cost."
+},
+"tag_mobile": {
+"label": "Mobile",
+"definition": "Covers ground fast: 3+ action points or teleport."
+},
+"tag_flyer": {
+"label": "Flyer",
+"definition": "Flies over terrain (coming with terrain in 0.3)."
 }
 }
