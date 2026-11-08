@@ -61,14 +61,18 @@ Per-effect dev flow: effect → legion → test → AI → AI test. See [`design
 - [ ] Balance pass for the six new units (prices/stats are first guesses)
 
 ### 0.3 — Terrain
-- [ ] More terrains: swamp, hill?, badlands, flower grass, jungle, tundra
-- [ ] Better map generation
-- [ ] Line of sight (mountains block ranged + heal_ally)
-- [ ] **Flying** (moved here from 0.2 so it ships complete with terrain; exact rules to design then)
-- [ ] Fog of war (AI sees through fog at first)
-- [ ] Forest: defence + slower + lower vision · Swamp: slower
-- [ ] Unit terrain affinities (e.g. scorpion faster on desert)
-- [ ] Right-click an empty tile → terrain name + effects
+- [x] Terrain as data (`data/terrain/*.tres`, `scripts/terrain/terrain_rules.gd`): move cost, cover, line-of-sight blocking, vision, map weight
+- [x] Swamp (2 AP; placeholder art = tinted grass)
+- [ ] More terrains: hill?, badlands, flower grass, jungle, tundra (need tile art; the data model is ready)
+- [ ] Swamp tile art
+- [x] Better map generation: weighted terrain, clustering, point-mirrored (fair) maps
+- [x] Line of sight: mountains block ranged attacks, heal_ally and status casts (AI threat map too)
+- [x] **Flying**: legions whose units all fly cross and land on water/mountains at 1 AP per hex, ignore slow terrain and ground cover. Gargoyle flies; new **Dragon Rider**
+- [x] Fog of war: 2-hex vision (forest -1, flyers +1, mountains block); unseen enemies hidden and untargetable; Play setup toggle (default On); the AI sees through fog
+- [x] Forest: 2 AP, ranged cover x0.7, -1 vision · Swamp: 2 AP
+- [x] Unit terrain affinities: Treant (forest 1 AP, x0.75 damage taken), Scorpion Rider (+2 attack on desert), Shadow Hound (forest 1 AP), rats (swamp 1 AP)
+- [x] Right-click an empty tile → terrain name + rules
+- [ ] Honest fog AI (difficulty option?) · stealth in forest?
 - [ ] Water units?
 
 ### 0.4 — Legion mixing (UI/UX)

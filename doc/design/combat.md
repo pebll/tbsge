@@ -61,6 +61,26 @@ Targeting inside a legion stays **random** (decided 2026-11-07); effects such as
 | First strike | 💡 | Strike order modifier |
 | Water units | 💡 | Siren, boat; needs water terrain to be walkable for some units |
 
+## Terrain (0.3)
+
+- **Data:** `data/terrain/<id>.tres` (`TerrainDefinition`) holds walkability, AP to enter, ranged/melee cover, line-of-sight blocking, vision change, flyer access and map-generation weight. `scripts/terrain/terrain_rules.gd` is the one place that reads it.
+
+| Terrain | Move | Effect |
+|---|---|---|
+| Grass, Desert | 1 AP | none |
+| Forest | 2 AP | ranged damage taken ×0.7; legions inside see 1 hex less |
+| Swamp | 2 AP | none (tile art missing) |
+| Water | ground: no | flyers only |
+| Mountain | ground: no | blocks line of sight; flyers only |
+
+- **Movement:** a legion pays the terrain cost of each hex it enters; a mixed legion pays its slowest unit's cost. In a swap, each legion pays for the hex it steps onto. Reach is a cheapest-cost search.
+- **Affinities** (`UnitDefinition.terrain_affinity`, per unit) can change `move_cost`, multiply damage taken (`defense`) or add `attack` per strike.
+- **Combat:** cover and affinity attack are applied per strike. Terrain reaches `CombatResolver` through options, so the AI's estimates and the attack preview match the real fight.
+- **Line of sight:** a ranged action needs no LOS-blocking hex strictly between the two hexes (adjacent always works).
+- **Flying:** a legion whose units all fly pays 1 AP per hex anywhere, may land on water and mountains, and gets no ground cover.
+- **Fog of war:** a team sees 2 hexes around each legion (forest −1, flyers +1), blocked by LOS. Unseen enemies are hidden and can't be targeted. The AI plans with full knowledge.
+- **Maps:** weighted random terrain, one clustering pass, mirrored through the centre so both sides get the same ground.
+
 ## Unit traits (0.2)
 
 - Traits are **passive, per-unit abilities** in `UnitDefinition.traits`: regeneration, lifesteal, pierce and poison_on_hit (`scripts/effects/unit_traits.gd`).

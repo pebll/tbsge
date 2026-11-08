@@ -62,6 +62,13 @@
 - Put rule changes in behaviour hooks, never directly in `CombatResolver` or the AI. Previews and the AI then pick them up through the resolver. See `doc/design/combat.md`.
 - Anything that copies a legion must copy `statuses`. `CombatSimSnapshot.clone_legion` already does.
 
+### Terrain, flying, fog (0.3)
+- Read terrain only through `scripts/terrain/terrain_rules.gd`:
+  - `enter_cost`, `modify_strike`, `has_los`, `is_flyer`.
+  - Don't check `tile.walkable` for movement in new code; flyers ignore it.
+- Every `CombatResolver.resolve_combat` / `CombatSampler.sample` / `CombatExpectation.estimate_combat` call that should see terrain must pass `TerrainRules.combat_options(grid, from, to)`.
+- Fog: `scripts/terrain/visibility.gd`. Fog rules sit in `ActionTargeting.get_targets` (when `state.fog_of_war` is on); drawing is in `GridPresenter.sync_fog` (`fog_viewer_team`).
+
 ### Combat logic (current rules)
 - Attacking legion **hits first**.
 - Each unit **hits at most once per combat**.

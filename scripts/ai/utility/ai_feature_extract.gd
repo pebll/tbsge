@@ -13,6 +13,7 @@ const HypotheticalPosition = preload("res://scripts/ai/hypothetical_position.gd"
 const AiTeamPlanScript = preload("res://scripts/ai/utility/ai_team_plan.gd")
 const AiCandidateGen = preload("res://scripts/ai/utility/ai_candidate_gen.gd")
 const TerrainRulesScript = preload("res://scripts/terrain/terrain_rules.gd")
+const HexPathfinderScript = preload("res://scripts/ai/hex_pathfinder.gd")
 const StatusEffectsScript = preload("res://scripts/effects/status_effects.gd")
 const StatusDefsScript = preload("res://scripts/effects/status_defs.gd")
 
@@ -284,6 +285,10 @@ static func _fill_status(
 	var strikers := float(target.units.size())
 	var value := 0.0
 	if target.team_id == legion.team_id:
+		# Only worth it if the buffed legion can reach a fight while the buff lasts:
+		# an enemy within its move + strike reach (this turn if it can still act, else next).
+		if not _can_reach_enemy_soon(target, ctx):
+			return
 		var turns := 1.0
 		if target != legion and session.can_act_legion(target):
 			turns += 1.0
@@ -296,10 +301,16 @@ static func _fill_status(
 			if ctx.threat != null and ctx.threat.enemy_strike_on(target, L.tile_coords) > 0.0:
 				threatens = true
 				break
-		value = gain * strikers * (1.0 if threatens else 0.3) / maxf(1.0, _avg_legion_hp(ours))
+		# A debuff can't take away more than each unit actually deals per strike.
+		var prevented := 0.0
+		for u in target.units:
+			if u:
+				prevented += minf(gain, maxf(float(u.attack), float(u.ranged_attack)))
+		value = prevented * (1.0 if threatens else 0.3) / maxf(1.0, _avg_legion_hp(ours))
 	feats[AiFeatureNames.STATUS_VALUE] = clampf(value, 0.0, 1.0)
-	# Only a status that changes something counts as "doing something" (no idle casting).
-	feats[AiFeatureNames.IS_STATUS] = 1.0 if value > 0.0 else 0.0
+	# "Doing something" bonus scales with the effect: full at 20% of a legion, so small
+	# buffs/debuffs don't beat engaging (mirror caster armies used to stall forever).
+	feats[AiFeatureNames.IS_STATUS] = clampf(value / 0.2, 0.0, 1.0)
 
 ## How much "this move lets me attack" is worth for this legion, in [0.5, 1]: full for a
 ## legion whose strikes take a quarter of an average enemy legion's HP or more, half for
@@ -312,6 +323,13 @@ static func offense_weight(legion: Legion, ctx: AiContext) -> float:
 			power += maxf(float(u.attack), float(u.ranged_attack))
 	var ref := 0.25 * _avg_legion_hp(ctx.enemies) if ctx != null else 1.0
 	return clampf(0.5 + 0.5 * power / maxf(1.0, ref), 0.5, 1.0)
+
+static func _can_reach_enemy_soon(L: Legion, ctx: AiContext) -> bool:
+	var reach := L.max_ap + maxi(1, L.max_attack_range())
+	for e in ctx.enemies:
+		if HexPathfinderScript.hex_distance(L.tile_coords, e.tile_coords) <= reach:
+			return true
+	return false
 
 static func _avg_legion_hp(legions: Array) -> float:
 	if legions.is_empty():
