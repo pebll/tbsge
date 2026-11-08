@@ -14,6 +14,7 @@ static func clone_unit(unit: Unit) -> Unit:
 static func clone_legion(legion: Legion) -> Legion:
 	if legion == null:
 		return null
+	# Units are copied one by one (each keeps its own type), so mixed legions clone exactly.
 	var copy := Legion.new(legion.unit_type, 0, legion.tile_coords, legion.team_id)
 	copy.units.clear()
 	for unit in legion.units:

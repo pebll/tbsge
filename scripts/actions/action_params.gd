@@ -26,21 +26,64 @@ static func resolve_int(
 ) -> int:
 	return int(resolve(legion, action, key, fallback))
 
+## Legion-wide value: over the unit types present that can perform the action, the
+## largest numeric override (range, cooldown, heal...), else the first non-numeric one.
 static func _unit_override(legion: Legion, action_id: String, key: String) -> Variant:
 	if legion == null or action_id.is_empty():
 		return null
-	var unit_def: UnitDefinition = UnitDefs.get_def(legion.unit_type)
-	if unit_def == null:
-		return null
-	if not unit_def.action_params.has(action_id):
+	var best: Variant = null
+	for type_id in legion.unit_types():
+		if action_id not in ActionDefs.unit_type_action_ids(type_id):
+			continue
+		var v: Variant = _type_override(type_id, action_id, key)
+		if v == null:
+			continue
+		if best == null:
+			best = v
+		elif (v is int or v is float) and (best is int or best is float) and float(v) > float(best):
+			best = v
+	return best
+
+static func _type_override(type_id: String, action_id: String, key: String) -> Variant:
+	var unit_def: UnitDefinition = UnitDefs.get_def(type_id)
+	if unit_def == null or not unit_def.action_params.has(action_id):
 		return null
 	var params: Variant = unit_def.action_params[action_id]
 	if not (params is Dictionary):
 		return null
 	var dict: Dictionary = params
-	if not dict.has(key):
-		return null
-	return dict[key]
+	return dict.get(key)
+
+## A param as one unit type sees it: its override ?? action default ?? fallback.
+static func resolve_for_type(
+	type_id: String, action: ActionDefinition, key: String, fallback: Variant = null
+) -> Variant:
+	if action == null:
+		return fallback
+	var v: Variant = _type_override(type_id, action.id, key)
+	if v != null:
+		return v
+	var d: Variant = _action_default(action, key)
+	return d if d != null else fallback
+
+## Heal each unit of the caster contributes, in `units` order: its own type's heal amount,
+## or 0 if its type can't perform the heal (a mixed legion heals with its healers only).
+static func unit_heal_amounts(legion: Legion, action: ActionDefinition) -> Array[int]:
+	var out: Array[int] = []
+	if legion == null or action == null:
+		return out
+	for unit in legion.units:
+		if unit == null or action.id not in ActionDefs.unit_type_action_ids(unit.unit_type):
+			out.append(0)
+			continue
+		out.append(int(resolve_for_type(unit.unit_type, action, "heal_amount", action.heal_amount)))
+	return out
+
+static func total_heal(legion: Legion, action: ActionDefinition) -> int:
+	var t := 0
+	for h in unit_heal_amounts(legion, action):
+		t += h
+	return t
 
 static func _action_default(action: ActionDefinition, key: String) -> Variant:
 	match key:

@@ -351,6 +351,7 @@ func _serialize_legions(for_team: String) -> Array:
 			"team_id": legion.team_id,
 			"unit_type": legion.unit_type,
 			"unit_count": legion.units.size(),
+			"composition": legion.composition(),
 			"coords": legion.tile_coords,
 			"current_ap": legion.current_ap,
 			"hidden": false,

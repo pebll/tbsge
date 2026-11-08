@@ -45,7 +45,7 @@ Goal: the AI feels smart in battle. See [`design/ai.md`](design/ai.md) and [`uti
 - *Later (not 0.1):* smart AI draft (after balance), enemy-reply lookahead, ranged kiting, stall-breaker, exploit tests
 
 ### 0.1.5 — Foundations before effects
-- [ ] **Mixed-legion data model**: a legion is any set of units; visuals, draft cost, SFX, stats and the legion strip read per-unit identity instead of `Legion.unit_type` (UI to create mixed legions stays in 0.4)
+- [x] **Mixed-legion data model**: a legion is any set of units; visuals, draft cost, SFX, stats and the legion strip read per-unit identity instead of `Legion.unit_type` (UI to create mixed legions stays in 0.4)
 - [ ] **Counter tags** on every unit (fixed list: armored, flyer, swarm, shielded, ranged, support, …), shown in tooltips
 - [ ] Status-effect framework: `StatusEffect` model + pre-strike / on-hit / on-death / turn-start hooks in `CombatResolver`, icons on legion and strip, tooltip, battle-log line
 

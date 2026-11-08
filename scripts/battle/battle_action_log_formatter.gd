@@ -220,7 +220,7 @@ static func _entry(
 static func _legion_summary(legion: Legion) -> String:
 	if legion == null:
 		return ""
-	return "%s %s" % [_team_label(legion.team_id), legion.unit_type]
+	return "%s %s" % [_team_label(legion.team_id), legion.display_name() if legion.is_mixed() else legion.unit_type]
 
 static func _team_label(team_id: String) -> String:
 	if team_id.is_empty():

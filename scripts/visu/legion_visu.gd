@@ -102,11 +102,15 @@ func _sync_internal_layers() -> void:
 func _get_formation_scale() -> float:
 	if legion == null:
 		return 1.0
-	var def := UnitDefs.get_def(legion.unit_type)
-	if def == null or def.size <= 0.0:
+	# Spacing follows legion "size" capacity (largest unit type present), not sprite art scale.
+	var size := 0.0
+	for type_id in legion.unit_types():
+		var def := UnitDefs.get_def(type_id)
+		if def != null:
+			size = maxf(size, def.size)
+	if size <= 0.0:
 		return 1.0
-	# Spacing follows legion "size" capacity, not sprite art scale.
-	return clampf(def.size / 1.5, 0.88, 1.12)
+	return clampf(size / 1.5, 0.88, 1.12)
 
 func _stable_jitter(i: int, amount: float) -> Vector2:
 	var sx := sin(float(_formation_seed) + float(i) * 12.9898) * 43758.5453

@@ -290,7 +290,7 @@ func _can_add_draft_unit() -> bool:
 func _render_legion(legion: Legion) -> void:
 	_apply_team_accent(legion.team_id)
 	legion_block.show()
-	legion_name.text = _format_legion_title(legion.unit_type)
+	legion_name.text = legion.display_name().to_upper() if legion.is_mixed() else _format_legion_title(legion.unit_type)
 
 	var unit0: Unit = legion.units[0] if legion.units.size() > 0 else null
 	if unit0:
@@ -324,7 +324,7 @@ func _render_legion(legion: Legion) -> void:
 		return a.get_instance_id() < b.get_instance_id()
 	)
 	for u in sorted_units:
-		units_list.add_child(_build_unit_row(legion.unit_type, u))
+		units_list.add_child(_build_unit_row(u.unit_type if u else legion.unit_type, u))
 
 func apply_unit_vitals_fx(unit: Unit, hp: float, shield: float) -> void:
 	if unit == null or not _unit_vitals.has(unit):

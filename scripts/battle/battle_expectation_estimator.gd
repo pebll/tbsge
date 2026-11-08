@@ -1,6 +1,7 @@
 class_name BattleExpectationEstimator
 extends RefCounted
 
+const ActionResolverScript = preload("res://scripts/actions/action_resolver.gd")
 const CombatResolver = preload("res://scripts/core/combat_resolver.gd")
 const CombatSimSnapshot = preload("res://scripts/battle/combat_sim_snapshot.gd")
 const HexPathfinder = preload("res://scripts/ai/hex_pathfinder.gd")
@@ -117,8 +118,7 @@ static func _estimate_heal(
 	if action_id == "self_heal":
 		target = attacker
 
-	var heal_amount := ActionParams.resolve_int(caster, action, "heal_amount", action.heal_amount)
-	if heal_amount <= 0:
+	if ActionParams.total_heal(caster, action) <= 0:
 		var empty := _empty_result()
 		empty["kind"] = "heal"
 		empty["heal_min"] = 0
@@ -129,12 +129,15 @@ static func _estimate_heal(
 
 	# Clone so we don't mutate the live battle legions during preview.
 	var sim_caster := CombatSimSnapshot.clone_legion(caster)
-	var sim_target := CombatSimSnapshot.clone_legion(target)
+	var sim_target := sim_caster if target == caster else CombatSimSnapshot.clone_legion(target)
 
 	var prev_quiet := CombatResolver.quiet
 	CombatResolver.quiet = true
 	var start_us := Time.get_ticks_usec()
-	var healed_total := _apply_focused_heal_total(sim_caster, sim_target, heal_amount)
+	# Same code path as the real heal (per-unit amounts, healers only in mixed legions).
+	var healed_total := int(round(float(ActionResolverScript._apply_focused_heal(
+		sim_caster, sim_target, ActionParams.unit_heal_amounts(sim_caster, action)
+	)["healed_total"])))
 	var elapsed_ms := float(Time.get_ticks_usec() - start_us) / 1000.0
 	CombatResolver.quiet = prev_quiet
 
@@ -165,41 +168,6 @@ static func _estimate_heal(
 		)
 	return result
 
-static func _apply_focused_heal_total(caster: Legion, target: Legion, heal_amount: int) -> int:
-	if caster == null or target == null or heal_amount <= 0:
-		return 0
-
-	var healed := 0
-	for caster_unit in caster.units:
-		if caster_unit == null:
-			continue
-		var focus := _pick_lowest_hp_wounded_snapshot(target)
-		if focus == null:
-			break
-		var before := int(focus.current_health)
-		var after := mini(before + heal_amount, int(focus.max_health))
-		if after > before:
-			healed += after - before
-		# Apply so subsequent picks see the updated HP.
-		focus.current_health = float(after)
-	return healed
-
-static func _pick_lowest_hp_wounded_snapshot(legion: Legion) -> Unit:
-	if legion == null:
-		return null
-	var best: Unit = null
-	var best_hp := 2147483647
-	for unit in legion.units:
-		if unit == null:
-			continue
-		var hp := int(unit.current_health)
-		if hp >= int(unit.max_health):
-			continue
-		if hp < best_hp:
-			best_hp = hp
-			best = unit
-	return best
-
 static func _cache_key(
 	attacker: Legion,
 	defender: Legion,
@@ -220,11 +188,10 @@ static func _cache_key(
 static func _legion_fingerprint(legion: Legion) -> String:
 	var parts: PackedStringArray = []
 	parts.append(legion.team_id)
-	parts.append(legion.unit_type)
 	parts.append(str(legion.tile_coords))
 	for unit in legion.units:
 		if unit:
-			parts.append("%d/%d" % [int(round(unit.current_health)), unit.shield_remaining])
+			parts.append("%s:%d/%d" % [unit.unit_type, int(round(unit.current_health)), unit.shield_remaining])
 	return "|".join(parts)
 
 static func _store_cache(key: String, value: Dictionary) -> void:

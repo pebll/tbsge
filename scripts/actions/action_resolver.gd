@@ -166,8 +166,7 @@ static func _execute_self_heal(
 	action: ActionDefinitionScript,
 	coords: Vector2i
 ) -> Dictionary:
-	var heal_amount := ActionParams.resolve_int(legion, action, "heal_amount", action.heal_amount)
-	var heal_result := _apply_focused_heal(legion, legion, heal_amount)
+	var heal_result := _apply_focused_heal(legion, legion, ActionParams.unit_heal_amounts(legion, action))
 	legion.spend_ap(action.ap_cost)
 	_apply_terminal(state, legion, action)
 	return _ok(["legion_healed"], {
@@ -195,8 +194,7 @@ static func _execute_ally_heal(
 	var target: Legion = to_tile.legion
 	if target.team_id != caster.team_id or target == caster:
 		return _fail("Invalid ally target")
-	var heal_amount := ActionParams.resolve_int(caster, action, "heal_amount", action.heal_amount)
-	var heal_result := _apply_focused_heal(caster, target, heal_amount)
+	var heal_result := _apply_focused_heal(caster, target, ActionParams.unit_heal_amounts(caster, action))
 	caster.spend_ap(action.ap_cost)
 	_apply_terminal(state, caster, action)
 	return _ok(["legion_healed"], {
@@ -235,14 +233,17 @@ static func _execute_teleport(
 		"caster_legion": legion,
 	})
 
-## Each caster unit applies heal_amount once to the current lowest-HP wounded unit.
-static func _apply_focused_heal(caster: Legion, target: Legion, heal_amount: int) -> Dictionary:
+## Each caster unit applies its heal amount (ActionParams.unit_heal_amounts) once to the
+## current lowest-HP wounded unit. Units that can't heal (amount 0) skip.
+static func _apply_focused_heal(caster: Legion, target: Legion, amounts: Array[int]) -> Dictionary:
 	var healed := 0.0
 	var unit_heals: Array = []
-	if caster == null or target == null or heal_amount <= 0:
+	if caster == null or target == null:
 		return {"healed_total": 0, "unit_heals": unit_heals}
-	for caster_unit in caster.units:
-		if caster_unit == null:
+	for i in range(caster.units.size()):
+		var caster_unit: Unit = caster.units[i]
+		var heal_amount: int = amounts[i] if i < amounts.size() else 0
+		if caster_unit == null or heal_amount <= 0:
 			continue
 		var focus := _pick_lowest_hp_wounded(target)
 		if focus == null:

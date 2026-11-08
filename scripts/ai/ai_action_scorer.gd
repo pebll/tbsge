@@ -174,7 +174,6 @@ static func _estimate_heal(session, legion: Legion, action_id: String, to_coords
 	var action = ActionDefs.get_def(action_id)
 	if action == null:
 		return 0
-	var heal_amount := ActionParams.resolve_int(legion, action, "heal_amount", action.heal_amount)
 	var target: Legion = legion
 	if action_id == "heal_ally":
 		target = session.get_legion_at(to_coords)
@@ -184,7 +183,7 @@ static func _estimate_heal(session, legion: Legion, action_id: String, to_coords
 	for tu in target.units:
 		if tu:
 			missing_total += maxi(0, int(tu.max_health) - int(tu.current_health))
-	var potential := heal_amount * legion.units.size()
+	var potential := ActionParams.total_heal(legion, action)
 	return mini(missing_total, potential)
 
 static func _total_hp(legion: Legion) -> float:

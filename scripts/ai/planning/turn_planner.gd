@@ -116,11 +116,11 @@ static func evaluate(sim, team: String, p_exposure_weight: float = 0.5) -> float
 	return value
 
 static func army_value(L: Legion) -> float:
-	var price := float(MinigameRulesScript.unit_price(L.unit_type))
 	var t := 0.0
 	for u in L.units:
 		if u == null or u.max_health <= 0.0:
 			continue
+		var price := float(MinigameRulesScript.unit_price(u.unit_type))
 		var frac := clampf(float(u.current_health) / float(u.max_health), 0.0, 1.0)
 		t += price * (WOUNDED_VALUE_FLOOR + (1.0 - WOUNDED_VALUE_FLOOR) * frac)
 	return t

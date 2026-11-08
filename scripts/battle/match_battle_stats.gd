@@ -23,6 +23,7 @@ func begin(session) -> void:
 			"unit_type": String(legion.unit_type),
 			"start_coords": legion.tile_coords,
 			"start_units": legion.units.size(),
+			"start_by_type": _counts_by_type(legion),
 			"damage_dealt": 0.0,
 			"damage_received": 0.0,
 		}
@@ -90,27 +91,34 @@ func build_report(winner: String = "") -> Dictionary:
 			elif team == "BLUE":
 				wiped_blue += 1
 
-		if not by_type.has(unit_type):
-			by_type[unit_type] = {
-				"unit_type": unit_type,
-				"display_name": _display_name(unit_type),
-				"price": MinigameRulesScript.unit_price(unit_type),
-				"green_start": 0,
-				"green_end": 0,
-				"green_lost": 0,
-				"blue_start": 0,
-				"blue_end": 0,
-				"blue_lost": 0,
-			}
-		var row: Dictionary = by_type[unit_type]
-		if team == "GREEN":
-			row["green_start"] = int(row["green_start"]) + start_u
-			row["green_end"] = int(row["green_end"]) + end_u
-			row["green_lost"] = int(row["green_lost"]) + lost
-		elif team == "BLUE":
-			row["blue_start"] = int(row["blue_start"]) + start_u
-			row["blue_end"] = int(row["blue_end"]) + end_u
-			row["blue_lost"] = int(row["blue_lost"]) + lost
+		# Per unit type, so a mixed legion's losses land on the right rows.
+		var start_types: Dictionary = track.get("start_by_type", {unit_type: start_u})
+		var end_types := _end_by_type(track)
+		for type_id in start_types.keys():
+			var t_start := int(start_types[type_id])
+			var t_end := mini(t_start, int(end_types.get(type_id, 0)))
+			var t_lost := maxi(0, t_start - t_end)
+			if not by_type.has(type_id):
+				by_type[type_id] = {
+					"unit_type": type_id,
+					"display_name": _display_name(type_id),
+					"price": MinigameRulesScript.unit_price(type_id),
+					"green_start": 0,
+					"green_end": 0,
+					"green_lost": 0,
+					"blue_start": 0,
+					"blue_end": 0,
+					"blue_lost": 0,
+				}
+			var row: Dictionary = by_type[type_id]
+			if team == "GREEN":
+				row["green_start"] = int(row["green_start"]) + t_start
+				row["green_end"] = int(row["green_end"]) + t_end
+				row["green_lost"] = int(row["green_lost"]) + t_lost
+			elif team == "BLUE":
+				row["blue_start"] = int(row["blue_start"]) + t_start
+				row["blue_end"] = int(row["blue_end"]) + t_end
+				row["blue_lost"] = int(row["blue_lost"]) + t_lost
 
 		var dealt := float(track.get("damage_dealt", 0.0))
 		var taken := float(track.get("damage_received", 0.0))
@@ -150,6 +158,20 @@ func build_report(winner: String = "") -> Dictionary:
 		"mvp": mvp,
 		"winner": winner,
 	}
+
+static func _counts_by_type(legion: Legion) -> Dictionary:
+	var out := {}
+	if legion == null:
+		return out
+	for part in legion.composition():
+		out[String(part[0])] = int(part[1])
+	return out
+
+func _end_by_type(track: Dictionary) -> Dictionary:
+	var legion: Legion = track.get("legion", null)
+	if legion == null or legion.units.is_empty():
+		return {}
+	return _counts_by_type(legion)
 
 func _end_units(track: Dictionary) -> int:
 	var legion: Legion = track.get("legion", null)
