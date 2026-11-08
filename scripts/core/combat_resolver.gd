@@ -2,6 +2,7 @@ class_name CombatResolver
 extends RefCounted
 
 const StatusEffects = preload("res://scripts/effects/status_effects.gd")
+const TerrainRules = preload("res://scripts/terrain/terrain_rules.gd")
 
 const MODE_MELEE := "melee"
 const MODE_RANGED := "ranged"
@@ -53,6 +54,12 @@ static func resolve_combat(
 	var deaths: Array = []
 	var status_events: Array = []
 	var with_statuses := StatusEffects.any_statuses(attacking_legion, defending_legion)
+	# Terrain each side stands on (TerrainRules.combat_options); empty = no terrain effects.
+	var terrain_of := {
+		attacking_legion: String(options.get("attacker_terrain", "")),
+		defending_legion: String(options.get("defender_terrain", "")),
+	}
+	var with_terrain := not (String(terrain_of[attacking_legion]).is_empty() and String(terrain_of[defending_legion]).is_empty())
 
 	# Track which specific Unit objects already attacked (no unit hits twice per combat).
 	var attacked := {}
@@ -93,6 +100,11 @@ static func resolve_combat(
 		if with_statuses:
 			raw_damage = StatusEffects.strike_damage(
 				current_attacker_legion, attacker_unit, current_defender_legion, target_unit, mode, raw_damage
+			)
+		if with_terrain:
+			raw_damage = TerrainRules.modify_strike(
+				attacker_unit, String(terrain_of.get(current_attacker_legion, "")),
+				target_unit, String(terrain_of.get(current_defender_legion, "")), mode, raw_damage
 			)
 		var shield_result: Dictionary
 		if with_statuses and StatusEffects.pierces(attacker_unit):

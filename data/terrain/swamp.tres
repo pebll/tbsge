@@ -1,0 +1,21 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/terrain/terrain_definition.gd" id="1_def"]
+[ext_resource type="Texture2D" path="res://assets/tiles_sliced/tiles_terrain/grass.png" id="2_tex"]
+
+[resource]
+script = ExtResource("1_def")
+id = "SWAMP"
+display_name = "Swamp"
+description = "Costs 2 AP to enter."
+texture = ExtResource("2_tex")
+tint = Color(0.55, 0.62, 0.42, 1)
+walkable = true
+move_cost = 2
+ranged_defense = 1.0
+melee_defense = 1.0
+blocks_los = false
+vision_mod = 0
+flyer_can_cross = true
+flyer_can_stop = true
+map_weight = 8

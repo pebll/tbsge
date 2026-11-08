@@ -2,6 +2,7 @@ class_name BattleExpectationEstimator
 extends RefCounted
 
 const ActionResolverScript = preload("res://scripts/actions/action_resolver.gd")
+const TerrainRulesScript = preload("res://scripts/terrain/terrain_rules.gd")
 const CombatResolver = preload("res://scripts/core/combat_resolver.gd")
 const CombatSimSnapshot = preload("res://scripts/battle/combat_sim_snapshot.gd")
 const HexPathfinder = preload("res://scripts/ai/hex_pathfinder.gd")
@@ -20,14 +21,16 @@ static func estimate(
 	defender: Legion,
 	action_id: String,
 	from_coords: Vector2i,
-	to_coords: Vector2i
+	to_coords: Vector2i,
+	grid: Dictionary = {}
 ) -> Dictionary:
 	if attacker == null or defender == null or action_id.is_empty():
 		return _empty_result()
+	var terrain: Dictionary = {} if grid.is_empty() else TerrainRulesScript.combat_options(grid, from_coords, to_coords)
 
 	var is_heal := action_id == "self_heal" or action_id == "heal_ally"
 	var sim_count := 1 if is_heal else GameSettings.battle_expectation_sim_count
-	var cache_key := _cache_key(attacker, defender, action_id, from_coords, to_coords, sim_count)
+	var cache_key := _cache_key(attacker, defender, action_id, from_coords, to_coords, sim_count) + str(terrain)
 	if _cache.has(cache_key):
 		var cached: Dictionary = _cache[cache_key].duplicate(true)
 		cached["cached"] = true
@@ -56,7 +59,7 @@ static func estimate(
 	var own_loss_samples: Array[int] = []
 
 	var start_us := Time.get_ticks_usec()
-	for row in CombatSampler.sample(attacker, defender, mode, distance, sim_count):
+	for row in CombatSampler.sample(attacker, defender, mode, distance, sim_count, terrain):
 		enemy_damage_samples.append(int(round(float(row["enemy_hp_lost"]))))
 		own_damage_samples.append(int(round(float(row["own_hp_lost"]))))
 		enemy_loss_samples.append(int(row["enemy_deaths"]))

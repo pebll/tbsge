@@ -1,7 +1,7 @@
 class_name Tile
 extends RefCounted
 
-const TERRAINS := ["MOUNTAIN", "WATER", "GRASS", "DESERT", "FOREST"]
+const TERRAINS := ["MOUNTAIN", "WATER", "GRASS", "DESERT", "FOREST", "SWAMP"]
 
 var coords: Vector2i
 var cube_q: int

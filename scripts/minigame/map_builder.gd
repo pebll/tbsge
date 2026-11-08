@@ -4,7 +4,11 @@ extends RefCounted
 const MinigameRulesScript = preload("res://scripts/minigame/minigame_rules.gd")
 const Utils = preload("res://scripts/core/utils.gd")
 
+const TerrainRules = preload("res://scripts/terrain/terrain_rules.gd")
+
 const MAX_CONNECTIVITY_ATTEMPTS := 4096
+## Chance a tile takes its neighbours' majority terrain (patches instead of noise).
+const CLUSTER_CHANCE := 0.45
 const WALKABLE_TERRAINS := ["GRASS", "DESERT", "FOREST"]
 
 static func build_grid(radius: int, rng_seed: int = -1, team_ids: Array[String] = []) -> Dictionary:
@@ -22,16 +26,74 @@ static func build_grid(radius: int, rng_seed: int = -1, team_ids: Array[String] 
 			if abs(s) > radius:
 				continue
 			var tile := Tile.new(q, r)
-			if rng_seed >= 0:
-				var terrain_idx := rng.randi() % Tile.TERRAINS.size()
-				tile.terrain_type = Tile.TERRAINS[terrain_idx]
-				tile.walkable = not (tile.terrain_type == "MOUNTAIN" or tile.terrain_type == "WATER")
 			grid[Vector2i(q, r)] = tile
+	if rng_seed >= 0:
+		_generate_terrain(grid, rng)
 
 	if team_ids.size() >= 2:
 		_ensure_deploy_back_rows_walkable(grid, radius, team_ids, rng)
 		_ensure_deploy_zones_connected(grid, radius, team_ids, rng)
 	return grid
+
+## Weighted terrain (TerrainDefinition.map_weight), one clustering pass so forests and
+## lakes form patches, mirrored through the centre so both sides get the same map.
+static func _generate_terrain(grid: Dictionary, rng: RandomNumberGenerator) -> void:
+	var ids: Array[String] = []
+	var weights: Array[float] = []
+	for id in TerrainRules.all_ids():
+		var def = TerrainRules.get_def(id)
+		if def != null and def.map_weight > 0.0:
+			ids.append(id)
+			weights.append(def.map_weight)
+	if ids.is_empty():
+		return
+	var half := _canonical_half(grid)
+	for c in half:
+		_set_terrain(grid, c, _weighted_pick(ids, weights, rng))
+	for c in half:
+		if rng.randf() < CLUSTER_CHANCE:
+			var counts := {}
+			for n in Utils.get_surrounding_coords(c):
+				var t: Tile = grid.get(n)
+				if t:
+					counts[t.terrain_type] = int(counts.get(t.terrain_type, 0)) + 1
+			var best := ""
+			var best_n := 1
+			for k in counts.keys():
+				if int(counts[k]) > best_n:
+					best = k
+					best_n = int(counts[k])
+			if not best.is_empty():
+				_set_terrain(grid, c, best)
+
+## One coords of every mirror pair (q, r) / (-q, -r), plus the centre.
+static func _canonical_half(grid: Dictionary) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for c in grid.keys():
+		var v: Vector2i = c
+		if v.y < 0 or (v.y == 0 and v.x <= 0):
+			out.append(v)
+	out.sort()
+	return out
+
+## Sets the tile and its mirror (fair maps).
+static func _set_terrain(grid: Dictionary, coords: Vector2i, terrain_id: String) -> void:
+	for c in [coords, -coords]:
+		var t: Tile = grid.get(c)
+		if t:
+			t.terrain_type = terrain_id
+			t.walkable = TerrainRules.ground_walkable(terrain_id)
+
+static func _weighted_pick(ids: Array[String], weights: Array[float], rng: RandomNumberGenerator) -> String:
+	var total := 0.0
+	for w in weights:
+		total += w
+	var x := rng.randf() * total
+	for i in range(ids.size()):
+		x -= weights[i]
+		if x <= 0.0:
+			return ids[i]
+	return ids[ids.size() - 1]
 
 static func _ensure_deploy_back_rows_walkable(
 	grid: Dictionary,
@@ -43,8 +105,8 @@ static func _ensure_deploy_back_rows_walkable(
 	for team_id in team_ids.slice(0, 2):
 		for coords in MinigameRulesScript.deploy_back_rows_coords(radius, team_id, team_ids, row_count):
 			var tile: Tile = grid.get(coords)
-			if tile:
-				_set_random_walkable(tile, rng)
+			if tile and not tile.walkable:
+				_set_random_walkable(tile, rng, grid)
 
 static func _ensure_deploy_zones_connected(
 	grid: Dictionary,
@@ -72,11 +134,15 @@ static func _ensure_deploy_zones_connected(
 		var coords: Vector2i = candidates[rng.randi() % candidates.size()]
 		var tile: Tile = grid.get(coords)
 		if tile:
-			_set_random_walkable(tile, rng)
+			_set_random_walkable(tile, rng, grid)
 
-static func _set_random_walkable(tile: Tile, rng: RandomNumberGenerator) -> void:
-	tile.terrain_type = WALKABLE_TERRAINS[rng.randi() % WALKABLE_TERRAINS.size()]
-	tile.walkable = true
+static func _set_random_walkable(tile: Tile, rng: RandomNumberGenerator, grid: Dictionary = {}) -> void:
+	var id: String = WALKABLE_TERRAINS[rng.randi() % WALKABLE_TERRAINS.size()]
+	if grid.is_empty():
+		tile.terrain_type = id
+		tile.walkable = true
+	else:
+		_set_terrain(grid, tile.coords, id)
 
 static func _obstacle_free_coords_set(radius: int, team_ids: Array[String]) -> Dictionary:
 	var out: Dictionary = {}

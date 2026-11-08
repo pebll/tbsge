@@ -9,6 +9,7 @@ const MoveReachability = preload("res://scripts/battle/move_reachability.gd")
 const ThreatMapScript = preload("res://scripts/ai/threat/threat_map.gd")
 const Utils = preload("res://scripts/core/utils.gd")
 const AiTeamPlanScript = preload("res://scripts/ai/utility/ai_team_plan.gd")
+const TerrainRulesScript = preload("res://scripts/terrain/terrain_rules.gd")
 
 var session
 var legion: Legion
@@ -69,23 +70,31 @@ static func _assign_focus(ctx: AiContext, p_session, p_legion: Legion) -> void:
 		ctx.focus = ranked[0]
 		ctx.focus_field = walk_distance_field(p_session.grid, ranked[0].tile_coords)
 
-## BFS step distance from `origin` over walkable tiles (same adjacency as movement;
-## legions are ignored because they move or swap).
+## Walking cost (AP) from `origin` over walkable tiles, using each terrain's base move cost
+## (forest / swamp count double). Legions are ignored because they move or swap.
 static func walk_distance_field(grid: Dictionary, origin: Vector2i) -> Dictionary:
 	var dist: Dictionary = {origin: 0}
-	var queue: Array[Vector2i] = [origin]
-	var qi := 0
-	while qi < queue.size():
-		var cur: Vector2i = queue[qi]
-		qi += 1
+	var frontier: Array[Vector2i] = [origin]
+	var done: Dictionary = {}
+	while not frontier.is_empty():
+		var bi := 0
+		for i in range(1, frontier.size()):
+			if int(dist[frontier[i]]) < int(dist[frontier[bi]]):
+				bi = i
+		var cur: Vector2i = frontier[bi]
+		frontier.remove_at(bi)
+		if done.has(cur):
+			continue
+		done[cur] = true
 		for nxt in Utils.get_surrounding_coords(cur):
-			if dist.has(nxt):
-				continue
 			var tile: Tile = grid.get(nxt)
 			if tile == null or not tile.walkable:
 				continue
-			dist[nxt] = int(dist[cur]) + 1
-			queue.append(nxt)
+			var def = TerrainRulesScript.get_def(tile.terrain_type)
+			var nd: int = int(dist[cur]) + (int(def.move_cost) if def != null else 1)
+			if not dist.has(nxt) or nd < int(dist[nxt]):
+				dist[nxt] = nd
+				frontier.append(nxt)
 	return dist
 
 static func _rank_enemies(from_coords: Vector2i, enemies: Array[Legion]) -> Array[Legion]:

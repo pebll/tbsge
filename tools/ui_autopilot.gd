@@ -54,6 +54,25 @@ func _ready() -> void:
 	_hex = load("res://scripts/ai/hex_pathfinder.gd")
 	_start.call_deferred()
 
+## Right-click an empty, on-screen tile: the terrain popup names its terrain.
+func _check_terrain_info() -> void:
+	var g = _game()
+	var view := get_viewport().get_visible_rect()
+	for c in g.session.grid.keys():
+		var t: Tile = g.session.grid[c]
+		if t.has_legion() or t.terrain_type == "GRASS":
+			continue
+		var pos := _tile_screen_pos(c)
+		if not Rect2(700, 260, view.size.x - 900, 300).has_point(pos):
+			continue
+		await _click(pos, MOUSE_BUTTON_RIGHT)
+		await _wait(0.4)
+		await _shot("terrain_info_%s" % t.terrain_type.to_lower())
+		var tip = g.battle.get("_terrain_tip")
+		_check(tip != null and tip.visible, "right-click on %s shows terrain info" % t.terrain_type)
+		g.battle.clear_battle_inspect()
+		return
+
 ## status_demo flag: a demo debuff on every enemy legion and a demo buff on ours.
 func _apply_status_demo() -> void:
 	var SD = load("res://scripts/effects/status_defs.gd")
@@ -325,6 +344,7 @@ func _run() -> void:
 	await _wheel(_free_map_spot(), MOUSE_BUTTON_WHEEL_DOWN, 3)
 	await _wait(0.4)
 	await _shot("battle_zoomed_out")
+	await _check_terrain_info()
 
 	var human_turns := 0
 	var tested_pause := false

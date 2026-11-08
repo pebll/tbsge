@@ -16,3 +16,8 @@ price = 8
 tags = Array[String](["armored", "striker", "mobile"])
 icon = ExtResource("2_icon")
 action_ids = Array[String](["move", "melee_attack", "self_heal"])
+terrain_affinity = {
+"DESERT": {
+"attack": 2
+}
+}

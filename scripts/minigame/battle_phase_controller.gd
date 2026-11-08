@@ -10,6 +10,7 @@ const BattleActionLogFormatterScript = preload("res://scripts/battle/battle_acti
 const MatchBattleStats = preload("res://scripts/battle/match_battle_stats.gd")
 const AiBrainCommand = preload("res://scripts/ai/ai_brain_command.gd")
 const TurnSimSession = preload("res://scripts/ai/planning/turn_sim_session.gd")
+const TerrainRules = preload("res://scripts/terrain/terrain_rules.gd")
 
 const AI_LEGION_DELAY := 0.5
 ## Pause after animating status ticks at a turn start.
@@ -24,6 +25,7 @@ var ai_running: bool = false
 var _lock: BattleInputLockScript = BattleInputLockScript.new()
 var battle_stats: MatchBattleStats = MatchBattleStats.new()
 var ai_brain: AiBrain = AiBrainRegistry.create("utility")
+var _terrain_tip = null
 
 func _init(phase_deps: MinigamePhaseDeps) -> void:
 	deps = phase_deps
@@ -258,6 +260,25 @@ func check_match_end() -> void:
 
 func inspect_tile(coords: Vector2i) -> void:
 	_show_strip_for_coords(coords, true)
+	_show_terrain_info(coords)
+
+## Right-click on an empty tile: terrain name and rules (TerrainDefinition.description).
+func _show_terrain_info(coords: Vector2i) -> void:
+	if _terrain_tip != null and is_instance_valid(_terrain_tip):
+		_terrain_tip.dismiss()
+	var tile: Tile = deps.session.grid.get(coords)
+	if tile == null or tile.has_legion() or not _host_alive():
+		return
+	if _terrain_tip == null or not is_instance_valid(_terrain_tip):
+		_terrain_tip = UiHoverTooltip.new()
+		# Screen-space HUD layer (the host is the zoomed map): next to the turn HUD.
+		var ui_parent: Node = deps.turn_hud.get_parent() if deps.turn_hud else deps.host
+		ui_parent.add_child(_terrain_tip)
+	var def = TerrainRules.get_def(tile.terrain_type)
+	_terrain_tip.present(
+		TerrainRules.label(tile.terrain_type),
+		def.description if def != null else ""
+	)
 
 func preview_inspect(coords: Vector2i) -> void:
 	_show_strip_for_coords(coords, false)
@@ -267,6 +288,8 @@ func clear_preview_inspect() -> void:
 		deps.legion_strip.hide_strip()
 
 func clear_battle_inspect() -> void:
+	if _terrain_tip != null and is_instance_valid(_terrain_tip):
+		_terrain_tip.dismiss()
 	if deps.legion_strip:
 		deps.legion_strip.hide_strip()
 

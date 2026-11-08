@@ -46,6 +46,7 @@ func _initialize() -> void:
 		"res://tests/test_status_effects.gd",
 		"res://tests/test_effects_v02.gd",
 		"res://tests/test_ai_effects.gd",
+		"res://tests/test_terrain.gd",
 		"res://tests/test_combat_expectation.gd",
 		"res://tests/test_ai_threat.gd",
 		"res://tests/test_ai_approach.gd",

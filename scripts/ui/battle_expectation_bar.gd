@@ -95,7 +95,8 @@ func show_attack_preview(
 	defender: Legion,
 	action_id: String,
 	from_coords: Vector2i,
-	to_coords: Vector2i
+	to_coords: Vector2i,
+	grid: Dictionary = {}
 ) -> void:
 	if attacker == null:
 		hide_attack_preview()
@@ -111,7 +112,8 @@ func show_attack_preview(
 		defender,
 		action_id,
 		from_coords,
-		to_coords
+		to_coords,
+		grid
 	)
 	var mode := _mode_for_action(action_id)
 	var mode_changed := _preview_mode != mode

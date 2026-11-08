@@ -4,6 +4,7 @@ extends RefCounted
 const ActionDefinitionScript = preload("res://scripts/actions/action_definition.gd")
 const BattleStateScript = preload("res://scripts/actions/battle_state.gd")
 const HexPathfinder = preload("res://scripts/ai/hex_pathfinder.gd")
+const TerrainRules = preload("res://scripts/terrain/terrain_rules.gd")
 
 static func available_actions(state: BattleStateScript, legion: Legion) -> Array[ActionDefinitionScript]:
 	var out: Array[ActionDefinitionScript] = []
@@ -95,20 +96,28 @@ static func get_targets(
 		ActionDefinitionScript.TargetingKind.ADJACENT_ENEMY:
 			return _coords_from_tiles(Utils.get_attackable_tiles(from_tile, state.grid))
 		ActionDefinitionScript.TargetingKind.ENEMY_IN_RANGE:
-			return _coords_from_tiles(
+			return _with_los(state, from_coords, _coords_from_tiles(
 				Utils.get_ranged_attackable_tiles(from_tile, state.grid, _legion_attack_range(legion))
-			)
+			))
 		ActionDefinitionScript.TargetingKind.ALLY_IN_RANGE:
 			var rng := ActionParams.resolve_int(legion, action, "target_range", action.target_range)
-			return _coords_from_tiles(Utils.get_healable_ally_tiles(from_tile, state.grid, rng))
+			return _with_los(state, from_coords, _coords_from_tiles(Utils.get_healable_ally_tiles(from_tile, state.grid, rng)))
 		ActionDefinitionScript.TargetingKind.EMPTY_IN_RANGE:
 			var rng := ActionParams.resolve_int(legion, action, "target_range", action.target_range)
 			return _coords_from_tiles(Utils.get_empty_tiles_in_range(from_tile, state.grid, rng))
 		ActionDefinitionScript.TargetingKind.STATUS_ALLY, ActionDefinitionScript.TargetingKind.STATUS_ENEMY:
 			var rng := ActionParams.resolve_int(legion, action, "target_range", action.target_range)
 			var want_ally := action.targeting == ActionDefinitionScript.TargetingKind.STATUS_ALLY
-			return _status_targets(state, legion, rng, want_ally)
+			return _with_los(state, from_coords, _status_targets(state, legion, rng, want_ally))
 	return []
+
+## Ranged actions need line of sight (mountains block; adjacent hexes always see).
+static func _with_los(state: BattleStateScript, from_coords: Vector2i, targets: Array[Vector2i]) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for c in targets:
+		if TerrainRules.has_los(state.grid, from_coords, c):
+			out.append(c)
+	return out
 
 ## Legions within range (allies include this legion; distance 0) for status actions.
 static func _status_targets(state: BattleStateScript, legion: Legion, rng: int, want_ally: bool) -> Array[Vector2i]:
@@ -123,14 +132,22 @@ static func _status_targets(state: BattleStateScript, legion: Legion, rng: int, 
 			out.append(t.coords)
 	return out
 
+## Adjacent tiles this legion can pay to step onto (terrain cost), empty or holding an
+## ally that can pay to step back (swap).
 static func _move_targets(state: BattleStateScript, from_tile: Tile, legion: Legion) -> Array[Vector2i]:
 	var out: Array[Vector2i] = []
-	for t in Utils.get_movable_tiles(from_tile, state.grid):
-		out.append(t.coords)
-	for t in Utils.get_swappable_tiles(from_tile, state.grid):
-		if t.legion and t.legion.can_afford(1):
-			if t.coords not in out:
-				out.append(t.coords)
+	for c in Utils.get_surrounding_coords(from_tile.coords):
+		var t: Tile = state.tile_at(c)
+		var cost := TerrainRules.enter_cost(legion, t)
+		if cost < 0 or not legion.can_afford(cost):
+			continue
+		if t.has_legion():
+			if t.legion.team_id != legion.team_id:
+				continue
+			var back := TerrainRules.enter_cost(t.legion, from_tile)
+			if back < 0 or not t.legion.can_afford(back):
+				continue
+		out.append(c)
 	return out
 
 static func _coords_from_tiles(tiles: Array) -> Array[Vector2i]:
@@ -161,4 +178,4 @@ static func is_swap_target(state: BattleStateScript, from_coords: Vector2i, to_c
 		return false
 	var legion_a: Legion = from_tile.legion
 	var legion_b: Legion = to_tile.legion
-	return legion_a.team_id == legion_b.team_id and legion_b.can_afford(1)
+	return legion_a.team_id == legion_b.team_id and legion_b.can_afford(maxi(1, TerrainRules.enter_cost(legion_b, from_tile)))

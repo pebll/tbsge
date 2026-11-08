@@ -186,7 +186,9 @@ func _setup_battle_context() -> void:
 		to_coords: Vector2i
 	) -> void:
 		if _legion_strip:
-			_legion_strip.show_attack_preview(attacker, defender, action_id, from_coords, to_coords)
+			_legion_strip.show_attack_preview(
+				attacker, defender, action_id, from_coords, to_coords, session.grid if session else {}
+			)
 	battle_context.clear_expectation_preview_fn = func() -> void:
 		if _legion_strip:
 			_legion_strip.hide_attack_preview()

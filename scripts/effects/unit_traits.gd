@@ -8,12 +8,15 @@ extends RefCounted
 ##   lifesteal (float)    each unit heals this fraction of the HP its strike took
 ##   pierce (bool)        strikes ignore and break the target's shield
 ##   poison_on_hit ({"stacks", "turns"})  each landed strike adds poison to the target
+##   flying (bool)        moves over any terrain at 1 AP per hex (see TerrainRules)
 
 const REGENERATION := "regeneration"
 const LIFESTEAL := "lifesteal"
 const PIERCE := "pierce"
 const POISON_ON_HIT := "poison_on_hit"
-const ALL: Array[String] = [REGENERATION, LIFESTEAL, PIERCE, POISON_ON_HIT]
+## Flies over water and mountains; terrain costs and cover don't apply (TerrainRules).
+const FLYING := "flying"
+const ALL: Array[String] = [FLYING, REGENERATION, LIFESTEAL, PIERCE, POISON_ON_HIT]
 
 static func of(unit: Unit) -> Dictionary:
 	if unit == null or unit.definition == null:

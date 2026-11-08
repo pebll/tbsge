@@ -42,7 +42,8 @@ static func estimate_combat(
 	action_id: String,
 	from_coords: Vector2i,
 	to_coords: Vector2i,
-	sim_count: int = -1
+	sim_count: int = -1,
+	terrain: Dictionary = {}
 ) -> Dictionary:
 	var empty := _empty()
 	if attacker == null or defender == null:
@@ -68,7 +69,7 @@ static func estimate_combat(
 	var atk_n0 := attacker.units.size()
 	var def_n0 := defender.units.size()
 
-	for row in CombatSampler.sample(attacker, defender, mode, distance, n):
+	for row in CombatSampler.sample(attacker, defender, mode, distance, n, terrain):
 		var enemy_kills := float(row["enemy_deaths"])
 		# Damage over time the fight leaves behind (poison) counts, discounted: the target
 		# may be healed or the match may end first.

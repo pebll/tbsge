@@ -12,6 +12,7 @@ const ActionParams = preload("res://scripts/actions/action_params.gd")
 const HypotheticalPosition = preload("res://scripts/ai/hypothetical_position.gd")
 const AiTeamPlanScript = preload("res://scripts/ai/utility/ai_team_plan.gd")
 const AiCandidateGen = preload("res://scripts/ai/utility/ai_candidate_gen.gd")
+const TerrainRulesScript = preload("res://scripts/terrain/terrain_rules.gd")
 const StatusEffectsScript = preload("res://scripts/effects/status_effects.gd")
 const StatusDefsScript = preload("res://scripts/effects/status_defs.gd")
 
@@ -25,18 +26,19 @@ static func estimate(
 	from_coords: Vector2i,
 	to_coords: Vector2i,
 	sim_count: int = -1,
-	memo = null
+	memo = null,
+	terrain: Dictionary = {}
 ) -> Dictionary:
 	var n := CombatExpectation.get_sim_count() if sim_count < 0 else maxi(1, sim_count)
 	if memo == null:
-		return CombatExpectation.estimate_combat(attacker, defender, action_id, from_coords, to_coords, n)
+		return CombatExpectation.estimate_combat(attacker, defender, action_id, from_coords, to_coords, n, terrain)
 	var key := "%d|%d|%s|%s|%s|%d" % [
 		attacker.get_instance_id(), defender.get_instance_id(), action_id, from_coords, to_coords, n,
 	]
 	if memo.has(key):
 		return memo[key]
 	var est: Dictionary = CombatExpectation.estimate_combat(
-		attacker, defender, action_id, from_coords, to_coords, n
+		attacker, defender, action_id, from_coords, to_coords, n, terrain
 	)
 	memo[key] = est
 	return est
@@ -207,7 +209,10 @@ static func _fill_combat(
 	if defender == null:
 		return
 	var estimate_there := func() -> Dictionary:
-		return estimate(legion, defender, action_id, from_coords, to_coords, sim_count, memo)
+		return estimate(
+			legion, defender, action_id, from_coords, to_coords, sim_count, memo,
+			TerrainRulesScript.combat_options(session.grid, from_coords, to_coords)
+		)
 	var est: Dictionary = HypotheticalPosition.evaluate(
 		session.grid, legion, from_coords, estimate_there, {}
 	)

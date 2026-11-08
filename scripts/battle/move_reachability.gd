@@ -5,39 +5,51 @@ extends RefCounted
 
 const ActionTargetingScript = preload("res://scripts/actions/action_targeting.gd")
 const BattleStateScript = preload("res://scripts/actions/battle_state.gd")
+const TerrainRules = preload("res://scripts/terrain/terrain_rules.gd")
+const Utils = preload("res://scripts/core/utils.gd")
 
 ## Returns { reachable: Array[Vector2i], cost: Dictionary, parents: Dictionary }
+## Cheapest AP cost to every tile the legion can reach this turn (terrain costs via
+## TerrainRules.enter_cost; swaps with allies allowed when the ally can pay its own step).
+## `parents` keeps every predecessor on a cheapest path (ambiguous first steps).
 static func compute(state: BattleStateScript, legion: Legion) -> Dictionary:
 	var empty := {"reachable": [], "cost": {}, "parents": {}}
 	if state == null or legion == null:
 		return empty
-	var max_steps := legion.current_ap
-	if max_steps <= 0:
+	var budget := legion.current_ap
+	if budget <= 0:
 		return empty
 
 	var start := legion.tile_coords
 	var cost: Dictionary = {start: 0}
 	var parents: Dictionary = {start: []}
-	var queue: Array[Vector2i] = [start]
-	var qi := 0
-
-	while qi < queue.size():
-		var cur: Vector2i = queue[qi]
-		qi += 1
-		var cur_cost: int = int(cost[cur])
-		if cur_cost >= max_steps:
+	var done: Dictionary = {}
+	var frontier: Array[Vector2i] = [start]
+	while not frontier.is_empty():
+		# Small maps: linear min-pick is plenty.
+		var bi := 0
+		for i in range(1, frontier.size()):
+			if int(cost[frontier[i]]) < int(cost[frontier[bi]]):
+				bi = i
+		var cur: Vector2i = frontier[bi]
+		frontier.remove_at(bi)
+		if done.has(cur):
 			continue
-		for nxt in _adjacent_move_targets(state, cur, legion.team_id, start):
-			var nxt_cost := cur_cost + 1
-			if not cost.has(nxt):
+		done[cur] = true
+		var cur_cost: int = int(cost[cur])
+		for step in _adjacent_steps(state, cur, legion, start):
+			var nxt: Vector2i = step[0]
+			var nxt_cost: int = cur_cost + int(step[1])
+			if nxt_cost > budget:
+				continue
+			if not cost.has(nxt) or nxt_cost < int(cost[nxt]):
 				cost[nxt] = nxt_cost
 				parents[nxt] = [cur]
-				queue.append(nxt)
-			elif int(cost[nxt]) == nxt_cost:
+				frontier.append(nxt)
+			elif nxt_cost == int(cost[nxt]):
 				var plist: Array = parents[nxt]
 				if cur not in plist:
 					plist.append(cur)
-					parents[nxt] = plist
 
 	var reachable: Array[Vector2i] = []
 	for c in cost.keys():
@@ -142,21 +154,32 @@ static func reconstruct_path(
 			stack.append(np)
 	return [start, required_first_step]
 
-static func _adjacent_move_targets(
+## [[coords, ap_cost], ...] for one step from `from_coords`: empty enterable tiles, and
+## allied legions to swap with when they can pay to step back onto `from_coords`.
+static func _adjacent_steps(
 	state: BattleStateScript,
 	from_coords: Vector2i,
-	team_id: String,
-	_mover_start: Vector2i
-) -> Array[Vector2i]:
-	var out: Array[Vector2i] = []
+	legion: Legion,
+	mover_start: Vector2i
+) -> Array:
+	var out: Array = []
 	var from_tile: Tile = state.tile_at(from_coords)
 	if from_tile == null:
 		return out
-	for t in Utils.get_movable_tiles(from_tile, state.grid):
-		out.append(t.coords)
-	# Allow swaps with friendly legions from any reachable tile.
-	for t in Utils.get_swappable_tiles(from_tile, state.grid):
-		if t.legion and t.legion.team_id == team_id and t.legion.can_afford(1):
-			if t.coords not in out:
-				out.append(t.coords)
+	for c in Utils.get_surrounding_coords(from_coords):
+		var t: Tile = state.tile_at(c)
+		if t == null:
+			continue
+		var step_cost := TerrainRules.enter_cost(legion, t)
+		if step_cost < 0:
+			continue
+		if t.has_legion() and t.legion != legion:
+			var other: Legion = t.legion
+			if other.team_id != legion.team_id:
+				continue
+			# The ally steps back onto from_coords (where the mover stood before this step).
+			var back_cost := TerrainRules.enter_cost(other, from_tile if from_coords != mover_start else state.tile_at(mover_start))
+			if back_cost < 0 or not other.can_afford(back_cost):
+				continue
+		out.append([c, step_cost])
 	return out

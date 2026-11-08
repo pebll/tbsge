@@ -6,6 +6,7 @@ const ActionDefinitionScript = preload("res://scripts/actions/action_definition.
 const BattleStateScript = preload("res://scripts/actions/battle_state.gd")
 const HexPathfinder = preload("res://scripts/ai/hex_pathfinder.gd")
 const StatusEffectsScript = preload("res://scripts/effects/status_effects.gd")
+const TerrainRulesScript = preload("res://scripts/terrain/terrain_rules.gd")
 
 static func resolve(state: BattleStateScript, cmd: Dictionary) -> Dictionary:
 	var action_id: String = String(cmd.get("action_id", ""))
@@ -65,10 +66,11 @@ static func _execute_move(
 		return _fail("Target tile occupied")
 
 	var legion: Legion = from_tile.legion
+	var step_cost := maxi(action.ap_cost, TerrainRulesScript.enter_cost(legion, to_tile))
 	from_tile.legion = null
 	to_tile.legion = legion
 	legion.tile_coords = to_coords
-	legion.spend_ap(action.ap_cost)
+	legion.spend_ap(step_cost)
 	_apply_terminal(state, legion, action)
 	return _ok(["legion_moved"], {
 		"action_id": action.id,
@@ -88,13 +90,16 @@ static func _execute_swap(
 	var legion_a: Legion = from_tile.legion
 	var legion_b: Legion = to_tile.legion
 
+	# Each pays the terrain cost of the tile it steps onto.
+	var cost_a := maxi(action.ap_cost, TerrainRulesScript.enter_cost(legion_a, to_tile))
+	var cost_b := maxi(action.ap_cost, TerrainRulesScript.enter_cost(legion_b, from_tile))
 	# Waits live on the legion, so a waited partner stays waited after the swap.
 	from_tile.legion = legion_b
 	to_tile.legion = legion_a
 	legion_a.tile_coords = to_coords
 	legion_b.tile_coords = from_coords
-	legion_a.spend_ap(action.ap_cost)
-	legion_b.spend_ap(action.ap_cost)
+	legion_a.spend_ap(cost_a)
+	legion_b.spend_ap(cost_b)
 	_apply_terminal(state, legion_a, action)
 	return _ok(["legions_swapped"], {
 		"action_id": action.id,
@@ -121,7 +126,7 @@ static func _execute_melee_attack(
 		attacker,
 		defender,
 		rng_seed,
-		{"mode": CombatResolver.MODE_MELEE, "distance": 1}
+		_combat_options(state, CombatResolver.MODE_MELEE, 1, from_coords, to_coords)
 	)
 	_cleanup_empty_legion(state, from_coords)
 	_cleanup_empty_legion(state, to_coords)
@@ -131,6 +136,14 @@ static func _execute_melee_attack(
 		"to": to_coords,
 		"combat": result,
 	})
+
+static func _combat_options(
+	state: BattleStateScript, mode: String, distance: int, from_coords: Vector2i, to_coords: Vector2i
+) -> Dictionary:
+	var opts := TerrainRulesScript.combat_options(state.grid, from_coords, to_coords)
+	opts["mode"] = mode
+	opts["distance"] = distance
+	return opts
 
 static func _execute_ranged_attack(
 	state: BattleStateScript,
@@ -152,7 +165,7 @@ static func _execute_ranged_attack(
 		attacker,
 		defender,
 		rng_seed,
-		{"mode": CombatResolver.MODE_RANGED, "distance": distance}
+		_combat_options(state, CombatResolver.MODE_RANGED, distance, from_coords, to_coords)
 	)
 	_cleanup_empty_legion(state, from_coords)
 	_cleanup_empty_legion(state, to_coords)

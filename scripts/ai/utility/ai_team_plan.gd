@@ -9,6 +9,7 @@ extends RefCounted
 
 const HexPathfinder = preload("res://scripts/ai/hex_pathfinder.gd")
 const MoveReachability = preload("res://scripts/battle/move_reachability.gd")
+const TerrainRules = preload("res://scripts/terrain/terrain_rules.gd")
 
 ## Melee follow-ups take retaliation and lose attackers mid-fight.
 const MELEE_FOLLOWUP_MULT := 0.8
@@ -62,11 +63,11 @@ func followup_damage(target: Legion) -> float:
 		return float(_followup_cache[key])
 	var total := 0.0
 	for row in _allies:
-		total += _best_strike(row["legion"], row["stands"], target.tile_coords)
+		total += _best_strike(row["legion"], row["stands"], target.tile_coords, session.grid)
 	_followup_cache[key] = total
 	return total
 
-static func _best_strike(ally: Legion, stands: Array, target_coords: Vector2i) -> float:
+static func _best_strike(ally: Legion, stands: Array, target_coords: Vector2i, grid: Dictionary = {}) -> float:
 	var ids: Array = ActionDefs.legion_action_ids(ally)
 	var can_melee := "melee_attack" in ids and ally.is_action_ready("melee_attack")
 	var can_shoot := "ranged_attack" in ids and ally.is_action_ready("ranged_attack")
@@ -75,7 +76,7 @@ static func _best_strike(ally: Legion, stands: Array, target_coords: Vector2i) -
 		var d := HexPathfinder.hex_distance(s, target_coords)
 		if can_melee and d == 1:
 			best = maxf(best, melee_power(ally) * MELEE_FOLLOWUP_MULT)
-		if can_shoot and d >= 1:
+		if can_shoot and d >= 1 and (d == 1 or grid.is_empty() or TerrainRules.has_los(grid, s, target_coords)):
 			best = maxf(best, ranged_power(ally, d))
 	return best
 

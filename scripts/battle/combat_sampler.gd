@@ -26,7 +26,8 @@ static func sample(
 	defender: Legion,
 	mode: String,
 	distance: int,
-	n: int
+	n: int,
+	terrain: Dictionary = {}
 ) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	if attacker == null or defender == null or n <= 0:
@@ -44,7 +45,7 @@ static func sample(
 			sim_a,
 			sim_d,
 			SEED_BASE + i * SEED_STRIDE,
-			{"mode": mode, "distance": distance}
+			_options(mode, distance, terrain)
 		)
 		out.append({
 			"enemy_hp_lost": maxf(0.0, def_hp0 - total_hp(sim_d)),
@@ -57,6 +58,13 @@ static func sample(
 			"own_future_loss": maxf(0.0, atk_proj0 - StatusEffects.projected_hp_change(sim_a)),
 		})
 	return out
+
+## `terrain`: TerrainRules.combat_options() for the two hexes (empty = ignore terrain).
+static func _options(mode: String, distance: int, terrain: Dictionary) -> Dictionary:
+	var o := terrain.duplicate()
+	o["mode"] = mode
+	o["distance"] = distance
+	return o
 
 static func total_hp(legion: Legion) -> float:
 	var t := 0.0

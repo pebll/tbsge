@@ -1,6 +1,7 @@
 class_name TileVisu
 extends Node2D
 
+const TerrainRules = preload("res://scripts/terrain/terrain_rules.gd")
 var base_sprite: Sprite2D
 var terrain_sprite: Sprite2D
 var qr_label: Label
@@ -36,7 +37,13 @@ func init(p_tile: Tile) -> void:
 	base_sprite = get_node("base_sprite")
 	qr_label = get_node("QR_Label")
 	terrain_sprite = base_sprite.get_child(0)
-	terrain_sprite.texture = load("res://assets/tiles_sliced/tiles_terrain/" + tile.terrain_type.to_lower() + ".png")
+	var tdef = TerrainRules.get_def(tile.terrain_type)
+	if tdef != null and tdef.texture != null:
+		terrain_sprite.texture = tdef.texture
+		# Tint lives on self_modulate so spent/hover modulate still applies on top.
+		terrain_sprite.self_modulate = tdef.tint
+	else:
+		terrain_sprite.texture = load("res://assets/tiles_sliced/tiles_terrain/" + tile.terrain_type.to_lower() + ".png")
 	base_sprite.texture = load("res://assets/tiles_sliced/tiles_bottom/base.png")
 	base_y = base_sprite.position.y
 	qr_label.text = "(%d,%d,%d)" % [tile.cube_q, tile.cube_r, tile.cube_s]

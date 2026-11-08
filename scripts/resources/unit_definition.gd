@@ -48,6 +48,10 @@ enum ProjectileMotion {
 ##   "pierce": bool       — strikes ignore and break shields
 ##   "poison_on_hit": {"stacks": int, "turns": int} — each landed strike poisons the target
 @export var traits: Dictionary = {}
+## Per-terrain affinities, e.g. {"FOREST": {"move_cost": 1, "defense": 0.75},
+## "DESERT": {"attack": 2}}: move_cost overrides the terrain's AP cost, defense multiplies
+## damage taken there, attack is added to each strike made from there.
+@export var terrain_affinity: Dictionary = {}
 ## Per-action param overrides: { "heal_ally": { "heal_amount": 4, "target_range": 2 } }.
 @export var action_params: Dictionary = {}
 

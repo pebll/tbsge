@@ -1,0 +1,21 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/terrain/terrain_definition.gd" id="1_def"]
+[ext_resource type="Texture2D" path="res://assets/tiles_sliced/tiles_terrain/forest.png" id="2_tex"]
+
+[resource]
+script = ExtResource("1_def")
+id = "FOREST"
+display_name = "Forest"
+description = "Costs 2 AP to enter. Cover: ranged damage taken x0.7. Legions inside see 1 hex less."
+texture = ExtResource("2_tex")
+tint = Color(1, 1, 1, 1)
+walkable = true
+move_cost = 2
+ranged_defense = 0.7
+melee_defense = 1.0
+blocks_los = false
+vision_mod = -1
+flyer_can_cross = true
+flyer_can_stop = true
+map_weight = 20

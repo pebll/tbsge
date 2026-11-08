@@ -7,6 +7,7 @@ const HexPathfinder = preload("res://scripts/ai/hex_pathfinder.gd")
 const MoveReachability = preload("res://scripts/battle/move_reachability.gd")
 const Utils = preload("res://scripts/core/utils.gd")
 const StatusEffects = preload("res://scripts/effects/status_effects.gd")
+const TerrainRules = preload("res://scripts/terrain/terrain_rules.gd")
 
 var session
 var for_team_id: String = ""
@@ -65,14 +66,24 @@ func _enemy_threat_to(enemy: Legion, hex: Vector2i) -> float:
 	var shoot := _legion_shoot_range(enemy)
 	if melee_p <= 0.0 and (ranged_p <= 0.0 or shoot <= 0):
 		return 0.0
-	var best := _strike_from(enemy.tile_coords, hex, melee_p, ranged_p, shoot, 1.0, 1.0)
+	var best := _strike_from_los(enemy.tile_coords, hex, melee_p, ranged_p, shoot, 1.0, 1.0)
 	# Walk-then-strike using enemy max AP reachability (cached per enemy).
 	for stand in _stands_for(enemy):
 		var stand_coords: Vector2i = stand
 		if stand_coords == enemy.tile_coords:
 			continue
-		best = maxf(best, _strike_from(stand_coords, hex, melee_p, ranged_p, shoot, 0.75, 0.7))
+		best = maxf(best, _strike_from_los(stand_coords, hex, melee_p, ranged_p, shoot, 0.75, 0.7))
 	return best * _hp_frac(enemy)
+
+## _strike_from, but a shot needs line of sight (TerrainRules.has_los).
+func _strike_from_los(
+	from: Vector2i, hex: Vector2i, melee_p: float, ranged_p: float, shoot: int,
+	melee_mult: float, ranged_mult: float
+) -> float:
+	var r_p := ranged_p
+	if r_p > 0.0 and HexPathfinder.hex_distance(from, hex) > 1 and not TerrainRules.has_los(session.grid, from, hex):
+		r_p = 0.0
+	return _strike_from(from, hex, melee_p, r_p, shoot, melee_mult, ranged_mult)
 
 static func _strike_from(
 	from: Vector2i, hex: Vector2i, melee_p: float, ranged_p: float, shoot: int,
