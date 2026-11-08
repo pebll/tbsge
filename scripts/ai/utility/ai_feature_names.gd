@@ -17,6 +17,12 @@ const ENEMY_LOSS_SPREAD := "enemy_loss_spread"
 const THREAT_AT_STAND := "threat_at_stand"
 const THREAT_RELIEF := "threat_relief"
 const LOW_HP_EXPOSURE := "low_hp_exposure"
+## Combat: how much of what this attack leaves of the target the rest of the team can still
+## deal this turn (0 when this attack wipes it alone). Drives focus fire.
+const TEAM_FINISH := "team_finish"
+## Move: a swap that pulls a softer (wounded / ranged / support) ally out of enemy reach
+## and puts this sturdier legion there instead.
+const COVER_ALLY := "cover_ally"
 const FOCUS_SUPPORT := "focus_support"
 const FOCUS_LOW_HP := "focus_low_hp"
 const HEAL_EFFICIENCY := "heal_efficiency"
@@ -46,6 +52,8 @@ static func all_names() -> Array[String]:
 		THREAT_AT_STAND,
 		THREAT_RELIEF,
 		LOW_HP_EXPOSURE,
+		TEAM_FINISH,
+		COVER_ALLY,
 		FOCUS_SUPPORT,
 		FOCUS_LOW_HP,
 		HEAL_EFFICIENCY,

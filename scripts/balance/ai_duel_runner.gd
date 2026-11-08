@@ -33,9 +33,12 @@ static func run_batch(
 	brain_b_id: String = "cascade",
 	mirror: bool = true,
 	seed_offset: int = 0,
-	play_sims: bool = false
+	play_sims: bool = false,
+	draft_mode: String = "random"
 ) -> Dictionary:
 	var headless := begin_headless()
+	## "mirror": both teams field the same army, so the result measures play, not the draft.
+	var draft_scenario = DraftScenarioScript.from_string(draft_mode)
 
 	var brain_a: AiBrain = AiBrainRegistry.create(brain_a_id)
 	var brain_b: AiBrain = AiBrainRegistry.create(brain_b_id)
@@ -78,7 +81,7 @@ static func run_batch(
 			var blue_brain: AiBrain = brain_b if a_is_green else brain_a
 			var t0 := Time.get_ticks_msec()
 			var result: Dictionary = run_one(
-				seed_offset + pair_i, map_size, budget, green_brain, blue_brain
+				seed_offset + pair_i, map_size, budget, green_brain, blue_brain, draft_scenario
 			)
 			result["elapsed_ms"] = Time.get_ticks_msec() - t0
 			result["pair_index"] = pair_i

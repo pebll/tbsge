@@ -10,6 +10,7 @@ const AiMatchScore = preload("res://scripts/ai/evolution/ai_match_score.gd")
 const MinigameRulesScript = preload("res://scripts/minigame/minigame_rules.gd")
 const ActionParams = preload("res://scripts/actions/action_params.gd")
 const HypotheticalPosition = preload("res://scripts/ai/hypothetical_position.gd")
+const AiTeamPlanScript = preload("res://scripts/ai/utility/ai_team_plan.gd")
 
 ## Combat estimate for one (attacker, defender, action, from, to). `sim_count` < 0 falls back to the
 ## global default. A non-null `memo` (owned by the caller, one board snapshot) caches estimates;
@@ -96,6 +97,7 @@ static func extract(
 	var progress := focus_dist_before - focus_dist_after
 	if cand.action_id == "move":
 		progress += _displaced_ally_progress(session, legion, ctx, cand.path)
+		feats[AiFeatureNames.COVER_ALLY] = cover_ally(session, legion, ctx, cand.path)
 	feats[AiFeatureNames.CLOSER_TO_FOCUS] = clampf(
 		progress / denom, -1.0, 1.0
 	)
@@ -103,7 +105,7 @@ static func extract(
 	_fill_threat(ctx, legion, stand, feats)
 
 	if action_id in ["melee_attack", "ranged_attack"]:
-		_fill_combat(session, legion, stand, target_coords, action_id, feats, sim_count, memo)
+		_fill_combat(session, legion, ctx, stand, target_coords, action_id, feats, sim_count, memo)
 	elif action_id in ["self_heal", "heal_ally"]:
 		_fill_heal(session, legion, stand, target_coords, action_id, feats)
 	elif action_id == "teleport":
@@ -117,8 +119,9 @@ static func extract(
 		)
 		if not cand.followup_action_id.is_empty() and cand.followup_action_id in ["melee_attack", "ranged_attack"]:
 			_fill_combat(
-			session, legion, stand, cand.followup_to, cand.followup_action_id, feats, sim_count, memo
-		)
+				session, legion, ctx, stand, cand.followup_to, cand.followup_action_id, feats,
+				sim_count, memo
+			)
 			feats[AiFeatureNames.IS_COMBAT] = 1.0
 			feats[AiFeatureNames.IS_MOVE] = 0.0
 			feats[AiFeatureNames.IS_TERMINAL] = 1.0
@@ -135,6 +138,32 @@ static func _displaced_ally_progress(session, legion: Legion, ctx: AiContext, pa
 			continue
 		total += ctx.dist_to_focus(path[i]) - ctx.dist_to_focus(path[i - 1])
 	return total
+
+## Swaps along the path move each displaced ally one tile back. Credit the threat that
+## takes off allies softer than this legion (wounded, or ranged/support), weighted by how
+## much softer they are. Plain shuffles between equals score 0.
+static func cover_ally(session, legion: Legion, ctx: AiContext, path: Array) -> float:
+	if ctx == null or ctx.threat == null or path.size() < 2:
+		return 0.0
+	var mover_soft := softness(legion)
+	var total := 0.0
+	for i in range(1, path.size()):
+		var occupant: Legion = session.get_legion_at(path[i])
+		if occupant == null or occupant == legion or occupant.team_id != legion.team_id:
+			continue
+		var relief: float = ctx.threat.threat_frac(path[i]) - ctx.threat.threat_frac(path[i - 1])
+		if relief <= 0.0:
+			continue
+		total += relief * clampf(softness(occupant) - mover_soft, 0.0, 1.0)
+	return clampf(total, 0.0, 1.0)
+
+## 0 for a healthy frontline legion, up to 1 for a badly wounded ranged/support one.
+static func softness(legion: Legion) -> float:
+	if legion == null:
+		return 0.0
+	var frail := clampf(1.0 - _total_hp(legion) / _max_hp(legion), 0.0, 1.0)
+	var role := 0.0 if AiActionScorer.is_frontline(legion) else 0.4
+	return clampf(0.6 * frail + role, 0.0, 1.0)
 
 static func _effective_action(cand: AiCandidate) -> String:
 	if not cand.followup_action_id.is_empty():
@@ -155,6 +184,7 @@ static func _fill_threat(ctx: AiContext, legion: Legion, stand: Vector2i, feats:
 static func _fill_combat(
 	session,
 	legion: Legion,
+	ctx: AiContext,
 	from_coords: Vector2i,
 	to_coords: Vector2i,
 	action_id: String,
@@ -197,9 +227,25 @@ static func _fill_combat(
 	feats[AiFeatureNames.ENEMY_LOSS_SPREAD] = clampf(
 		float(est.get("enemy_loss_spread", 0.0)) / def_hp, 0.0, 1.0
 	)
+	feats[AiFeatureNames.TEAM_FINISH] = team_finish(ctx, defender, est)
 	feats[AiFeatureNames.FOCUS_SUPPORT] = 0.0 if AiActionScorer.is_frontline(defender) else 1.0
 	feats[AiFeatureNames.FOCUS_LOW_HP] = 1.0 - clampf(_total_hp(defender) / _max_hp(defender), 0.0, 1.0)
 	feats[AiFeatureNames.ENABLES_ATTACK] = 1.0
+
+## Fraction of what this attack is expected to leave of the target (HP + shields) that the
+## other allies can still deal this turn, scaled by the chance this attack does not wipe it
+## alone (that case is already wipe_prob's).
+static func team_finish(ctx: AiContext, defender: Legion, est: Dictionary) -> float:
+	if ctx == null or defender == null:
+		return 0.0
+	var plan = ctx.team_plan()
+	if plan.ally_count() == 0:
+		return 0.0
+	var left := maxf(
+		1.0, AiTeamPlanScript.effective_hp(defender) - float(est.get("enemy_loss_mean", 0.0))
+	)
+	var not_wiped := 1.0 - clampf(float(est.get("wipe_prob", 0.0)), 0.0, 1.0)
+	return not_wiped * clampf(plan.followup_damage(defender) / left, 0.0, 1.0)
 
 static func _fill_heal(
 	session,

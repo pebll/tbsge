@@ -18,7 +18,7 @@
 
 A complete, playable skirmish loop: menu → setup (Vs AI / Hotseat / AI vs AI, map size, difficulty, **choice of opponent AI**) → draft → battle → victory screen → rematch. The game has 15 unit types, six actions (move, melee, ranged, self-heal, heal ally, teleport) with cooldowns, a live battle log, attack previews, tooltips, and a legion strip with sidebar HP bars.
 
-- **AI:** a utility AI that judges fights by simulating them with the real combat code. It beats the old cascade AI. Three selectable opponents: Evolved, Hand-tuned (default), Cascade. **Weak spot:** the AI drafts its army at random, and the draft decides most games. That's a known item for the balance milestone.
+- **AI:** a utility AI that judges fights by simulating them with the real combat code, and **plans each turn as a team** (tries the strongest first moves on a copy of the board and plays out the rest of the turn). It clearly beats both the per-legion version and the old cascade AI. Three selectable opponents: Evolved, Hand-tuned (default), Cascade. **Weak spot:** the AI drafts its army at random, and the draft decides most games. That's a known item for the balance milestone.
 - **Engine:** game state updates first and animations replay it afterwards. One seeded RNG per match. 38 headless test suites, CI on GitHub, and a click-through UI test that plays real matches on a virtual screen.
 
 ## Roadmap

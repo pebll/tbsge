@@ -4,7 +4,8 @@ extends SceneTree
 ## Usage:
 ##   ./run_ai_duel.sh [--games N] [--map-size 3|4|5] [--budget N]
 ##     [--brain-a cascade] [--brain-b cascade] [--no-mirror] [--seed-offset N] [--play-sims]
-##     [--verbose] [--out-dir PATH]
+##     [--verbose] [--out-dir PATH] [--draft random|mirror]
+##   --draft mirror: both teams get the same army (measures play, not the draft).
 
 const DEFAULT_GAMES := 100
 const DEFAULT_MAP_SIZE := 3
@@ -27,13 +28,15 @@ func _initialize() -> void:
 	var out_dir := _parse_string("--out-dir", "")
 	var seed_offset := _parse_int("--seed-offset", 0)
 	var play_sims := _has_flag("--play-sims")
+	var draft_mode := _parse_string("--draft", "random")
 
 	var runner = load("res://scripts/balance/ai_duel_runner.gd")
 	var report = load("res://scripts/balance/ai_duel_report.gd")
 	if out_dir.is_empty():
 		out_dir = report.make_run_dir()
 	var batch: Dictionary = runner.run_batch(
-		games, map_size, budget, verbose, out_dir, brain_a, brain_b, mirror, seed_offset, play_sims
+		games, map_size, budget, verbose, out_dir, brain_a, brain_b, mirror, seed_offset, play_sims,
+		draft_mode
 	)
 	runner.print_report(batch)
 	quit(0)
@@ -73,11 +76,12 @@ func _print_help() -> void:
 	print("Usage:")
 	print("  ./run_ai_duel.sh [--games N] [--map-size 3|4|5] [--budget N]")
 	print("    [--brain-a ID] [--brain-b ID] [--no-mirror] [--seed-offset N] [--play-sims]")
-	print("    [--verbose] [--out-dir PATH]")
+	print("    [--verbose] [--out-dir PATH] [--draft random|mirror]")
 	print("")
 	print("Options:")
 	print("  --games N      Seed scenarios to run (default: %d)" % DEFAULT_GAMES)
 	print("                 With mirror (default), each seed plays twice with brains swapped.")
+	print("  --draft MODE   random (default) or mirror: both teams get the same army")
 	print("  --map-size N   Hex map radius (default: %d)" % DEFAULT_MAP_SIZE)
 	print("  --budget N     Gold per side (default: %d)" % DEFAULT_BUDGET)
 	print("  --brain-a ID   Brain on side A (default: %s)" % DEFAULT_BRAIN)
@@ -89,4 +93,4 @@ func _print_help() -> void:
 	print("  --out-dir PATH Folder for matches.csv + legions.csv (default: data/ai_duel/run_<timestamp>)")
 	print("  --help         Show this help")
 	print("")
-	print("Known brains: cascade, utility, utility_hand, utility:<profile.json>, curriculum_pass, curriculum_greedy")
+	print("Known brains: cascade, utility, utility_hand (plans whole turns), utility_hand_greedy, utility_v0, utility_evolved, utility:<profile.json>, curriculum_pass, curriculum_greedy")

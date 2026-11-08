@@ -8,6 +8,7 @@ const AiActionScorer = preload("res://scripts/ai/ai_action_scorer.gd")
 const MoveReachability = preload("res://scripts/battle/move_reachability.gd")
 const ThreatMapScript = preload("res://scripts/ai/threat/threat_map.gd")
 const Utils = preload("res://scripts/core/utils.gd")
+const AiTeamPlanScript = preload("res://scripts/ai/utility/ai_team_plan.gd")
 
 var session
 var legion: Legion
@@ -21,6 +22,7 @@ var threat = null
 ## Walking distance (steps) from the focus legion over walkable tiles; legions are passable.
 var focus_field: Dictionary = {}
 var unreachable_dist: float = 0.0
+var _team_plan = null
 
 static func build(p_session, p_legion: Legion) -> AiContext:
 	var ctx := AiContext.new()
@@ -118,3 +120,9 @@ func dist_to_focus(from_coords: Vector2i) -> float:
 	if focus_field.has(from_coords):
 		return float(focus_field[from_coords])
 	return unreachable_dist
+
+## Built on first use: only combat candidates need it.
+func team_plan():
+	if _team_plan == null:
+		_team_plan = AiTeamPlanScript.new().setup(session, legion)
+	return _team_plan

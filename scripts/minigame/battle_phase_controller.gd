@@ -9,8 +9,11 @@ const BattleHostWiringScript = preload("res://scripts/battle/battle_host_wiring.
 const BattleActionLogFormatterScript = preload("res://scripts/battle/battle_action_log_formatter.gd")
 const MatchBattleStats = preload("res://scripts/battle/match_battle_stats.gd")
 const AiBrainCommand = preload("res://scripts/ai/ai_brain_command.gd")
+const TurnSimSession = preload("res://scripts/ai/planning/turn_sim_session.gd")
 
 const AI_LEGION_DELAY := 0.5
+## Cap on whole-turn planning per AI step (it runs on a worker thread; see _ai_sort_actionable).
+const AI_PLAN_TIME_BUDGET_MS := 800
 
 signal ai_turn_finished
 
@@ -26,6 +29,8 @@ func _init(phase_deps: MinigamePhaseDeps) -> void:
 func enter() -> void:
 	# Opponent chosen in Play setup (Vs AI / AI vs AI).
 	ai_brain = AiBrainRegistry.create(GameSettings.match_ai_brain)
+	if bool(ai_brain.get("turn_planning")):
+		ai_brain.plan_time_budget_ms = AI_PLAN_TIME_BUDGET_MS
 	deps.tile_info_panel.set_draft_mode(false)
 	deps.tile_info_panel.hide()
 	if deps.legion_strip:
@@ -293,10 +298,9 @@ func _run_ai_turn_async() -> void:
 		deps.session.phase == MinigameSessionScript.Phase.BATTLE
 		and deps.is_ai_team(deps.session.turn_manager.active_team_id)
 	):
-		var actionable := ai_brain.sort_actionable(
-			deps.session,
-			deps.session.get_actionable_coords()
-		)
+		var actionable: Array[Vector2i] = await _ai_sort_actionable()
+		if not _host_alive():
+			return
 		if actionable.is_empty():
 			if AttackNearestEnemyBehavior.debug_enabled:
 				print(
@@ -374,6 +378,30 @@ func _run_ai_turn_async() -> void:
 	ai_turn_finished.emit()
 	if deps.session.phase == MinigameSessionScript.Phase.BATTLE and deps.is_ai_team(deps.session.turn_manager.active_team_id):
 		maybe_start_ai_turn()
+
+## Brains that plan whole turns think for a noticeable moment: score a copy of the board
+## on a worker thread and keep rendering. The brain's caches are keyed by tile and board
+## content, so its choice for the copy carries over to decide() on the live board.
+func _ai_sort_actionable() -> Array[Vector2i]:
+	var live = deps.session
+	if not bool(ai_brain.get("turn_planning")):
+		return ai_brain.sort_actionable(live, live.get_actionable_coords())
+	live.prune_stale_legions()
+	var sim = TurnSimSession.clone_from(live)
+	var result := {}
+	var brain := ai_brain
+	var task_id := WorkerThreadPool.add_task(func() -> void:
+		result["order"] = brain.sort_actionable(sim, sim.get_actionable_coords())
+	)
+	while not WorkerThreadPool.is_task_completed(task_id):
+		if not _host_alive():
+			break
+		await deps.host.get_tree().process_frame
+	WorkerThreadPool.wait_for_task_completion(task_id)
+	var order: Array[Vector2i] = []
+	for c in result.get("order", []):
+		order.append(c)
+	return order
 
 func _host_alive() -> bool:
 	return is_instance_valid(deps.host) and deps.host.is_inside_tree()
