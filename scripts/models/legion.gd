@@ -29,6 +29,9 @@ var waited: bool = false
 var action_cooldowns: Dictionary = {}
 ## Skip one tick after start so cooldown 1 blocks the next full turn.
 var _cooldown_skip_tick: Dictionary = {}
+## Status effects on this legion: [{"id", "stacks", "turns_left", "source_team"}, ...].
+## Use scripts/effects/status_effects.gd to apply / query / remove.
+var statuses: Array[Dictionary] = []
 ## False for headless simulation: skip EventBus autoload emits (unsafe off the main thread).
 var emit_global_events: bool = true
 

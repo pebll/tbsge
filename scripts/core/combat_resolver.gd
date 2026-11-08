@@ -1,6 +1,8 @@
 class_name CombatResolver
 extends RefCounted
 
+const StatusEffects = preload("res://scripts/effects/status_effects.gd")
+
 const MODE_MELEE := "melee"
 const MODE_RANGED := "ranged"
 
@@ -49,6 +51,8 @@ static func resolve_combat(
 
 	var hits: Array = []
 	var deaths: Array = []
+	var status_events: Array = []
+	var with_statuses := StatusEffects.any_statuses(attacking_legion, defending_legion)
 
 	# Track which specific Unit objects already attacked (no unit hits twice per combat).
 	var attacked := {}
@@ -86,6 +90,10 @@ static func resolve_combat(
 		var target_unit: Unit = current_defender_legion.units[target_index]
 
 		var raw_damage := _strike_damage(attacker_unit, mode)
+		if with_statuses:
+			raw_damage = StatusEffects.strike_damage(
+				current_attacker_legion, attacker_unit, current_defender_legion, target_unit, mode, raw_damage
+			)
 		var shield_result := target_unit.absorb_damage(raw_damage)
 		var damage: float = shield_result["applied"]
 		var shield_absorbed: float = shield_result["absorbed"]
@@ -128,6 +136,8 @@ static func resolve_combat(
 		})
 
 		attacked[attacker_unit] = true
+		if with_statuses:
+			status_events.append_array(StatusEffects.after_hit(hits[hits.size() - 1]))
 
 		if target_unit.current_health <= 0:
 			# Dies immediately and will never attack later.
@@ -137,6 +147,8 @@ static func resolve_combat(
 				"legion": current_defender_legion,
 				"unit": target_unit,
 			})
+			if with_statuses:
+				status_events.append_array(StatusEffects.after_death(current_defender_legion, target_unit))
 
 		hit_index += 1
 
@@ -149,6 +161,8 @@ static func resolve_combat(
 	return {
 		"hits": hits,
 		"deaths": deaths,
+		## Effects triggered by status hooks during this fight (StatusEffects event shape).
+		"status_events": status_events,
 		"combat_mode": mode,
 		"distance": distance,
 	}

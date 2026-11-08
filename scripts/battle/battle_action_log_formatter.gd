@@ -1,6 +1,8 @@
 class_name BattleActionLogFormatter
 extends RefCounted
 
+const StatusEffectsScript = preload("res://scripts/effects/status_effects.gd")
+
 ## Build a structured battle-log entry from a successful session apply result.
 ## UI is icon/number-first; keep summaries mainly for tooltips/tests.
 
@@ -113,6 +115,60 @@ static func team_turn_number(global_turn_index: int) -> int:
 	return maxi(1, int(ceili(float(global_turn_index) / 2.0)))
 
 ## Kept for call sites that still pass ending-team context; logs the *next* turn start.
+## One card per status event: action_id "status:<id>", the affected legion as the
+## caster side (HP lost / healed / deaths), and a sentence for the inspect panel.
+static func from_status_event(session: MatchSession, ev: Dictionary) -> Dictionary:
+	if ev.is_empty():
+		return {}
+	var status_id := String(ev.get("status_id", ""))
+	var legion: Legion = ev.get("legion")
+	var name := StatusEffectsScript.label(status_id)
+	var who := _legion_summary(legion)
+	var kind := String(ev.get("kind", ""))
+	var amount := int(round(float(ev.get("amount", 0.0))))
+	var summary := ""
+	match kind:
+		"applied":
+			summary = "%s: %s (%s)" % [name, who, _turns_text(int(ev.get("turns_left", -1)))]
+		"expired":
+			summary = "%s wore off: %s" % [name, who]
+		"damage":
+			summary = "%s: %s lost %d HP%s" % [name, who, amount, " (unit died)" if bool(ev.get("died", false)) else ""]
+		"heal":
+			summary = "%s: %s healed %d HP" % [name, who, amount]
+	var team := String(ev.get("team_id", ""))
+	var coords: Vector2i = legion.tile_coords if legion else Vector2i.ZERO
+	var entry := _entry(
+		session,
+		"status:" + status_id,
+		coords,
+		coords,
+		who,
+		"",
+		summary,
+		{"status_kind": kind, "status_id": status_id},
+		String(ev.get("unit_type", "")),
+		"",
+		team,
+		""
+	)
+	entry["status_kind"] = kind
+	entry["caster_hp_lost"] = amount if kind == "damage" else 0
+	entry["caster_deaths"] = 1 if bool(ev.get("died", false)) else 0
+	entry["caster_wiped"] = legion != null and legion.units.is_empty()
+	entry["target_hp_lost"] = 0
+	entry["target_deaths"] = 0
+	entry["target_wiped"] = false
+	entry["healed_total"] = amount if kind == "heal" else 0
+	entry["show_coords"] = false
+	entry["coord_text"] = ""
+	return entry
+
+static func _turns_text(turns_left: int) -> String:
+	if turns_left < 0:
+		return "until removed"
+	return "%d turn%s" % [turns_left, "" if turns_left == 1 else "s"]
+
 static func from_end_turn(
 	session: MatchSession,
 	_ending_team: String,

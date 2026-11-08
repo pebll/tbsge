@@ -22,4 +22,6 @@ static func clone_legion(legion: Legion) -> Legion:
 			copy.units.append(clone_unit(unit))
 	copy.max_ap = legion.max_ap
 	copy.current_ap = legion.current_ap
+	for e in legion.statuses:
+		copy.statuses.append(e.duplicate(true))
 	return copy
