@@ -11,6 +11,9 @@ const MinigameRulesScript = preload("res://scripts/minigame/minigame_rules.gd")
 const ActionParams = preload("res://scripts/actions/action_params.gd")
 const HypotheticalPosition = preload("res://scripts/ai/hypothetical_position.gd")
 const AiTeamPlanScript = preload("res://scripts/ai/utility/ai_team_plan.gd")
+const AiCandidateGen = preload("res://scripts/ai/utility/ai_candidate_gen.gd")
+const StatusEffectsScript = preload("res://scripts/effects/status_effects.gd")
+const StatusDefsScript = preload("res://scripts/effects/status_defs.gd")
 
 ## Combat estimate for one (attacker, defender, action, from, to). `sim_count` < 0 falls back to the
 ## global default. A non-null `memo` (owned by the caller, one board snapshot) caches estimates;
@@ -77,7 +80,8 @@ static func extract(
 	feats[AiFeatureNames.IS_COMBAT] = 1.0 if action_id in ["melee_attack", "ranged_attack"] else 0.0
 	feats[AiFeatureNames.IS_HEAL] = 1.0 if action_id in ["self_heal", "heal_ally"] else 0.0
 
-	var terminal := action_id in ["melee_attack", "ranged_attack", "self_heal", "heal_ally", "teleport"]
+	var is_status := action_id in AiCandidateGen.status_action_ids([action_id])
+	var terminal := is_status or action_id in ["melee_attack", "ranged_attack", "self_heal", "heal_ally", "teleport"]
 	feats[AiFeatureNames.IS_TERMINAL] = 1.0 if terminal else 0.0
 
 	var move_cost := 0
@@ -108,15 +112,22 @@ static func extract(
 		_fill_combat(session, legion, ctx, stand, target_coords, action_id, feats, sim_count, memo)
 	elif action_id in ["self_heal", "heal_ally"]:
 		_fill_heal(session, legion, stand, target_coords, action_id, feats)
+	elif is_status:
+		_fill_status(session, legion, ctx, stand, target_coords, action_id, feats)
 	elif action_id == "teleport":
 		feats[AiFeatureNames.ENABLES_ATTACK] = (
-			1.0 if _has_combat_from(session, legion, stand) else 0.0
+			offense_weight(legion, ctx) if _has_combat_from(session, legion, stand) else 0.0
 		)
 	elif cand.action_id == "move":
 		feats[AiFeatureNames.ENABLES_ATTACK] = (
-			1.0 if not cand.followup_action_id.is_empty() or _has_combat_from(session, legion, stand)
+			offense_weight(legion, ctx)
+			if not cand.followup_action_id.is_empty() or _has_combat_from(session, legion, stand)
 			else 0.0
 		)
+		if not cand.followup_action_id.is_empty() and cand.followup_action_id in AiCandidateGen.status_action_ids([cand.followup_action_id]):
+			_fill_status(session, legion, ctx, stand, cand.followup_to, cand.followup_action_id, feats)
+			feats[AiFeatureNames.IS_MOVE] = 0.0
+			feats[AiFeatureNames.IS_TERMINAL] = 1.0
 		if not cand.followup_action_id.is_empty() and cand.followup_action_id in ["melee_attack", "ranged_attack"]:
 			_fill_combat(
 				session, legion, ctx, stand, cand.followup_to, cand.followup_action_id, feats,
@@ -246,6 +257,64 @@ static func team_finish(ctx: AiContext, defender: Legion, est: Dictionary) -> fl
 	)
 	var not_wiped := 1.0 - clampf(float(est.get("wipe_prob", 0.0)), 0.0, 1.0)
 	return not_wiped * clampf(plan.followup_damage(defender) / left, 0.0, 1.0)
+
+## Value of putting the action's status on the target, as damage per strike changed:
+## an ally's extra damage while it can still strike (this turn if it hasn't acted, and its
+## next turn), or the damage a threatening enemy won't deal on its next turn. Over an
+## average legion's HP on the receiving side, clamped to [0, 1].
+static func _fill_status(
+	session, legion: Legion, ctx: AiContext, _from: Vector2i, to_coords: Vector2i,
+	action_id: String, feats: Dictionary
+) -> void:
+	var action = ActionDefs.get_def(action_id)
+	var target: Legion = legion if to_coords == legion.tile_coords else session.get_legion_at(to_coords)
+	if action == null or target == null:
+		return
+	var stacks := ActionParams.resolve_int(legion, action, "status_stacks", action.status_stacks)
+	var def = StatusDefsScript.get_def(action.status_id)
+	var existing := StatusEffectsScript.stacks_of(target, action.status_id)
+	var gain := float(stacks if (def != null and def.stacking == "add") else maxi(0, stacks - existing))
+	if gain <= 0.0:
+		return
+	var strikers := float(target.units.size())
+	var value := 0.0
+	if target.team_id == legion.team_id:
+		var turns := 1.0
+		if target != legion and session.can_act_legion(target):
+			turns += 1.0
+		value = gain * strikers * turns / maxf(1.0, _avg_legion_hp(ctx.enemies))
+	else:
+		var threatens := false
+		var ours: Array = ctx.allies.duplicate()
+		ours.append(legion)
+		for L in ours:
+			if ctx.threat != null and ctx.threat.enemy_strike_on(target, L.tile_coords) > 0.0:
+				threatens = true
+				break
+		value = gain * strikers * (1.0 if threatens else 0.3) / maxf(1.0, _avg_legion_hp(ours))
+	feats[AiFeatureNames.STATUS_VALUE] = clampf(value, 0.0, 1.0)
+	# Only a status that changes something counts as "doing something" (no idle casting).
+	feats[AiFeatureNames.IS_STATUS] = 1.0 if value > 0.0 else 0.0
+
+## How much "this move lets me attack" is worth for this legion, in [0.5, 1]: full for a
+## legion whose strikes take a quarter of an average enemy legion's HP or more, half for
+## one that barely scratches (support casters), so walking into a fight never outranks
+## the support action they exist for.
+static func offense_weight(legion: Legion, ctx: AiContext) -> float:
+	var power := 0.0
+	for u in legion.units:
+		if u:
+			power += maxf(float(u.attack), float(u.ranged_attack))
+	var ref := 0.25 * _avg_legion_hp(ctx.enemies) if ctx != null else 1.0
+	return clampf(0.5 + 0.5 * power / maxf(1.0, ref), 0.5, 1.0)
+
+static func _avg_legion_hp(legions: Array) -> float:
+	if legions.is_empty():
+		return 1.0
+	var t := 0.0
+	for L in legions:
+		t += _total_hp(L)
+	return t / float(legions.size())
 
 static func _fill_heal(
 	session,

@@ -143,7 +143,10 @@ static func resolve_combat(
 
 		attacked[attacker_unit] = true
 		if with_statuses:
-			status_events.append_array(StatusEffects.after_hit(hits[hits.size() - 1]))
+			var hit_events: Array = StatusEffects.after_hit(hits[hits.size() - 1])
+			# Also on the hit row, so playback can show lifesteal / poison on that strike.
+			hits[hits.size() - 1]["status_events"] = hit_events
+			status_events.append_array(hit_events)
 
 		if target_unit.current_health <= 0:
 			# Dies immediately and will never attack later.

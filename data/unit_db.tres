@@ -9,7 +9,13 @@
 [ext_resource type="Resource" path="res://data/units/mage.tres" id="7_mage"]
 [ext_resource type="Resource" path="res://data/units/assassin.tres" id="8_assassin"]
 [ext_resource type="Resource" path="res://data/units/scorpion_rider.tres" id="9_scorpion_rider"]
+[ext_resource type="Resource" path="res://data/units/venom_archer.tres" id="10_venom_archer"]
+[ext_resource type="Resource" path="res://data/units/treant.tres" id="11_treant"]
+[ext_resource type="Resource" path="res://data/units/shadow_dog.tres" id="12_shadow_dog"]
+[ext_resource type="Resource" path="res://data/units/axeman.tres" id="13_axeman"]
+[ext_resource type="Resource" path="res://data/units/rat_shaman.tres" id="14_rat_shaman"]
+[ext_resource type="Resource" path="res://data/units/rat_sorcerer.tres" id="15_rat_sorcerer"]
 
 [resource]
 script = ExtResource("1_db")
-defs = Array[Resource]([ExtResource("2_goblin"), ExtResource("3_gargoyle"), ExtResource("4_golem"), ExtResource("5_archer"), ExtResource("6_spider"), ExtResource("7_mage"), ExtResource("8_assassin"), ExtResource("9_scorpion_rider")])
+defs = Array[Resource]([ExtResource("2_goblin"), ExtResource("3_gargoyle"), ExtResource("4_golem"), ExtResource("5_archer"), ExtResource("6_spider"), ExtResource("7_mage"), ExtResource("8_assassin"), ExtResource("9_scorpion_rider"), ExtResource("10_venom_archer"), ExtResource("11_treant"), ExtResource("12_shadow_dog"), ExtResource("13_axeman"), ExtResource("14_rat_shaman"), ExtResource("15_rat_sorcerer")])

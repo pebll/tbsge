@@ -23,6 +23,10 @@ const TEAM_FINISH := "team_finish"
 ## Move: a swap that pulls a softer (wounded / ranged / support) ally out of enemy reach
 ## and puts this sturdier legion there instead.
 const COVER_ALLY := "cover_ally"
+## Status actions (Rally, Curse): damage the status adds to an ally's strikes or removes
+## from a threatening enemy's, over an average legion's HP.
+const STATUS_VALUE := "status_value"
+const IS_STATUS := "is_status"
 const FOCUS_SUPPORT := "focus_support"
 const FOCUS_LOW_HP := "focus_low_hp"
 const HEAL_EFFICIENCY := "heal_efficiency"
@@ -54,6 +58,8 @@ static func all_names() -> Array[String]:
 		LOW_HP_EXPOSURE,
 		TEAM_FINISH,
 		COVER_ALLY,
+		STATUS_VALUE,
+		IS_STATUS,
 		FOCUS_SUPPORT,
 		FOCUS_LOW_HP,
 		HEAL_EFFICIENCY,

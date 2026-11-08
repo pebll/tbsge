@@ -38,6 +38,9 @@ static func hand_v1() -> AiProfile:
 		AiFeatureNames.LOW_HP_EXPOSURE: -4.0,
 		AiFeatureNames.TEAM_FINISH: 3.0,
 		AiFeatureNames.COVER_ALLY: 4.0,
+		# Same scale as combat: adding X damage ~ dealing X; is_status mirrors is_combat.
+		AiFeatureNames.STATUS_VALUE: 25.0,
+		AiFeatureNames.IS_STATUS: 4.0,
 		AiFeatureNames.FOCUS_SUPPORT: 1.5,
 		AiFeatureNames.FOCUS_LOW_HP: 2.0,
 		AiFeatureNames.HEAL_EFFICIENCY: 3.0,

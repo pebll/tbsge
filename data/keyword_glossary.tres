@@ -39,7 +39,7 @@ entries = {
 },
 "tag_support": {
 "label": "Support",
-"definition": "Heals allied legions."
+"definition": "Helps allies or hinders enemies: heals, buffs or curses."
 },
 "tag_shielded": {
 "label": "Shielded",
@@ -64,5 +64,21 @@ entries = {
 "tag_flyer": {
 "label": "Flyer",
 "definition": "Flies over terrain (coming with terrain in 0.3)."
+},
+"trait_regeneration": {
+"label": "Regeneration",
+"definition": "Each unit heals at the start of its own turn."
+},
+"trait_lifesteal": {
+"label": "Lifesteal",
+"definition": "Each unit heals half the HP its strikes take."
+},
+"trait_pierce": {
+"label": "Pierce",
+"definition": "Strikes ignore and break shields."
+},
+"trait_poison_on_hit": {
+"label": "Poison strikes",
+"definition": "Each landed strike adds a stack of Poison to the target."
 }
 }

@@ -9,6 +9,8 @@ const CombatSimSnapshot = preload("res://scripts/battle/combat_sim_snapshot.gd")
 const HexPathfinder = preload("res://scripts/ai/hex_pathfinder.gd")
 const CombatSampler = preload("res://scripts/battle/combat_sampler.gd")
 
+## Weight of damage-over-time left behind by a fight (e.g. poison) vs damage dealt now.
+const FUTURE_LOSS_WEIGHT := 0.7
 ## Default N for EA / headless fitness evaluation.
 const TRAIN_SIM_COUNT := 2
 ## Default N for in-game UtilityBrain decisions.
@@ -68,8 +70,10 @@ static func estimate_combat(
 
 	for row in CombatSampler.sample(attacker, defender, mode, distance, n):
 		var enemy_kills := float(row["enemy_deaths"])
-		enemy_loss_samples.append(float(row["enemy_hp_lost"]))
-		own_loss_samples.append(float(row["own_hp_lost"]))
+		# Damage over time the fight leaves behind (poison) counts, discounted: the target
+		# may be healed or the match may end first.
+		enemy_loss_samples.append(float(row["enemy_hp_lost"]) + FUTURE_LOSS_WEIGHT * float(row.get("enemy_future_loss", 0.0)))
+		own_loss_samples.append(float(row["own_hp_lost"]) + FUTURE_LOSS_WEIGHT * float(row.get("own_future_loss", 0.0)))
 		enemy_kill_samples.append(enemy_kills)
 		own_kill_samples.append(float(row["own_deaths"]))
 		if enemy_kills >= 1.0:

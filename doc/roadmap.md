@@ -51,11 +51,14 @@ Goal: the AI feels smart in battle. See [`design/ai.md`](design/ai.md) and [`uti
 
 ### 0.2 — More effects
 Per-effect dev flow: effect → legion → test → AI → AI test. See [`design/combat.md`](design/combat.md).
-- [ ] Regeneration
-- [ ] Lifesteal
-- [ ] Pierce (break shield)
-- [ ] Attack buff / debuff
-- [ ] Poison (ticks at the poisoned legion's turn start, N turns)
+- [x] Regeneration: **Treant** (trait, +3 HP per unit at its turn start)
+- [x] Lifesteal: **Shadow Hound** (trait, heals 50% of the HP its strikes take)
+- [x] Pierce (break shield): **Axeman** (trait, strikes ignore and break shields)
+- [x] Attack buff / debuff: **Rat Shaman** casts *Rally* (Empowered: +2 per strike, 2 turns, range 2, self included); **Rat Sorcerer** casts *Curse* (Weakened: -3 per strike on its next turn, range 3)
+- [x] Poison: **Venom Archer** (each landed arrow adds a stack; every unit loses 1 HP per stack at its turn start; 2 turns, stacks add up to 5)
+- [x] AI: Rally/Curse candidates + `status_value` feature; poison counted in fight estimates; planner values poison/regeneration to come; threat map reads Empowered/Weakened; `enables_attack` scaled by the legion's punch (support casters don't wander into fights). Benchmarks vs `utility_v0` 45-19, vs cascade 27-3 decisive pairs
+- [ ] Icons for Poison / Weakened statuses and for unit traits (badges use colour + letter for now)
+- [ ] Balance pass for the six new units (prices/stats are first guesses)
 
 ### 0.3 — Terrain
 - [ ] More terrains: swamp, hill?, badlands, flower grass, jungle, tundra

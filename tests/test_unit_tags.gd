@@ -36,7 +36,7 @@ func _check_unit(def: UnitDefinition) -> bool:
 	var ids: Array = ActionDefs.unit_type_action_ids(def.id)
 	var derived := {
 		UnitTags.RANGED: def.has_ranged(),
-		UnitTags.SUPPORT: "heal_ally" in ids,
+		UnitTags.SUPPORT: "heal_ally" in ids or "rally" in ids or "curse" in ids,
 		UnitTags.SHIELDED: def.shield > 0,
 		UnitTags.MOBILE: def.ap >= 3 or "teleport" in ids,
 	}

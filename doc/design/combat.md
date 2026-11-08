@@ -39,11 +39,11 @@ Targeting inside a legion stays **random** (decided 2026-11-07); effects such as
 | Teleport | ✅ | |
 | Status-effect visualisation | 🎯 0.2 | Prerequisite for every status below |
 | Flying | 🎯 0.3 | Moved to terrain milestone (decided 2026-11-07); rules designed with terrain |
-| Regeneration | 🎯 0.2 | Heal X at the start of own turn |
-| Lifesteal | 🎯 0.2 | % of HP damage dealt → heal own lowest unit |
-| Pierce / shieldbreak | 🎯 0.2 | Ignores or destroys the shield |
-| Attack buff / debuff | 🎯 0.2 | First real status with a duration |
-| Poison | 🎯 0.2 | Ticks at the start of the poisoned legion's turn, for N turns (decided 2026-11-07) |
+| Regeneration | ✅ 0.2 | Unit trait. Treant: +3 HP per unit at the start of its own turn |
+| Lifesteal | ✅ 0.2 | Unit trait. Shadow Hound: the striking unit heals 50% of the HP its strike took |
+| Pierce / shieldbreak | ✅ 0.2 | Unit trait. Axeman: strikes ignore the shield and break it |
+| Attack buff / debuff | ✅ 0.2 | Statuses Empowered (+N per strike) and Weakened (-N per strike), applied by the Rally (Rat Shaman) and Curse (Rat Sorcerer) actions |
+| Poison | ✅ 0.2 | Status. Venom Archer arrows add a stack per landed hit; each unit loses 1 HP per stack at the start of the poisoned legion's turn, for 2 turns (stacks add, max 5) |
 | Freeze | 🎯 0.4 | Skip next turn / no move |
 | Scare | 🎯 0.4 | Target must move away; needs pathing rules |
 | Summon | 🎯 0.4 | Needs free slots in a legion → depends on mixing (data model done in 0.1.5) |
@@ -60,6 +60,13 @@ Targeting inside a legion stays **random** (decided 2026-11-07); effects such as
 | AoE | 💡 | Heal/damage **each** unit in the legion |
 | First strike | 💡 | Strike order modifier |
 | Water units | 💡 | Siren, boat; needs water terrain to be walkable for some units |
+
+## Unit traits (0.2)
+
+- Traits are **passive, per-unit abilities** in `UnitDefinition.traits`: regeneration, lifesteal, pierce and poison_on_hit (`scripts/effects/unit_traits.gd`).
+- They run from the same hook points as statuses, so mixed legions work per unit.
+- Statuses are temporary and sit on the legion; traits are permanent and belong to the unit type.
+- **Status actions:** `TargetingKind.STATUS_ALLY` / `STATUS_ENEMY` with `status_id`, `status_stacks` and `status_turns` on the `ActionDefinition` (Rally, Curse). A new buff or debuff is just data.
 
 ## Status-effect framework (0.1.5, implemented)
 
