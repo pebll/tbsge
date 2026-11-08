@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="UnitDefinition" format=3]
+
+[ext_resource type="Script" uid="uid://xdkpld8vue81" path="res://scripts/resources/unit_definition.gd" id="1_def"]
+[ext_resource type="Texture2D" path="res://assets/units_v2/done/vermine_sprites/rat_mage.png" id="2_icon"]
+
+[resource]
+script = ExtResource("1_def")
+id = "RAT_SHAMAN"
+display_name = "Rat Shaman"
+max_health = 7
+attack = 1
+size = 1.0
+price = 5
+tags = Array[String](["support"])
+action_ids = Array[String](["move", "melee_attack", "self_heal", "rally"])
+icon = ExtResource("2_icon")

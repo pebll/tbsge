@@ -3,6 +3,7 @@ extends RefCounted
 
 const ActionDefinitionScript = preload("res://scripts/actions/action_definition.gd")
 const BattleStateScript = preload("res://scripts/actions/battle_state.gd")
+const HexPathfinder = preload("res://scripts/ai/hex_pathfinder.gd")
 
 static func available_actions(state: BattleStateScript, legion: Legion) -> Array[ActionDefinitionScript]:
 	var out: Array[ActionDefinitionScript] = []
@@ -103,7 +104,24 @@ static func get_targets(
 		ActionDefinitionScript.TargetingKind.EMPTY_IN_RANGE:
 			var rng := ActionParams.resolve_int(legion, action, "target_range", action.target_range)
 			return _coords_from_tiles(Utils.get_empty_tiles_in_range(from_tile, state.grid, rng))
+		ActionDefinitionScript.TargetingKind.STATUS_ALLY, ActionDefinitionScript.TargetingKind.STATUS_ENEMY:
+			var rng := ActionParams.resolve_int(legion, action, "target_range", action.target_range)
+			var want_ally := action.targeting == ActionDefinitionScript.TargetingKind.STATUS_ALLY
+			return _status_targets(state, legion, rng, want_ally)
 	return []
+
+## Legions within range (allies include this legion; distance 0) for status actions.
+static func _status_targets(state: BattleStateScript, legion: Legion, rng: int, want_ally: bool) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for coords in state.grid.keys():
+		var t: Tile = state.grid[coords]
+		if t == null or not t.has_legion() or t.legion.units.is_empty():
+			continue
+		if (t.legion.team_id == legion.team_id) != want_ally:
+			continue
+		if HexPathfinder.hex_distance(legion.tile_coords, t.coords) <= rng:
+			out.append(t.coords)
+	return out
 
 static func _move_targets(state: BattleStateScript, from_tile: Tile, legion: Legion) -> Array[Vector2i]:
 	var out: Array[Vector2i] = []

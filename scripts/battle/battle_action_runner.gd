@@ -98,6 +98,15 @@ func play_result(
 		_call_hook(hooks, "on_finished")
 		return true
 
+	if "status_applied" in events:
+		# Rally / Curse: a squish on the target and its new badge.
+		var target_visu = presenter.get_legion_visu(payload.get("target_legion"))
+		if target_visu:
+			target_visu.juice_squish()
+			target_visu.sync_status_badges()
+		_call_hook(hooks, "deselect")
+		_call_hook(hooks, "clear_overlays")
+
 	var refresh_coords := from_coords
 	if "legion_moved" in events or "legions_swapped" in events:
 		refresh_coords = to_coords

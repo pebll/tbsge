@@ -356,7 +356,7 @@ func _unit_tooltip_payload_for(u: Unit) -> Dictionary:
 	var title := def.display_name if def and not def.display_name.is_empty() else u.unit_type
 	return {
 		"title": title,
-		"subtitle": UnitTags.labels_line(UnitTags.for_type(u.unit_type)),
+		"subtitle": UnitTags.descriptor_line_for_type(u.unit_type),
 		"rows": UiStatIcons.unit_stat_rows(u, _legion),
 	}
 

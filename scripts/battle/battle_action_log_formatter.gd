@@ -26,7 +26,7 @@ static func from_use_action(session: MatchSession, result: Dictionary) -> Dictio
 
 	var target_unit_type := ""
 	var target_legion: Legion = null
-	if action_id == "heal_ally":
+	if action_id == "heal_ally" or "status_applied" in events:
 		target_legion = payload.get("target_legion", session.get_legion_at(to))
 		if target_legion:
 			target_unit_type = target_legion.unit_type
@@ -327,6 +327,15 @@ static func _result_summary_for_action(action_id: String, payload: Dictionary, e
 		return "teleported"
 	if "combat_resolved" in events:
 		return _combat_result_summary(payload.get("combat", {}))
+	if "status_applied" in events:
+		var evs: Array = payload.get("status_events", [])
+		if not evs.is_empty():
+			var ev: Dictionary = evs[0]
+			return "%s ×%d (%s)" % [
+				StatusEffectsScript.label(String(ev.get("status_id", ""))),
+				int(ev.get("stacks", 1)),
+				_turns_text(int(ev.get("turns_left", -1))),
+			]
 	if action_id == "pass":
 		return "waited"
 	if action_id == "end_turn" or action_id == "turn_start":

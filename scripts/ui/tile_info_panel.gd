@@ -294,7 +294,7 @@ func _render_legion(legion: Legion) -> void:
 	_apply_team_accent(legion.team_id)
 	legion_block.show()
 	legion_name.text = legion.display_name().to_upper() if legion.is_mixed() else _format_legion_title(legion.unit_type)
-	_set_tags_line(UnitTags.labels_line(UnitTags.for_legion(legion)))
+	_set_tags_line(UnitTags.descriptor_line_for_legion(legion))
 
 	var unit0: Unit = legion.units[0] if legion.units.size() > 0 else null
 	if unit0:

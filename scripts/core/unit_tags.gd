@@ -7,7 +7,7 @@ extends RefCounted
 ## tests/test_unit_tags.gd; armored / swarm / striker are design judgment (guidelines below).
 
 const RANGED := "ranged"      ## can shoot (ranged attack)
-const SUPPORT := "support"    ## heals allies
+const SUPPORT := "support"    ## heals, buffs allies or curses enemies
 const SHIELDED := "shielded"  ## shield absorbs the first hit each turn
 const ARMORED := "armored"    ## high HP per unit (about 16+)
 const SWARM := "swarm"        ## many cheap units (about price 4 or less)
@@ -55,4 +55,23 @@ static func labels_line(tags: Array[String]) -> String:
 	var parts: PackedStringArray = PackedStringArray()
 	for t in tags:
 		parts.append(label(t))
+	return " · ".join(parts)
+
+## Tags then abilities, for the info panel and unit tooltips: "Ranged · Poison strikes".
+static func descriptor_line_for_type(type_id: String) -> String:
+	var UnitTraitsScript = load("res://scripts/effects/unit_traits.gd")
+	var parts: PackedStringArray = PackedStringArray()
+	for t in for_type(type_id):
+		parts.append(label(t))
+	for k in UnitTraitsScript.for_type(type_id):
+		parts.append(UnitTraitsScript.label(k))
+	return " · ".join(parts)
+
+static func descriptor_line_for_legion(legion: Legion) -> String:
+	var UnitTraitsScript = load("res://scripts/effects/unit_traits.gd")
+	var parts: PackedStringArray = PackedStringArray()
+	for t in for_legion(legion):
+		parts.append(label(t))
+	for k in UnitTraitsScript.for_legion(legion):
+		parts.append(UnitTraitsScript.label(k))
 	return " · ".join(parts)

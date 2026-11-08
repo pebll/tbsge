@@ -3,7 +3,10 @@
 	"source": "data/ai/evolve/cur2/best_profile.json (GA run cur2, gen 42)",
 	"benchmark": "2026-11-07, held-out seeds, play sims: vs utility_hand 30 pairs = 50.0% (1-1 decisive, 28 split); vs cascade 40 pairs = 55.6% (5-0 decisive). hand_v1 vs cascade on the same seeds: 57.5% (7-1).",
 	"temperature": 0.0,
+	"note": "status_value / is_status (0.2 Rally/Curse) copied from hand_v1; not evolved.",
 	"weights": {
+		"status_value": 25.0,
+		"is_status": 4.0,
 		"closer_to_focus": 10.5994563598186,
 		"enables_attack": 7.23918987736107,
 		"enemy_kill_frac": 6.8502525523305,

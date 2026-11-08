@@ -8,6 +8,10 @@ enum TargetingKind {
 	ENEMY_IN_RANGE,
 	ALLY_IN_RANGE,
 	EMPTY_IN_RANGE,
+	## Apply `status_id` to an ally (or this legion) within target_range.
+	STATUS_ALLY,
+	## Apply `status_id` to an enemy within target_range.
+	STATUS_ENEMY,
 }
 
 @export var id: String = ""
@@ -23,6 +27,10 @@ enum TargetingKind {
 @export var target_range: int = 0
 ## Turns before this action can be used again (0 = no cooldown).
 @export var cooldown: int = 0
+## STATUS_ALLY / STATUS_ENEMY: the status applied, its stacks and duration (owner's turns).
+@export var status_id: String = ""
+@export var status_stacks: int = 1
+@export var status_turns: int = 1
 ## Plain-language tooltip; may include {heal}, {range}, {ap} tokens.
 @export_multiline var tooltip_body: String = ""
 ## Glossary keyword ids shown as chips (e.g. terminal, range, ally).

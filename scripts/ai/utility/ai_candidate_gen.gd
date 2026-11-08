@@ -66,7 +66,7 @@ static func _append_from_tile(
 	out: Array
 ) -> void:
 	var action_ids: Array = ActionDefs.legion_action_ids(legion)
-	for action_id in COMBAT_ACTIONS + HEAL_ACTIONS + RELOCATE_ACTIONS:
+	for action_id in COMBAT_ACTIONS + HEAL_ACTIONS + RELOCATE_ACTIONS + status_action_ids(action_ids):
 		if String(action_id) not in action_ids:
 			continue
 		var targets: Array = _targets_from(session, legion, at_coords, String(action_id))
@@ -86,6 +86,17 @@ static func _append_from_tile(
 				cand.to = to_coords
 				cand.reason = "utility %s -> %s" % [action_id, to_coords]
 			out.append(cand)
+
+## Actions that put a status on a legion (Rally, Curse, ...): any STATUS_* targeting.
+static func status_action_ids(action_ids: Array) -> Array[String]:
+	var out: Array[String] = []
+	for id in action_ids:
+		var def = ActionDefs.get_def(String(id))
+		if def != null and def.targeting in [
+			ActionDefinition.TargetingKind.STATUS_ALLY, ActionDefinition.TargetingKind.STATUS_ENEMY
+		]:
+			out.append(String(id))
+	return out
 
 static func _append_combat_plans_from(
 	session,

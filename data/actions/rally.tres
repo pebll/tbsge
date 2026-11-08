@@ -1,0 +1,22 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/actions/action_definition.gd" id="1_def"]
+[ext_resource type="Texture2D" path="res://assets/icons/base_icons_sprites/strong.png" id="2_icon"]
+
+[resource]
+script = ExtResource("1_def")
+id = "rally"
+display_name = "Rally"
+icon = ExtResource("2_icon")
+ap_cost = 1
+terminal = true
+targeting = 6
+overlay_state = "healable"
+target_range = 2
+cooldown = 1
+status_id = "empowered"
+status_stacks = 2
+status_turns = 2
+tooltip_body = "Empower an ally (or this legion) within {range} hexes: its strikes deal +2 damage this turn and next. Ends this legion's turn."
+keywords = Array[String](["terminal", "cooldown", "range", "ally"])
+select_hint = "Choose an ally to empower"

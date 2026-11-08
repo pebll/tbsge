@@ -16,6 +16,7 @@ const TurnSimSession = preload("res://scripts/ai/planning/turn_sim_session.gd")
 const AiBrainCommand = preload("res://scripts/ai/ai_brain_command.gd")
 const ThreatMapScript = preload("res://scripts/ai/threat/threat_map.gd")
 const MinigameRulesScript = preload("res://scripts/minigame/minigame_rules.gd")
+const StatusEffectsScript = preload("res://scripts/effects/status_effects.gd")
 
 ## First moves tried per legion, and in total per decision.
 var options_per_legion: int = 2
@@ -109,11 +110,22 @@ static func evaluate(sim, team: String, p_exposure_weight: float = 0.5) -> float
 	for L in sim.legions:
 		if L == null or L.units.is_empty():
 			continue
-		var v := army_value(L)
+		var v := army_value(L) + future_value_change(L)
 		value += v if L.team_id == team else -v
 	if p_exposure_weight > 0.0:
 		value -= p_exposure_weight * exposure(sim, team)
 	return value
+
+## Gold-equivalent of the HP the legion's effects will still cost or give (poison to come,
+## regeneration), at the legion's average gold per HP.
+static func future_value_change(L: Legion) -> float:
+	var delta := StatusEffectsScript.projected_hp_change(L)
+	if is_zero_approx(delta):
+		return 0.0
+	var hp := 0.0
+	for u in L.units:
+		hp += maxf(0.0, float(u.current_health))
+	return delta * army_value(L) / maxf(1.0, hp)
 
 static func army_value(L: Legion) -> float:
 	var t := 0.0

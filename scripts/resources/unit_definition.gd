@@ -42,6 +42,12 @@ enum ProjectileMotion {
 @export var sfx_death: AudioStream
 ## Empty = legion uses default move / melee_attack / ranged_attack / self_heal.
 @export var action_ids: Array[String] = []
+## Passive abilities, implemented in scripts/effects/unit_traits.gd:
+##   "regeneration": int  — each unit heals this much at the start of its own turn
+##   "lifesteal": float   — each unit heals this fraction of the HP its strikes take
+##   "pierce": bool       — strikes ignore and break shields
+##   "poison_on_hit": {"stacks": int, "turns": int} — each landed strike poisons the target
+@export var traits: Dictionary = {}
 ## Per-action param overrides: { "heal_ally": { "heal_amount": 4, "target_range": 2 } }.
 @export var action_params: Dictionary = {}
 

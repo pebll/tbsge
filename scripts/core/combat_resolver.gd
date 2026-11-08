@@ -94,7 +94,13 @@ static func resolve_combat(
 			raw_damage = StatusEffects.strike_damage(
 				current_attacker_legion, attacker_unit, current_defender_legion, target_unit, mode, raw_damage
 			)
-		var shield_result := target_unit.absorb_damage(raw_damage)
+		var shield_result: Dictionary
+		if with_statuses and StatusEffects.pierces(attacker_unit):
+			# Pierce: the strike ignores the shield and breaks it.
+			target_unit.shield_remaining = 0
+			shield_result = {"applied": maxf(0.0, raw_damage), "absorbed": 0.0}
+		else:
+			shield_result = target_unit.absorb_damage(raw_damage)
 		var damage: float = shield_result["applied"]
 		var shield_absorbed: float = shield_result["absorbed"]
 		var hp_before: float = float(target_unit.current_health)
@@ -137,7 +143,10 @@ static func resolve_combat(
 
 		attacked[attacker_unit] = true
 		if with_statuses:
-			status_events.append_array(StatusEffects.after_hit(hits[hits.size() - 1]))
+			var hit_events: Array = StatusEffects.after_hit(hits[hits.size() - 1])
+			# Also on the hit row, so playback can show lifesteal / poison on that strike.
+			hits[hits.size() - 1]["status_events"] = hit_events
+			status_events.append_array(hit_events)
 
 		if target_unit.current_health <= 0:
 			# Dies immediately and will never attack later.

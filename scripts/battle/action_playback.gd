@@ -55,6 +55,21 @@ func get_combat_fx() -> CombatFxPresenter:
 func dismiss_fx_tail() -> void:
 	_combat_fx.dismiss_all()
 
+## Effects triggered by one strike (lifesteal heal, poison applied): heal pop on the unit,
+## refreshed badges on the legion.
+func _play_hit_status_events(hit: Dictionary, legion_to_visu: Dictionary) -> void:
+	for ev in hit.get("status_events", []):
+		var visu: LegionVisu = legion_to_visu.get(ev.get("legion"))
+		if visu == null:
+			continue
+		match String(ev.get("kind", "")):
+			"heal":
+				var u: Unit = ev.get("unit")
+				if u != null:
+					visu.animate_unit_healed(u, float(ev["hp_before"]), float(ev["hp_after"]), float(u.max_health))
+			"applied":
+				visu.sync_status_badges()
+
 func play_combat(from_coords: Vector2i, to_coords: Vector2i, combat: Dictionary, options: Dictionary = {}) -> void:
 	var from_visu: TileVisu = _tile_visu_at.call(from_coords)
 	var to_visu: TileVisu = _tile_visu_at.call(to_coords)
@@ -115,6 +130,7 @@ func play_combat(from_coords: Vector2i, to_coords: Vector2i, combat: Dictionary,
 			var died_on_hit := _apply_defender_reaction(
 				def_visu, def_legion, def_unit, direction, def_hp_before, def_hp_after, h, deaths_by_hit
 			)
+			_play_hit_status_events(h, legion_to_visu)
 			await _emit_combat_log_tick(attacker, defender, def_legion, h, died_on_hit)
 			var beat := COMBAT_DEATH_BEAT if died_on_hit else COMBAT_HIT_BEAT
 			if died_on_hit:
@@ -134,6 +150,7 @@ func play_combat(from_coords: Vector2i, to_coords: Vector2i, combat: Dictionary,
 	for lv in legion_to_visu.values():
 		if lv:
 			lv.sync_all_unit_hp_bars()
+			lv.sync_status_badges()
 
 	if options.has("on_ap_changed"):
 		var on_ap_changed: Callable = options["on_ap_changed"]
@@ -190,6 +207,7 @@ func _play_ranged_hit(
 	var died_on_hit := _apply_defender_reaction(
 		def_visu, def_legion, def_unit, direction, def_hp_before, def_hp_after, hit, deaths_by_hit
 	)
+	_play_hit_status_events(hit, {hit["attacker_legion"]: atk_visu, def_legion: def_visu})
 	await _emit_combat_log_tick(attacker, defender, def_legion, hit, died_on_hit)
 	await _beat(maxf(0.0, COMBAT_DEATH_BEAT - LOG_DEATH_POP_DELAY) if died_on_hit else 0.15)
 

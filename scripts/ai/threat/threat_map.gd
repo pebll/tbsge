@@ -6,6 +6,7 @@ extends RefCounted
 const HexPathfinder = preload("res://scripts/ai/hex_pathfinder.gd")
 const MoveReachability = preload("res://scripts/battle/move_reachability.gd")
 const Utils = preload("res://scripts/core/utils.gd")
+const StatusEffects = preload("res://scripts/effects/status_effects.gd")
 
 var session
 var for_team_id: String = ""
@@ -114,18 +115,28 @@ func _stands_for(enemy: Legion) -> Array:
 	_enemy_reach[key] = stands
 	return stands
 
+## Strike power includes status modifiers (Empowered / Weakened ...) through the same hook
+## the combat resolver uses.
 static func _legion_melee_power(legion: Legion) -> float:
 	var t := 0.0
+	var with_status := not legion.statuses.is_empty()
 	for u in legion.units:
 		if u:
-			t += float(u.attack)
+			var d := float(u.attack)
+			if with_status:
+				d = StatusEffects.strike_damage(legion, u, null, null, "melee", d)
+			t += d
 	return t
 
 static func _legion_ranged_power(legion: Legion) -> float:
 	var t := 0.0
+	var with_status := not legion.statuses.is_empty()
 	for u in legion.units:
 		if u and u.ranged_attack > 0:
-			t += float(u.ranged_attack)
+			var d := float(u.ranged_attack)
+			if with_status:
+				d = StatusEffects.strike_damage(legion, u, null, null, "ranged", d)
+			t += d
 	return t
 
 static func _legion_shoot_range(legion: Legion) -> int:
