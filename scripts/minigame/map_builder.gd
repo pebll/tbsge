@@ -11,7 +11,14 @@ const MAX_CONNECTIVITY_ATTEMPTS := 4096
 const CLUSTER_CHANCE := 0.45
 const WALKABLE_TERRAINS := ["GRASS", "DESERT", "FOREST"]
 
-static func build_grid(radius: int, rng_seed: int = -1, team_ids: Array[String] = []) -> Dictionary:
+## Mirror pairs (q, r) / (-q, -r) get the same terrain. Only for AI duels / benchmarks
+## (fair test maps); real matches are not mirrored.
+static var _mirror := false
+
+static func build_grid(
+	radius: int, rng_seed: int = -1, team_ids: Array[String] = [], mirrored: bool = false
+) -> Dictionary:
+	_mirror = mirrored
 	var grid: Dictionary = {}
 	var rng := RandomNumberGenerator.new()
 	if rng_seed >= 0:
@@ -27,16 +34,15 @@ static func build_grid(radius: int, rng_seed: int = -1, team_ids: Array[String] 
 				continue
 			var tile := Tile.new(q, r)
 			grid[Vector2i(q, r)] = tile
-	if rng_seed >= 0:
-		_generate_terrain(grid, rng)
+	_generate_terrain(grid, rng)
 
 	if team_ids.size() >= 2:
 		_ensure_deploy_back_rows_walkable(grid, radius, team_ids, rng)
 		_ensure_deploy_zones_connected(grid, radius, team_ids, rng)
 	return grid
 
-## Weighted terrain (TerrainDefinition.map_weight), one clustering pass so forests and
-## lakes form patches, mirrored through the centre so both sides get the same map.
+## Weighted terrain (TerrainDefinition.map_weight) and one clustering pass so forests and
+## lakes form patches; mirrored through the centre when _mirror (AI test maps).
 static func _generate_terrain(grid: Dictionary, rng: RandomNumberGenerator) -> void:
 	var ids: Array[String] = []
 	var weights: Array[float] = []
@@ -47,7 +53,7 @@ static func _generate_terrain(grid: Dictionary, rng: RandomNumberGenerator) -> v
 			weights.append(def.map_weight)
 	if ids.is_empty():
 		return
-	var half := _canonical_half(grid)
+	var half := _canonical_half(grid) if _mirror else _all_coords(grid)
 	for c in half:
 		_set_terrain(grid, c, _weighted_pick(ids, weights, rng))
 	for c in half:
@@ -66,6 +72,13 @@ static func _generate_terrain(grid: Dictionary, rng: RandomNumberGenerator) -> v
 			if not best.is_empty():
 				_set_terrain(grid, c, best)
 
+static func _all_coords(grid: Dictionary) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for c in grid.keys():
+		out.append(c)
+	out.sort()
+	return out
+
 ## One coords of every mirror pair (q, r) / (-q, -r), plus the centre.
 static func _canonical_half(grid: Dictionary) -> Array[Vector2i]:
 	var out: Array[Vector2i] = []
@@ -76,9 +89,9 @@ static func _canonical_half(grid: Dictionary) -> Array[Vector2i]:
 	out.sort()
 	return out
 
-## Sets the tile and its mirror (fair maps).
+## Sets the tile (and its mirror on mirrored maps).
 static func _set_terrain(grid: Dictionary, coords: Vector2i, terrain_id: String) -> void:
-	for c in [coords, -coords]:
+	for c in ([coords, -coords] if _mirror else [coords]):
 		var t: Tile = grid.get(c)
 		if t:
 			t.terrain_type = terrain_id

@@ -1,6 +1,7 @@
 class_name UnitVisu
 extends Node2D
 
+const UnitTraitsScript = preload("res://scripts/effects/unit_traits.gd")
 var unit : Unit
 var direction_front: bool = true
 var direction_right: bool = true
@@ -50,8 +51,32 @@ func _ready() -> void:
 	sync_damage_hp_bar()
 	set_process(true)
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	_sync_hover(delta)
 	_sync_hp_bar_transform()
+
+## Flyers float above the ground (their shadow stays put) and bob gently. Done through
+## sprite.offset so every position tween (move, attack, layout) keeps working untouched.
+const HOVER_LIFT := 22.0
+const HOVER_BOB := 5.0
+const HOVER_SPEED := 2.2
+var _hover_t := 0.0
+var _base_offset_y := NAN
+
+func _is_flyer() -> bool:
+	return unit != null and UnitTraitsScript.has_trait(unit, UnitTraitsScript.FLYING)
+
+func _sync_hover(delta: float) -> void:
+	if sprite == null or not _is_flyer():
+		return
+	if _hover_t == 0.0:
+		# Desynchronise units in the same legion.
+		_hover_t = fposmod(float(get_instance_id() % 1000) * 0.37, TAU)
+	if is_nan(_base_offset_y):
+		_base_offset_y = sprite.offset.y
+	_hover_t += delta * HOVER_SPEED
+	var lift := HOVER_LIFT + sin(_hover_t) * HOVER_BOB
+	sprite.offset.y = _base_offset_y - lift / maxf(0.01, absf(sprite.scale.y))
 
 func _hp_bar_world_drop() -> float:
 	var def := _get_unit_def()

@@ -5,6 +5,8 @@ extends RefCounted
 ## animation (attacks, tweens, reposition). Non-blocking report popups and lingering
 ## HP FX go through ActionFxTail.release() at the end.
 
+const EffectPopupScript = preload("res://scripts/visu/effect_popup.gd")
+const UnitTraitsScript = preload("res://scripts/effects/unit_traits.gd")
 const ActionFxTailScript = preload("res://scripts/battle/action_fx_tail.gd")
 const CombatFxPresenterScript = preload("res://scripts/visu/combat_fx_presenter.gd")
 const ProjectilePresenterScript = preload("res://scripts/visu/projectile_presenter.gd")
@@ -58,6 +60,11 @@ func dismiss_fx_tail() -> void:
 ## Effects triggered by one strike (lifesteal heal, poison applied): heal pop on the unit,
 ## refreshed badges on the legion.
 func _play_hit_status_events(hit: Dictionary, legion_to_visu: Dictionary) -> void:
+	# Pierce: the strike went through a shield.
+	var atk_unit: Unit = hit.get("attacker")
+	var tgt: Unit = hit.get("target")
+	if atk_unit != null and tgt != null and tgt.shield_max > 0 and UnitTraitsScript.has_trait(atk_unit, UnitTraitsScript.PIERCE):
+		EffectPopupScript.spawn_over(legion_to_visu.get(hit.get("defender_legion")), UnitTraitsScript.PIERCE)
 	for ev in hit.get("status_events", []):
 		var visu: LegionVisu = legion_to_visu.get(ev.get("legion"))
 		if visu == null:
@@ -67,8 +74,10 @@ func _play_hit_status_events(hit: Dictionary, legion_to_visu: Dictionary) -> voi
 				var u: Unit = ev.get("unit")
 				if u != null:
 					visu.animate_unit_healed(u, float(ev["hp_before"]), float(ev["hp_after"]), float(u.max_health))
+				EffectPopupScript.spawn_over(visu, String(ev.get("status_id", "")), "+%d" % int(round(float(ev.get("amount", 0.0)))))
 			"applied":
 				visu.sync_status_badges()
+				EffectPopupScript.spawn_over(visu, String(ev.get("status_id", "")))
 
 func play_combat(from_coords: Vector2i, to_coords: Vector2i, combat: Dictionary, options: Dictionary = {}) -> void:
 	var from_visu: TileVisu = _tile_visu_at.call(from_coords)

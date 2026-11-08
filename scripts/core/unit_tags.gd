@@ -57,12 +57,11 @@ static func labels_line(tags: Array[String]) -> String:
 		parts.append(label(t))
 	return " · ".join(parts)
 
-## Tags then abilities, for the info panel and unit tooltips: "Ranged · Poison strikes".
+## Abilities line for the info panel and unit tooltips: "Poison strikes · Flying".
+## Counter tags are not shown to players (kept for the AI / draft logic).
 static func descriptor_line_for_type(type_id: String) -> String:
 	var UnitTraitsScript = load("res://scripts/effects/unit_traits.gd")
 	var parts: PackedStringArray = PackedStringArray()
-	for t in for_type(type_id):
-		parts.append(label(t))
 	for k in UnitTraitsScript.for_type(type_id):
 		parts.append(UnitTraitsScript.label(k))
 	return " · ".join(parts)
@@ -70,8 +69,6 @@ static func descriptor_line_for_type(type_id: String) -> String:
 static func descriptor_line_for_legion(legion: Legion) -> String:
 	var UnitTraitsScript = load("res://scripts/effects/unit_traits.gd")
 	var parts: PackedStringArray = PackedStringArray()
-	for t in for_legion(legion):
-		parts.append(label(t))
 	for k in UnitTraitsScript.for_legion(legion):
 		parts.append(UnitTraitsScript.label(k))
 	return " · ".join(parts)

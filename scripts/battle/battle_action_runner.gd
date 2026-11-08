@@ -1,6 +1,7 @@
 class_name BattleActionRunner
 extends RefCounted
 
+const EffectPopupScript = preload("res://scripts/visu/effect_popup.gd")
 const ActionPlaybackScript = preload("res://scripts/battle/action_playback.gd")
 const GridPresenterScript = preload("res://scripts/visu/grid_presenter.gd")
 const MatchSessionScript = preload("res://scripts/match/match_session.gd")
@@ -104,6 +105,9 @@ func play_result(
 		if target_visu:
 			target_visu.juice_squish()
 			target_visu.sync_status_badges()
+			var evs: Array = payload.get("status_events", [])
+			if not evs.is_empty():
+				EffectPopupScript.spawn_over(target_visu, String(evs[0].get("status_id", "")))
 		_call_hook(hooks, "deselect")
 		_call_hook(hooks, "clear_overlays")
 

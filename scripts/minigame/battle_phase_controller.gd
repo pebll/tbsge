@@ -11,6 +11,7 @@ const MatchBattleStats = preload("res://scripts/battle/match_battle_stats.gd")
 const AiBrainCommand = preload("res://scripts/ai/ai_brain_command.gd")
 const TurnSimSession = preload("res://scripts/ai/planning/turn_sim_session.gd")
 const TerrainRules = preload("res://scripts/terrain/terrain_rules.gd")
+const EffectPopupScript = preload("res://scripts/visu/effect_popup.gd")
 
 const AI_LEGION_DELAY := 0.5
 ## Pause after animating status ticks at a turn start.
@@ -461,6 +462,21 @@ func _ai_sort_actionable() -> Array[Vector2i]:
 func _play_status_events(result: Dictionary) -> bool:
 	var events: Array = result.get("payload", {}).get("status_events", [])
 	var played := false
+	# One popup per legion and effect, with the total ("-6" poison, "+9" regeneration).
+	var totals := {}
+	for ev in events:
+		var k := String(ev.get("kind", ""))
+		if k != "damage" and k != "heal":
+			continue
+		var key := [ev.get("legion"), String(ev.get("status_id", ""))]
+		totals[key] = float(totals.get(key, 0.0)) + (float(ev.get("amount", 0.0)) * (-1.0 if k == "damage" else 1.0))
+	var n := 0
+	for key in totals.keys():
+		var amount: float = totals[key]
+		EffectPopupScript.spawn_over(
+			deps.presenter.get_legion_visu(key[0]), key[1], ("%+d" % int(round(amount))), 0.12 * n
+		)
+		n += 1
 	for ev in events:
 		var kind := String(ev.get("kind", ""))
 		if kind != "damage" and kind != "heal":

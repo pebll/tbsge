@@ -152,7 +152,7 @@ func _test_los_mountain_blocks() -> bool:
 func _test_map_is_mirrored_and_connected() -> bool:
 	var teams: Array[String] = ["GREEN", "BLUE"]
 	for seed_i in range(6):
-		var grid: Dictionary = MapBuilderScript.build_grid(4, 1000 + seed_i, teams)
+		var grid: Dictionary = MapBuilderScript.build_grid(4, 1000 + seed_i, teams, true)
 		for c in grid.keys():
 			var v: Vector2i = c
 			if grid[v].terrain_type != grid[-v].terrain_type:
@@ -164,6 +164,16 @@ func _test_map_is_mirrored_and_connected() -> bool:
 				swamp_or_forest = true
 		if not swamp_or_forest and seed_i == 0:
 			push_warning("No forest/swamp on a radius-4 map (unlikely but possible)")
+	# Real matches are not mirrored.
+	var asym := false
+	for seed_i in range(6):
+		var g: Dictionary = MapBuilderScript.build_grid(4, 2000 + seed_i, teams)
+		for c in g.keys():
+			if g[c].terrain_type != g[-c].terrain_type:
+				asym = true
+	if not asym:
+		push_error("Unmirrored maps should not be symmetric")
+		return false
 	return true
 
 func _test_ranged_targeting_needs_los() -> bool:

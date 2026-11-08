@@ -278,7 +278,8 @@ static func _run_one_impl(
 	var session: MinigameSessionScript = MinigameSessionScript.new(config)
 	# Worker threads must not touch the EventBus autoload, and nothing listens during a duel.
 	session.emit_global_events = false
-	session.grid = MapBuilderScript.build_grid(config.map_radius, map_seed, config.team_ids)
+	# Mirrored maps: both seats get the same ground, so results measure play, not the map.
+	session.grid = MapBuilderScript.build_grid(config.map_radius, map_seed, config.team_ids, true)
 	session.refresh_deploy_slots()
 
 	var rng := RandomNumberGenerator.new()
