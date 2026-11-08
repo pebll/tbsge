@@ -11,6 +11,8 @@ extends RefCounted
 ##    "unit", "unit_type", "amount", "hp_before", "hp_after", "died", "stacks", "turns_left"}
 
 const StatusDefs = preload("res://scripts/effects/status_defs.gd")
+const UnitTraits = preload("res://scripts/effects/unit_traits.gd")
+const POISON := "poison"
 
 # --- Instances -------------------------------------------------------------------------
 
@@ -87,6 +89,7 @@ static func after_hit(hit: Dictionary) -> Array:
 	var out: Array = []
 	var attacker: Legion = hit.get("attacker_legion")
 	var defender: Legion = hit.get("defender_legion")
+	out.append_array(_traits_after_hit(hit, attacker, defender))
 	if attacker != null:
 		for e in attacker.statuses.duplicate():
 			out.append_array(StatusDefs.behavior(e["id"]).on_hit_dealt(attacker, e, hit))
@@ -102,8 +105,35 @@ static func after_death(legion: Legion, unit: Unit) -> Array:
 			out.append_array(StatusDefs.behavior(e["id"]).on_unit_death(legion, e, unit))
 	return out
 
+## True when either side has statuses or unit traits, i.e. combat must run the hooks.
 static func any_statuses(a: Legion, b: Legion) -> bool:
-	return (a != null and not a.statuses.is_empty()) or (b != null and not b.statuses.is_empty())
+	return (
+		(a != null and not a.statuses.is_empty()) or (b != null and not b.statuses.is_empty())
+		or UnitTraits.legion_has_any(a) or UnitTraits.legion_has_any(b)
+	)
+
+## Pierce: this unit's strikes ignore and break shields.
+static func pierces(unit: Unit) -> bool:
+	return bool(UnitTraits.value(unit, UnitTraits.PIERCE, false))
+
+static func _traits_after_hit(hit: Dictionary, attacker: Legion, defender: Legion) -> Array:
+	var out: Array = []
+	var unit: Unit = hit.get("attacker")
+	if unit == null or attacker == null:
+		return out
+	var t: Dictionary = UnitTraits.of(unit)
+	if t.is_empty():
+		return out
+	var lost := float(hit.get("hp_lost", 0.0))
+	if t.has(UnitTraits.LIFESTEAL) and lost > 0.0 and unit in attacker.units:
+		var ev := heal_unit(attacker, unit, lost * float(t[UnitTraits.LIFESTEAL]), UnitTraits.LIFESTEAL)
+		if not ev.is_empty():
+			out.append(ev)
+	if t.has(UnitTraits.POISON_ON_HIT) and defender != null and not defender.units.is_empty() \
+			and float(hit.get("raw_damage", 0.0)) > 0.0:
+		var p: Dictionary = t[UnitTraits.POISON_ON_HIT]
+		out.append(apply(defender, POISON, int(p.get("stacks", 1)), int(p.get("turns", 2)), attacker.team_id))
+	return out
 
 # --- Turn hooks (MatchSession.apply_end_turn) ------------------------------------------
 
@@ -113,6 +143,12 @@ static func turn_start(legions: Array, team: String) -> Array:
 	for L in legions.duplicate():
 		if L == null or L.team_id != team or L.units.is_empty():
 			continue
+		for u in L.units:
+			var regen := float(UnitTraits.value(u, UnitTraits.REGENERATION, 0))
+			if regen > 0.0:
+				var ev := heal_unit(L, u, regen, UnitTraits.REGENERATION)
+				if not ev.is_empty():
+					out.append(ev)
 		for e in L.statuses.duplicate():
 			out.append_array(StatusDefs.behavior(e["id"]).on_turn_start(L, e))
 	return out
@@ -132,6 +168,20 @@ static func turn_end(legions: Array, team: String) -> Array:
 				L.statuses.erase(e)
 				out.append(_event("expired", String(e["id"]), L, null, 0.0, {}))
 	return out
+
+## Expected HP the legion's effects and traits will still cost (-) or give (+) it; used by
+## the AI to value a board beyond the current turn (poison to come, regeneration).
+static func projected_hp_change(legion: Legion) -> float:
+	if legion == null:
+		return 0.0
+	var total := 0.0
+	for e in legion.statuses:
+		total += float(StatusDefs.behavior(e["id"]).projected_hp_change(legion, e))
+	for u in legion.units:
+		var regen := float(UnitTraits.value(u, UnitTraits.REGENERATION, 0))
+		if regen > 0.0:
+			total += minf(regen, maxf(0.0, float(u.max_health) - float(u.current_health)))
+	return total
 
 # --- Helpers for behaviours ------------------------------------------------------------
 
@@ -181,4 +231,6 @@ static func label(id: String) -> String:
 	var def = StatusDefs.get_def(id)
 	if def != null and not String(def.display_name).is_empty():
 		return def.display_name
+	if id in UnitTraits.ALL:
+		return UnitTraits.label(id)
 	return id.capitalize()

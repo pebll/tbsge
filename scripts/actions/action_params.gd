@@ -95,5 +95,9 @@ static func _action_default(action: ActionDefinition, key: String) -> Variant:
 			return action.ap_cost
 		"cooldown":
 			return action.cooldown
+		"status_stacks":
+			return action.status_stacks
+		"status_turns":
+			return action.status_turns
 		_:
 			return null

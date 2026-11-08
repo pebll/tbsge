@@ -42,3 +42,8 @@ func on_turn_start(_owner: Legion, _effect: Dictionary) -> Array:
 
 func on_turn_end(_owner: Legion, _effect: Dictionary) -> Array:
 	return []
+
+## Expected HP change the effect will still cause its owner (negative = damage), for AI
+## end-of-turn evaluation. Combat modifiers return 0: the combat sims already see them.
+func projected_hp_change(_owner: Legion, _effect: Dictionary) -> float:
+	return 0.0

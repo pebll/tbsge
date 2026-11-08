@@ -94,7 +94,13 @@ static func resolve_combat(
 			raw_damage = StatusEffects.strike_damage(
 				current_attacker_legion, attacker_unit, current_defender_legion, target_unit, mode, raw_damage
 			)
-		var shield_result := target_unit.absorb_damage(raw_damage)
+		var shield_result: Dictionary
+		if with_statuses and StatusEffects.pierces(attacker_unit):
+			# Pierce: the strike ignores the shield and breaks it.
+			target_unit.shield_remaining = 0
+			shield_result = {"applied": maxf(0.0, raw_damage), "absorbed": 0.0}
+		else:
+			shield_result = target_unit.absorb_damage(raw_damage)
 		var damage: float = shield_result["applied"]
 		var shield_absorbed: float = shield_result["absorbed"]
 		var hp_before: float = float(target_unit.current_health)

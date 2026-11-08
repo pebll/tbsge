@@ -7,7 +7,9 @@
 [ext_resource type="Resource" path="res://data/actions/self_heal.tres" id="5_heal"]
 [ext_resource type="Resource" path="res://data/actions/heal_ally.tres" id="6_heal_ally"]
 [ext_resource type="Resource" path="res://data/actions/teleport.tres" id="7_teleport"]
+[ext_resource type="Resource" path="res://data/actions/rally.tres" id="8_rally"]
+[ext_resource type="Resource" path="res://data/actions/curse.tres" id="9_curse"]
 
 [resource]
 script = ExtResource("1_db")
-defs = Array[Resource]([ExtResource("2_move"), ExtResource("3_attack"), ExtResource("4_ranged"), ExtResource("5_heal"), ExtResource("6_heal_ally"), ExtResource("7_teleport")])
+defs = Array[Resource]([ExtResource("2_move"), ExtResource("3_attack"), ExtResource("4_ranged"), ExtResource("5_heal"), ExtResource("6_heal_ally"), ExtResource("7_teleport"), ExtResource("8_rally"), ExtResource("9_curse")])

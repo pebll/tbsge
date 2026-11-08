@@ -1,0 +1,18 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/effects/status_definition.gd" id="1_def"]
+[ext_resource type="Script" path="res://scripts/effects/statuses/empowered.gd" id="2_beh"]
+[ext_resource type="Texture2D" path="res://assets/icons/base_icons_sprites/strong.png" id="3_icon"]
+
+[resource]
+script = ExtResource("1_def")
+id = "empowered"
+display_name = "Empowered"
+description = "Every strike deals +1 damage per stack."
+icon = ExtResource("3_icon")
+color = Color(0.86, 0.45, 0.16, 1)
+is_debuff = false
+stacking = "refresh"
+max_stacks = 5
+default_turns = 2
+behavior = ExtResource("2_beh")

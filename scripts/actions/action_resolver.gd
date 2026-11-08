@@ -5,6 +5,7 @@ const CombatResolver = preload("res://scripts/core/combat_resolver.gd")
 const ActionDefinitionScript = preload("res://scripts/actions/action_definition.gd")
 const BattleStateScript = preload("res://scripts/actions/battle_state.gd")
 const HexPathfinder = preload("res://scripts/ai/hex_pathfinder.gd")
+const StatusEffectsScript = preload("res://scripts/effects/status_effects.gd")
 
 static func resolve(state: BattleStateScript, cmd: Dictionary) -> Dictionary:
 	var action_id: String = String(cmd.get("action_id", ""))
@@ -43,6 +44,8 @@ static func resolve(state: BattleStateScript, cmd: Dictionary) -> Dictionary:
 			result = _execute_ally_heal(state, legion, action, from_coords, to_coords)
 		ActionDefinitionScript.TargetingKind.EMPTY_IN_RANGE:
 			result = _execute_teleport(state, legion, action, from_coords, to_coords)
+		ActionDefinitionScript.TargetingKind.STATUS_ALLY, ActionDefinitionScript.TargetingKind.STATUS_ENEMY:
+			result = _execute_apply_status(state, legion, action, from_coords, to_coords)
 		_:
 			return _fail("Unhandled action targeting")
 
@@ -207,6 +210,33 @@ static func _execute_ally_heal(
 		"legion": target,
 		"caster_legion": caster,
 		"target_legion": target,
+	})
+
+## Rally / Curse style actions: put action.status_id on the target legion.
+static func _execute_apply_status(
+	state: BattleStateScript,
+	caster: Legion,
+	action: ActionDefinitionScript,
+	from_coords: Vector2i,
+	to_coords: Vector2i
+) -> Dictionary:
+	var to_tile: Tile = state.tile_at(to_coords)
+	if to_tile == null or not to_tile.has_legion():
+		return _fail("No legion at target")
+	var target: Legion = to_tile.legion
+	var stacks := ActionParams.resolve_int(caster, action, "status_stacks", action.status_stacks)
+	var turns := ActionParams.resolve_int(caster, action, "status_turns", action.status_turns)
+	var ev: Dictionary = StatusEffectsScript.apply(target, action.status_id, stacks, turns, caster.team_id)
+	caster.spend_ap(action.ap_cost)
+	_apply_terminal(state, caster, action)
+	return _ok(["status_applied"], {
+		"action_id": action.id,
+		"from": from_coords,
+		"to": to_coords,
+		"legion": target,
+		"caster_legion": caster,
+		"target_legion": target,
+		"status_events": [ev],
 	})
 
 static func _execute_teleport(

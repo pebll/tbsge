@@ -1,0 +1,16 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/effects/status_definition.gd" id="1_def"]
+[ext_resource type="Script" path="res://scripts/effects/statuses/poison.gd" id="2_beh"]
+
+[resource]
+script = ExtResource("1_def")
+id = "poison"
+display_name = "Poison"
+description = "Each unit loses 1 HP per stack at the start of its turn. Shields don't help."
+color = Color(0.36, 0.62, 0.22, 1)
+is_debuff = true
+stacking = "add"
+max_stacks = 5
+default_turns = 2
+behavior = ExtResource("2_beh")
