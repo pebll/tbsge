@@ -39,6 +39,7 @@ func _check_unit(def: UnitDefinition) -> bool:
 		UnitTags.SUPPORT: "heal_ally" in ids or "rally" in ids or "curse" in ids,
 		UnitTags.SHIELDED: def.shield > 0,
 		UnitTags.MOBILE: def.ap >= 3 or "teleport" in ids,
+		UnitTags.FLYER: bool(def.traits.get("flying", false)),
 	}
 	# armored / swarm / striker are design judgment (guidelines in unit_tags.gd), not checked.
 	for t in derived.keys():

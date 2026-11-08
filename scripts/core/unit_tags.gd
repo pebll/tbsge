@@ -13,7 +13,7 @@ const ARMORED := "armored"    ## high HP per unit (about 16+)
 const SWARM := "swarm"        ## many cheap units (about price 4 or less)
 const STRIKER := "striker"    ## damage dealer: hits hard for its cost (assassin, demon, ogre, rider)
 const MOBILE := "mobile"      ## 3+ AP or teleport
-const FLYER := "flyer"        ## reserved: arrives with flying in 0.3
+const FLYER := "flyer"        ## has the flying trait (follows from it)
 
 const ALL: Array[String] = [RANGED, SUPPORT, SHIELDED, ARMORED, SWARM, STRIKER, MOBILE, FLYER]
 

@@ -6,6 +6,7 @@ extends RefCounted
 const AiCandidateScript = preload("res://scripts/ai/utility/ai_candidate.gd")
 const MoveReachability = preload("res://scripts/battle/move_reachability.gd")
 const HypotheticalPosition = preload("res://scripts/ai/hypothetical_position.gd")
+const TerrainRules = preload("res://scripts/terrain/terrain_rules.gd")
 
 const COMBAT_ACTIONS: Array[String] = ["melee_attack", "ranged_attack"]
 const HEAL_ACTIONS: Array[String] = ["self_heal", "heal_ally"]
@@ -29,7 +30,7 @@ static func generate(session, legion: Legion, ctx: AiContext) -> Array:
 			continue
 		# Prefer empty destinations for plan standing (swaps are ok as pure moves).
 		var tile: Tile = session.grid.get(dest_coords)
-		if tile == null or not tile.walkable:
+		if tile == null or TerrainRules.enter_cost(legion, tile) < 0:
 			continue
 		var path := MoveReachability.reconstruct_path(
 			legion.tile_coords,

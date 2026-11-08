@@ -18,6 +18,7 @@ func run(_tree: SceneTree) -> bool:
 		_test_los_mountain_blocks,
 		_test_map_is_mirrored_and_connected,
 		_test_ranged_targeting_needs_los,
+		_test_flyers,
 	]:
 		if not t.call():
 			return false
@@ -173,5 +174,42 @@ func _test_ranged_targeting_needs_los() -> bool:
 	var targets: Array = b["session"].get_action_targets(b["legions"][0], "ranged_attack")
 	if Vector2i(2, 0) in targets or not (Vector2i(0, 2) in targets):
 		push_error("The mountain hides (2,0) but not (0,2): %s" % [targets])
+		return false
+	return true
+
+func _test_flyers() -> bool:
+	var b := _board({Vector2i(1, 0): "WATER", Vector2i(2, 0): "MOUNTAIN", Vector2i(0, 1): "FOREST"}, [
+		["a", "DRAGON_RIDER", 1, Vector2i(0, 0)],
+		["a", "GOBLIN", 1, Vector2i(-1, 0)],
+	])
+	var session = b["session"]
+	var dragon: Legion = b["legions"][0]
+	var goblin: Legion = b["legions"][1]
+	if not TerrainRules.is_flyer(dragon) or TerrainRules.is_flyer(goblin):
+		push_error("Dragon riders fly, goblins don't")
+		return false
+	var reach: Dictionary = MoveReachability.compute(session.battle_state(), dragon)
+	if int(reach["cost"].get(Vector2i(1, 0), -1)) != 1 or int(reach["cost"].get(Vector2i(2, 0), -1)) != 2:
+		push_error("Flyers cross water and mountains at 1 AP per hex: %s" % [reach["cost"]])
+		return false
+	if int(reach["cost"].get(Vector2i(0, 1), -1)) != 1:
+		push_error("Forest costs flyers 1 AP")
+		return false
+	var r: Dictionary = session.apply({"type": "use_action", "action_id": "move", "from": Vector2i(0, 0), "to": Vector2i(1, 0)})
+	if not r.get("ok", false) or dragon.tile_coords != Vector2i(1, 0):
+		push_error("A flyer can land on water: %s" % r)
+		return false
+	var mixed := Legion.from_composition([["DRAGON_RIDER", 1], ["GOBLIN", 1]], Vector2i.ZERO, "GREEN")
+	if TerrainRules.is_flyer(mixed):
+		push_error("A legion with walkers doesn't fly")
+		return false
+	# Cover doesn't protect flyers.
+	var CombatResolverS = load("res://scripts/core/combat_resolver.gd")
+	var archer := Legion.new("ARCHER", 1, Vector2i.ZERO, "BLUE")
+	var target := Legion.new("GARGOYLE", 1, Vector2i(2, 0), "GREEN")
+	target.units[0].shield_remaining = 0
+	var res: Dictionary = CombatResolverS.resolve_combat(archer, target, 1, {"mode": "ranged", "distance": 2, "defender_terrain": "FOREST"})
+	if not is_equal_approx(float(res["hits"][0]["raw_damage"]), 4.0):
+		push_error("Forest cover doesn't apply to flyers, got %s" % res["hits"][0]["raw_damage"])
 		return false
 	return true

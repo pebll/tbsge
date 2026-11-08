@@ -60,7 +60,7 @@ static func _approx_map_radius(session) -> float:
 ## overall preference when none is reachable.
 static func _assign_focus(ctx: AiContext, p_session, p_legion: Legion) -> void:
 	for candidate in _rank_enemies(p_legion.tile_coords, ctx.enemies):
-		var field := walk_distance_field(p_session.grid, candidate.tile_coords)
+		var field := approach_field(p_session.grid, candidate.tile_coords, p_legion)
 		if field.has(p_legion.tile_coords):
 			ctx.focus = candidate
 			ctx.focus_field = field
@@ -68,10 +68,20 @@ static func _assign_focus(ctx: AiContext, p_session, p_legion: Legion) -> void:
 	var ranked := _rank_enemies(p_legion.tile_coords, ctx.enemies)
 	if not ranked.is_empty():
 		ctx.focus = ranked[0]
-		ctx.focus_field = walk_distance_field(p_session.grid, ranked[0].tile_coords)
+		ctx.focus_field = approach_field(p_session.grid, ranked[0].tile_coords, p_legion)
 
 ## Walking cost (AP) from `origin` over walkable tiles, using each terrain's base move cost
 ## (forest / swamp count double). Legions are ignored because they move or swap.
+## Approach cost to `origin` for this legion: walking costs for ground legions, straight
+## hex distance for flyers (they cross water and mountains at 1 AP per hex).
+static func approach_field(grid: Dictionary, origin: Vector2i, legion: Legion) -> Dictionary:
+	if not TerrainRulesScript.is_flyer(legion):
+		return walk_distance_field(grid, origin)
+	var out: Dictionary = {}
+	for c in grid.keys():
+		out[c] = HexPathfinder.hex_distance(origin, c)
+	return out
+
 static func walk_distance_field(grid: Dictionary, origin: Vector2i) -> Dictionary:
 	var dist: Dictionary = {origin: 0}
 	var frontier: Array[Vector2i] = [origin]

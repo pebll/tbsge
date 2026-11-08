@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="UnitDefinition" format=3]
+
+[ext_resource type="Script" uid="uid://xdkpld8vue81" path="res://scripts/resources/unit_definition.gd" id="1_def"]
+[ext_resource type="Texture2D" path="res://assets/units_v2/done/base_uncut_sprites/dragon_rider_front.png" id="2_icon"]
+
+[resource]
+script = ExtResource("1_def")
+id = "DRAGON_RIDER"
+display_name = "Dragon Rider"
+max_health = 18
+attack = 7
+ap = 3
+size = 3.0
+price = 11
+tags = Array[String](["armored", "striker", "mobile", "flyer"])
+icon = ExtResource("2_icon")
+action_ids = Array[String](["move", "melee_attack", "self_heal"])
+traits = {
+"flying": true
+}

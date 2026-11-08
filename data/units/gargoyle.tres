@@ -19,7 +19,10 @@ shield = 5
 image_size = 1.04
 size = 2.0
 price = 7
-tags = Array[String](["armored", "shielded", "ranged"])
+tags = Array[String](["armored", "shielded", "ranged", "flyer"])
 icon = ExtResource("2_icon")
 sfx_move = ExtResource("3_move")
 action_ids = Array[String](["move", "melee_attack", "ranged_attack", "self_heal"])
+traits = {
+"flying": true
+}

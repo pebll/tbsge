@@ -45,7 +45,7 @@ static func _strike_stands(p_session, ally: Legion) -> Array:
 		if int(cost.get(c, 999)) >= ally.current_ap:
 			continue
 		var tile: Tile = p_session.grid.get(c)
-		if tile == null or not tile.walkable or tile.has_legion():
+		if tile == null or tile.has_legion() or TerrainRules.enter_cost(ally, tile) < 0:
 			continue
 		stands.append(c)
 	return stands

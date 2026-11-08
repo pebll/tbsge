@@ -63,7 +63,7 @@ entries = {
 },
 "tag_flyer": {
 "label": "Flyer",
-"definition": "Flies over terrain (coming with terrain in 0.3)."
+"definition": "Flies over water and mountains at 1 AP per hex and can land there; ignores slow terrain and cover."
 },
 "trait_regeneration": {
 "label": "Regeneration",
@@ -80,5 +80,9 @@ entries = {
 "trait_poison_on_hit": {
 "label": "Poison strikes",
 "definition": "Each landed strike adds a stack of Poison to the target."
+},
+"trait_flying": {
+"label": "Flying",
+"definition": "Flies over water and mountains at 1 AP per hex and can land there; ignores slow terrain and cover."
 }
 }
