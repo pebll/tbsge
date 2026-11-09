@@ -30,10 +30,17 @@ theme_override_font_sizes/font_size = 28
 text = "Green's turn"
 horizontal_alignment = 1
 
+[node name="TurnStatusLabel" type="Label" parent="VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = ""
+horizontal_alignment = 1
+
 [node name="NextTurnButton" parent="VBox" instance=ExtResource("2_gb")]
 unique_name_in_owner = true
 layout_mode = 2
-text = "Next turn"
+text = "End turn"
 font_size = 22
 preferred_width = 260
 

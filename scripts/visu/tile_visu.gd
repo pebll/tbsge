@@ -94,7 +94,7 @@ func set_hover_boost(enabled: bool) -> void:
 	_sync_lift()
 
 ## Fog of war: darken a tile the viewing team can't see.
-const COLOR_FOG := Color(0.42, 0.42, 0.52, 1.0)
+const COLOR_FOG := Color(0.34, 0.34, 0.44, 1.0)
 var _fogged := false
 
 func set_fogged(fogged: bool) -> void:

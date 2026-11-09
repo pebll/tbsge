@@ -23,3 +23,5 @@ flyer_can_stop = true
 map_weight = 34
 variants = Array[Texture2D]([ExtResource("v0"), ExtResource("v1")])
 variant_fit = PackedVector3Array(1.7976, -0.6, -43.2, 0.9415, -6.2, -3.5)
+accent_variants = PackedInt32Array(1)
+accent_chance = 0.12

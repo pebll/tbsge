@@ -360,7 +360,7 @@ func _run() -> void:
 		if not _is_battle():
 			break
 		await _shot("turn%d_before_end" % human_turns)
-		await _click_button("Next turn")
+		await _click_button("End turn")
 		if _status_demo and human_turns == 1:
 			await _wait(0.25)
 			await _shot("status_tick")
@@ -374,7 +374,7 @@ func _run() -> void:
 		_check(shown, "game-over panel appears after the final playback")
 	else:
 		# Abandon from the pause menu, ideally while the AI is acting (old crash path).
-		await _click_button("Next turn")
+		await _click_button("End turn")
 		await _wait_until(func() -> bool: return _game().battle.ai_running, 5.0)
 		await _wait(0.3)
 		_log("abandoning mid-AI turn (ai_running=%s)" % _game().battle.ai_running)

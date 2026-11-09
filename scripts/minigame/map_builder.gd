@@ -43,15 +43,22 @@ static func build_grid(
 	return grid
 
 ## One look per terrain for the whole match: coherent maps, variety between matches.
+## Busy looks (TerrainDefinition.accent_variants) are only sprinkled on single tiles.
 static func _pick_variants(grid: Dictionary, rng: RandomNumberGenerator) -> void:
 	var chosen: Dictionary = {}
 	for c in _all_coords(grid):
 		var t: Tile = grid[c]
+		var def = TerrainRules.get_def(t.terrain_type)
 		if not chosen.has(t.terrain_type):
-			var def = TerrainRules.get_def(t.terrain_type)
-			var n: int = 1 + (def.variants.size() if def != null else 0)
-			chosen[t.terrain_type] = rng.randi() % n
+			var looks: Array[int] = [0]
+			if def != null:
+				for i in def.variants.size():
+					if not (i + 1) in def.accent_variants:
+						looks.append(i + 1)
+			chosen[t.terrain_type] = looks[rng.randi() % looks.size()]
 		t.variant = int(chosen[t.terrain_type])
+		if def != null and not def.accent_variants.is_empty() and rng.randf() < def.accent_chance:
+			t.variant = def.accent_variants[rng.randi() % def.accent_variants.size()]
 
 ## Weighted terrain (TerrainDefinition.map_weight) and one clustering pass so forests and
 ## lakes form patches; mirrored through the centre when _mirror (AI test maps).

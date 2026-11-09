@@ -10,6 +10,7 @@ const COLOR_TEXT := UiTheme.COLOR_TEXT
 const COLOR_MUTED := UiTheme.COLOR_TEXT_MUTED
 const BORDER_THICK := UiTheme.BORDER_THICK
 const RADIUS := UiTheme.RADIUS
+const BUTTON_PX := 80.0
 
 var _buttons: Dictionary = {}
 var _selected_id: String = ""
@@ -21,6 +22,7 @@ var _visibility_tween: Tween
 var _showing: bool = false
 ## When true: show actions for inspect only (no press, always "enabled" look, tooltips work).
 var _display_only: bool = false
+var _embedded: bool = false
 
 @onready var _row: HBoxContainer = %ActionRow
 @onready var _hint: Label = %HintLabel
@@ -49,6 +51,10 @@ func set_display_only(enabled: bool) -> void:
 
 ## Re-anchor for embedding inside another panel (inspect UI), not screen-bottom HUD.
 func configure_embedded() -> void:
+	_embedded = true
+	var p: Control = get_node_or_null("Panel")
+	if p:
+		p.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	offset_left = 0
 	offset_top = 0
@@ -63,7 +69,7 @@ func configure_embedded() -> void:
 func _apply_panel_style() -> void:
 	%Panel.add_theme_stylebox_override(
 		"panel",
-		UiTheme.panel_stylebox(UiTheme.COLOR_PANEL, UiTheme.COLOR_BORDER, RADIUS, BORDER_THICK, 10)
+		UiTheme.panel_stylebox(UiTheme.COLOR_PANEL, UiTheme.COLOR_BORDER, RADIUS, BORDER_THICK, 8)
 	)
 
 func set_actions(
@@ -86,6 +92,7 @@ func set_actions(
 		set_hint(_hint_for_action(selected))
 	else:
 		set_hint("")
+	_fit_panel.call_deferred()
 	_animate_show()
 	_juice_buttons_in()
 
@@ -102,6 +109,17 @@ func set_hint(text: String) -> void:
 		return
 	_hint.text = text
 	_hint.visible = not text.is_empty()
+	_fit_panel.call_deferred()
+
+## HUD mode: the panel hugs its buttons, centred on the bar's bottom edge.
+func _fit_panel() -> void:
+	if _embedded or _panel == null or not is_instance_valid(_panel):
+		return
+	var m := _panel.get_combined_minimum_size()
+	_panel.offset_left = -m.x * 0.5
+	_panel.offset_right = m.x * 0.5
+	_panel.offset_top = -m.y
+	_panel.offset_bottom = 0
 
 func clear_bar() -> void:
 	_selected_id = ""
@@ -112,6 +130,7 @@ func clear_bar() -> void:
 
 func _clear_buttons() -> void:
 	for child in _row.get_children():
+		_row.remove_child(child)
 		child.queue_free()
 	_buttons.clear()
 
@@ -120,7 +139,7 @@ func _add_action_button(action: ActionDefinitionScript) -> void:
 	btn.toggle_mode = not _display_only
 	btn.button_pressed = (not _display_only) and action.id == _selected_id
 	btn.focus_mode = Control.FOCUS_NONE
-	btn.custom_minimum_size = Vector2(96, 96)
+	btn.custom_minimum_size = Vector2(BUTTON_PX, BUTTON_PX)
 	var reason := String(_disabled_reasons.get(action.id, ""))
 	var disabled := (not _display_only) and not reason.is_empty()
 	btn.disabled = disabled

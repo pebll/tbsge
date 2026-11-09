@@ -44,8 +44,11 @@ func enter() -> void:
 	deps.presenter.sync_legions(deps.session)
 	deps.turn_hud.show()
 	deps.turn_hud.show_active_team(deps.session.turn_manager.active_team_id)
+	refresh_turn_status()
 	if deps.action_log_panel:
 		deps.action_log_panel.enter_battle(deps.session.action_log)
+	if deps.host and deps.host.has_method("frame_battle_view"):
+		deps.host.frame_battle_view.call_deferred()
 	battle_stats = MatchBattleStats.new()
 	battle_stats.begin(deps.session)
 	_log_battle_opening_turn()
@@ -92,8 +95,9 @@ func handle_end_turn() -> void:
 	var result: Dictionary = deps.session.apply({"type": "end_turn"})
 	if result["ok"]:
 		deps.turn_hud.show_active_team(deps.session.turn_manager.active_team_id)
+		refresh_turn_status()
 		_update_fog_viewer()
-		deps.presenter.sync_spent_visuals(deps.session)
+		_sync_spent()
 		if not await _play_status_events(result):
 			return
 		if deps.session.phase != MinigameSessionScript.Phase.BATTLE:
@@ -107,6 +111,7 @@ func handle_pass_continue() -> void:
 	if deps.pass_overlay:
 		deps.pass_overlay.hide()
 	deps.turn_hud.show_active_team(deps.session.turn_manager.active_team_id)
+	refresh_turn_status()
 	maybe_start_ai_turn()
 
 func request_use_action(action_id: String, from_coords: Vector2i, to_coords: Vector2i) -> void:
@@ -362,7 +367,8 @@ func _run_ai_turn_async() -> void:
 			var end_result: Dictionary = deps.session.apply({"type": "end_turn"})
 			if end_result["ok"]:
 				deps.turn_hud.show_active_team(deps.session.turn_manager.active_team_id)
-				deps.presenter.sync_spent_visuals(deps.session)
+				refresh_turn_status()
+				_sync_spent()
 				if not await _play_status_events(end_result):
 					return
 			break
@@ -376,7 +382,7 @@ func _run_ai_turn_async() -> void:
 			if AttackNearestEnemyBehavior.debug_enabled:
 				print("[AI] stale legion slot @ %s, skipping" % coords)
 			deps.session.pass_legion_or_force_wait(coords)
-			deps.presenter.sync_spent_visuals(deps.session)
+			_sync_spent()
 			prefer_coords = Vector2i(2147483646, 2147483646)
 			var still_alive: bool = await _ai_delay(AI_LEGION_DELAY)
 			if not still_alive:
@@ -411,14 +417,14 @@ func _run_ai_turn_async() -> void:
 					if AttackNearestEnemyBehavior.debug_enabled:
 						print("[AI] action failed for %s @ %s, passing legion" % [legion.team_id, coords])
 					deps.session.pass_legion_or_force_wait(legion.tile_coords)
-					deps.presenter.sync_spent_visuals(deps.session)
+					_sync_spent()
 					prefer_coords = Vector2i(2147483646, 2147483646)
 				else:
 					# Stick to this legion so teleport can be followed by melee.
 					prefer_coords = legion.tile_coords
 			_:
 				deps.session.pass_legion_or_force_wait(coords)
-				deps.presenter.sync_spent_visuals(deps.session)
+				_sync_spent()
 				prefer_coords = Vector2i(2147483646, 2147483646)
 
 		var alive: bool = await _ai_delay(AI_LEGION_DELAY)
@@ -499,7 +505,7 @@ func _play_status_events(result: Dictionary) -> bool:
 		if not await _ai_delay(STATUS_TICK_DELAY):
 			return false
 	deps.presenter.prune_gone_legions(deps.session)
-	deps.presenter.sync_spent_visuals(deps.session)
+	_sync_spent()
 	return _host_alive()
 
 func _host_alive() -> bool:
@@ -553,7 +559,27 @@ func _battle_action_hooks() -> Dictionary:
 		hooks["refresh_after_action"] = func(_coords: Vector2i) -> void:
 			deps.battle_ui.deselect()
 			deps.battle_ui.clear_overlays()
-			deps.presenter.sync_spent_visuals(deps.session)
+			_sync_spent()
 		hooks["deselect_after_combat"] = true
 		hooks["keep_selection_in_combat"] = false
 	return hooks
+
+## Turn HUD line: turn number and how many of the active team's legions can still act.
+func refresh_turn_status() -> void:
+	if deps.turn_hud == null or deps.session == null:
+		return
+	var team: String = deps.session.turn_manager.active_team_id
+	var ready := 0
+	var total := 0
+	for L in deps.session.legions:
+		if L == null or L.units.is_empty() or L.team_id != team:
+			continue
+		total += 1
+		if deps.session.can_act_legion(L):
+			ready += 1
+	var turn_no := BattleActionLogFormatterScript.team_turn_number(deps.session.turn_manager.turn_index)
+	deps.turn_hud.set_turn_status(turn_no, ready, total, not deps.is_ai_team(team))
+
+func _sync_spent() -> void:
+	deps.presenter.sync_spent_visuals(deps.session)
+	refresh_turn_status()

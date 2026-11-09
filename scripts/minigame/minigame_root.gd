@@ -45,6 +45,7 @@ var _action_bar: Control
 var _tooltip_controller: TooltipController
 var _action_log_panel: BattleActionLogPanel
 var _pause_menu: PauseMenu
+var _target_tag: PanelContainer
 
 @onready var _camera: Camera2D = $Camera2D
 
@@ -62,6 +63,9 @@ func _ready() -> void:
 	_setup_phase_controllers()
 	_setup_battle_context()
 	battle_ui = BattleUIAdapterScript.new(battle_context)
+	battle_ui.interaction.move_hint_fn = func(coords: Vector2i, text: String) -> void:
+		if _target_tag:
+			_target_tag.show_text(text, presenter.tile_visu_at(coords))
 	deps.battle_ui = battle_ui
 	_connect_phase_signals()
 
@@ -118,6 +122,9 @@ func inspect_tile(coords: Vector2i) -> void:
 		draft.inspect_tile(coords)
 	else:
 		battle.inspect_tile(coords)
+		var tile: Tile = session.grid.get(coords)
+		if tile and tile.has_legion():
+			keep_coords_visible([coords], battle_insets(SELECTED_BOTTOM))
 
 func preview_inspect(coords: Vector2i) -> void:
 	if session.phase == MinigameSessionScript.Phase.BATTLE:
@@ -137,7 +144,74 @@ func clear_inspect() -> void:
 		elif _legion_strip:
 			_legion_strip.hide_strip()
 
+# --- Camera framing (screen insets: left, top, right, bottom) ---
+
+const HUD_TOP := 230.0
+const DRAFT_INSETS := Vector4(24, 120, 580, 230)
+## Bottom HUD while a legion is selected: unit strip + action bar.
+const SELECTED_BOTTOM := 470.0
+
+func battle_insets(bottom: float = 60.0) -> Vector4:
+	var left := 60.0
+	if _action_log_panel and _action_log_panel.visible and _action_log_panel.is_expanded():
+		left = _action_log_panel.dock_width() + 60.0
+	return Vector4(left, HUD_TOP, 40.0, bottom)
+
+## World rect around tiles, padded so legions standing on them fit (their art rises above).
+func coords_world_rect(coords: Array) -> Rect2:
+	var pts: Array[Vector2] = []
+	for c in coords:
+		var tv: TileVisu = presenter.tile_visu_at(c)
+		if tv:
+			pts.append(tv.global_position)
+	if pts.is_empty():
+		return Rect2()
+	var spacing := _tile_spacing()
+	var r := Rect2(pts[0], Vector2.ZERO)
+	for p in pts:
+		r = r.expand(p)
+	return Rect2(
+		r.position - Vector2(spacing * 0.6, spacing * 0.95),
+		r.size + Vector2(spacing * 1.2, spacing * 1.45)
+	)
+
+func _tile_spacing() -> float:
+	var best := INF
+	var first: TileVisu = null
+	for c in session.grid.keys():
+		var tv: TileVisu = presenter.tile_visu_at(c)
+		if tv == null:
+			continue
+		if first == null:
+			first = tv
+			continue
+		best = minf(best, first.global_position.distance_to(tv.global_position))
+	return 100.0 if best == INF else best
+
+func frame_coords(coords: Array, insets: Vector4, animate: bool = true) -> void:
+	var r := coords_world_rect(coords)
+	if r.size != Vector2.ZERO and _camera is StrategyCamera:
+		(_camera as StrategyCamera).frame_world_rect(r, insets, 2.6, animate)
+
+## Battle start: everything the viewer can see (whole map without fog).
+func frame_battle_view() -> void:
+	var coords: Array = []
+	for c in session.grid.keys():
+		var tv: TileVisu = presenter.tile_visu_at(c)
+		if tv and not tv.is_fogged():
+			coords.append(c)
+	if coords.is_empty():
+		coords = session.grid.keys()
+	frame_coords(coords, battle_insets(), true)
+
+func keep_coords_visible(coords: Array, insets: Vector4) -> void:
+	var r := coords_world_rect(coords)
+	if r.size != Vector2.ZERO and _camera is StrategyCamera:
+		(_camera as StrategyCamera).ensure_world_rect_visible(r, insets)
+
 func request_use_action(action_id: String, from_coords: Vector2i, to_coords: Vector2i) -> void:
+	if _target_tag:
+		_target_tag.hide()
 	await battle.request_use_action(action_id, from_coords, to_coords)
 
 func _setup_phase_controllers() -> void:
@@ -189,10 +263,19 @@ func _setup_battle_context() -> void:
 			_legion_strip.show_attack_preview(
 				attacker, defender, action_id, from_coords, to_coords, session.grid if session else {}
 			)
+		if _target_tag:
+			_target_tag.show_for(
+				attacker, defender, action_id, from_coords, to_coords,
+				session.grid if session else {}, presenter.tile_visu_at(to_coords)
+			)
 	battle_context.clear_expectation_preview_fn = func() -> void:
 		if _legion_strip:
 			_legion_strip.hide_attack_preview()
+		if _target_tag:
+			_target_tag.hide()
 	battle_context.apply_move_path_fn = func(path: Array) -> void:
+		if _target_tag:
+			_target_tag.hide()
 		battle.request_move_path(path)
 	battle_context.battle_phase_fn = func() -> bool: return session.phase == MinigameSessionScript.Phase.BATTLE
 
@@ -256,6 +339,9 @@ func _setup_ui() -> void:
 		_tile_info_panel.set_tooltip_controller(_tooltip_controller)
 	if _action_bar.has_method("set_tooltip_controller"):
 		_action_bar.set_tooltip_controller(_tooltip_controller)
+
+	_target_tag = preload("res://scripts/ui/target_preview_tag.gd").new()
+	_ui_layer.add_child(_target_tag)
 
 	_action_log_panel = BattleActionLogPanel.new()
 	_ui_layer.add_child(_action_log_panel)
@@ -334,6 +420,8 @@ func _on_legion_ap_changed(legion: Legion) -> void:
 	if session.phase == MinigameSessionScript.Phase.BATTLE:
 		if _legion_strip and _legion_strip.visible:
 			_legion_strip.refresh_if_legion(legion)
+		if battle:
+			battle.refresh_turn_status()
 		return
 	if not _tile_info_panel or not _tile_info_panel.visible:
 		return

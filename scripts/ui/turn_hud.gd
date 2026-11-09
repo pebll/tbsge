@@ -7,6 +7,9 @@ signal next_turn_pressed
 @onready var team_label: Label = %TurnTeamLabel
 @onready var team_footer: PanelContainer = %TurnTeamFooter
 @onready var next_turn_button: GameButton = %NextTurnButton
+@onready var status_label: Label = %TurnStatusLabel
+
+var _done_pulse: Tween
 
 const COLOR_BG := Color(0.91, 0.86, 0.78)
 const COLOR_BORDER := Color(0.78, 0.70, 0.58)
@@ -38,6 +41,7 @@ func _apply_panel_style() -> void:
 	add_theme_stylebox_override("panel", sb)
 
 	team_label.add_theme_color_override("font_color", COLOR_TEXT)
+	status_label.add_theme_color_override("font_color", Color(0.36, 0.30, 0.24))
 
 func show_active_team(team_id: String) -> void:
 	var team_res: Resource = TeamDefs.get_def(team_id)
@@ -74,3 +78,26 @@ func _accent_stylebox(color: Color) -> StyleBoxFlat:
 
 func _contrasting_text_color(bg: Color) -> Color:
 	return Color.WHITE if bg.get_luminance() < 0.45 else COLOR_TEXT
+
+## "Turn 3 · 2 of 4 legions ready". When nothing can act, the End turn button pulses.
+func set_turn_status(turn_no: int, ready: int, total: int, is_human: bool) -> void:
+	var parts := PackedStringArray(["Turn %d" % turn_no])
+	if is_human and total > 0:
+		parts.append("%d of %d legions ready" % [ready, total] if ready > 0 else "All legions done")
+	elif not is_human:
+		parts.append("thinking…")
+	status_label.text = " · ".join(parts)
+	_set_done_pulse(is_human and total > 0 and ready == 0)
+
+func _set_done_pulse(on: bool) -> void:
+	if _done_pulse and _done_pulse.is_valid():
+		_done_pulse.kill()
+		_done_pulse = null
+	next_turn_button.modulate = Color.WHITE
+	if not on:
+		return
+	_done_pulse = next_turn_button.create_tween().set_loops()
+	_done_pulse.tween_property(next_turn_button, "modulate", Color(1.15, 1.1, 0.75), 0.55)\
+		.set_trans(Tween.TRANS_SINE)
+	_done_pulse.tween_property(next_turn_button, "modulate", Color.WHITE, 0.55)\
+		.set_trans(Tween.TRANS_SINE)

@@ -29,6 +29,7 @@ func enter(first_team_id: String) -> void:
 		_auto_draft_all_ai_teams()
 		return
 	refresh_view()
+	_frame_deploy_zone(false)
 
 func exit() -> void:
 	deps.pass_overlay.hide()
@@ -159,6 +160,14 @@ func handle_pass_continue() -> void:
 	selected_coords = INVALID_COORDS
 	refresh_view()
 	deps.setup_panel.show()
+	_frame_deploy_zone(true)
+
+## Camera on this team's deploy hexes, clear of the gold panel, buttons and info panel.
+func _frame_deploy_zone(animate: bool) -> void:
+	if deps.host and deps.host.has_method("frame_coords"):
+		deps.host.frame_coords.call_deferred(
+			deps.session.get_deploy_slots(viewing_team), deps.host.DRAFT_INSETS, animate
+		)
 
 func handle_unit_picked(unit_type: String) -> void:
 	if selected_coords == INVALID_COORDS:

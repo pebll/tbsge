@@ -4,6 +4,7 @@ extends RefCounted
 const ActionDefinitionScript = preload("res://scripts/actions/action_definition.gd")
 const ActionTargetingScript = preload("res://scripts/actions/action_targeting.gd")
 const BattleStateScript = preload("res://scripts/actions/battle_state.gd")
+const BattleExpectationEstimatorScript = preload("res://scripts/battle/battle_expectation_estimator.gd")
 const MoveReachabilityScript = preload("res://scripts/battle/move_reachability.gd")
 const UiTheme = preload("res://scripts/ui/ui_theme.gd")
 
@@ -48,6 +49,9 @@ var _clear_preview_inspect_fn: Callable = Callable()
 var _expectation_preview_fn: Callable = Callable()
 var _clear_expectation_preview_fn: Callable = Callable()
 var turn_manager_fn: Callable
+## Host hook for a small text tag above a hovered hex: (coords, text); "" hides it.
+var move_hint_fn: Callable = Callable()
+var _move_cost: Dictionary = {}
 var legions_fn: Callable
 var _events_bound: bool = false
 var _attack_choice_popup: Control = null
@@ -130,6 +134,7 @@ func can_accept_command() -> bool:
 	return not bool(is_locked_fn.call())
 
 func deselect() -> void:
+	_hide_move_hint()
 	_hide_attack_choice_popup()
 	_clear_overlay_visuals()
 	has_selected = false
@@ -175,6 +180,7 @@ func select_tile(coords: Vector2i) -> void:
 	var legion: Legion = _legion_at(state, coords)
 	if legion == null:
 		return
+	_hide_move_hint()
 	_hide_attack_choice_popup()
 	_clear_overlay_visuals()
 	has_selected = true
@@ -219,6 +225,7 @@ func select_action(action: ActionDefinitionScript) -> void:
 	if action.id == "move":
 		var reach := MoveReachabilityScript.compute(state, legion)
 		target_coords = reach["reachable"]
+		_move_cost = reach.get("cost", {})
 	else:
 		target_coords = ActionTargetingScript.get_targets(state, legion, action)
 	default_target_actions.clear()
@@ -363,6 +370,8 @@ func _on_tile_hover_entered(coords: Vector2i) -> void:
 				selected_visu.legion_visu.update_direction(dir)
 	if _is_attack_target_hover(coords):
 		_show_expectation_for_target(coords)
+	elif _is_move_hover(coords):
+		_show_move_hint(coords)
 
 func _on_tile_hover_exited(coords: Vector2i) -> void:
 	if coords in _overlay_coords:
@@ -373,9 +382,34 @@ func _on_tile_hover_exited(coords: Vector2i) -> void:
 		var selected_visu: TileVisu = tile_visu_fn.call(selected_coords)
 		if selected_visu and selected_visu.legion_visu:
 			selected_visu.legion_visu.juice_direct_reset()
+	if move_hint_fn.is_valid():
+		move_hint_fn.call(coords, "")
 	if coords == _hovered_attack_target:
 		_hovered_attack_target = Vector2i(2147483645, 2147483645)
 		_clear_expectation_preview()
+
+func _hide_move_hint() -> void:
+	if move_hint_fn.is_valid():
+		move_hint_fn.call(Vector2i.ZERO, "")
+
+func _is_move_hover(coords: Vector2i) -> bool:
+	if not has_selected or not _move_cost.has(coords):
+		return false
+	if selected_action:
+		return selected_action.id == "move" and coords in target_coords
+	return default_target_actions.get(coords, []) == ["move"]
+
+## "2 AP · 1 left" above a move destination (forest and hills cost more).
+func _show_move_hint(coords: Vector2i) -> void:
+	if not move_hint_fn.is_valid():
+		return
+	var state: BattleStateScript = battle_state_fn.call()
+	var legion: Legion = _legion_at(state, selected_coords) if state else null
+	if legion == null:
+		return
+	var cost := int(_move_cost.get(coords, 0))
+	var left := legion.current_ap - cost
+	move_hint_fn.call(coords, "👣 %d AP · %d left" % [cost, maxi(0, left)])
 
 func _is_attack_target_hover(coords: Vector2i) -> bool:
 	if not has_selected:
@@ -533,6 +567,7 @@ func _paint_default_targets(state: BattleStateScript, legion: Legion) -> void:
 		if action_id == "move":
 			var reach := MoveReachabilityScript.compute(state, legion)
 			targets = reach["reachable"]
+			_move_cost = reach.get("cost", {})
 		for c in targets:
 			if c == selected_coords:
 				continue
@@ -606,59 +641,76 @@ func _show_attack_choice_popup(to_coords: Vector2i, attack_ids: Array[String]) -
 			root.accept_event()
 	)
 
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.add_child(center)
-
 	var panel := PanelContainer.new()
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = COLOR_POPUP_BG
 	sb.border_color = COLOR_POPUP_BORDER
-	sb.border_width_left = 4
-	sb.border_width_right = 4
-	sb.border_width_top = 4
-	sb.border_width_bottom = 4
-	sb.corner_radius_top_left = 16
-	sb.corner_radius_top_right = 16
-	sb.corner_radius_bottom_left = 16
-	sb.corner_radius_bottom_right = 16
-	sb.content_margin_left = 20
-	sb.content_margin_right = 20
-	sb.content_margin_top = 16
-	sb.content_margin_bottom = 16
+	sb.set_border_width_all(4)
+	sb.set_corner_radius_all(16)
+	sb.content_margin_left = 14
+	sb.content_margin_right = 14
+	sb.content_margin_top = 10
+	sb.content_margin_bottom = 10
 	panel.add_theme_stylebox_override("panel", sb)
-	center.add_child(panel)
-
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 12)
-	vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	panel.add_child(vbox)
-
-	var title := Label.new()
-	title.text = "Choose attack"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_color_override("font_color", COLOR_POPUP_TEXT)
-	title.add_theme_font_size_override("font_size", 28)
-	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	vbox.add_child(title)
+	root.add_child(panel)
 
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 16)
+	row.add_theme_constant_override("separation", 14)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	vbox.add_child(row)
+	panel.add_child(row)
 
+	var state: BattleStateScript = battle_state_fn.call()
+	var attacker: Legion = _legion_at(state, selected_coords) if state else null
+	var defender: Legion = _legion_at(state, to_coords) if state else null
 	for action_id in attack_ids:
 		var def: ActionDefinitionScript = ActionDefs.get_def(action_id)
+		var col := VBoxContainer.new()
+		col.add_theme_constant_override("separation", 4)
+		col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var btn := _make_attack_icon_button(def.icon if def else null)
+		btn.tooltip_text = def.display_name if def else action_id
 		var chosen := action_id
 		btn.pressed.connect(func() -> void:
 			_hide_attack_choice_popup()
 			apply_action_fn.call(chosen, selected_coords, to_coords)
 		)
-		row.add_child(btn)
+		col.add_child(btn)
+		# Expected damage to the target for this option (same estimate as the preview bar).
+		if attacker and defender:
+			var est: Dictionary = BattleExpectationEstimatorScript.estimate(
+				attacker, defender, action_id, selected_coords, to_coords, state.grid
+			)
+			var lo := int(est.get("enemy_damage_min", 0))
+			var hi := int(est.get("enemy_damage_max", 0))
+			var lbl := Label.new()
+			lbl.text = ("💥 %d" % lo) if lo == hi else ("💥 %d–%d" % [lo, hi])
+			lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			lbl.add_theme_color_override("font_color", COLOR_POPUP_TEXT)
+			lbl.add_theme_font_size_override("font_size", 20)
+			lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			col.add_child(lbl)
+		row.add_child(col)
+
+	# Sit right above the target hex (clamped on screen), not in the middle of the HUD.
+	var anchor := Vector2.ZERO
+	var tv: TileVisu = tile_visu_fn.call(to_coords) if tile_visu_fn.is_valid() else null
+	if tv:
+		anchor = tv.get_global_transform_with_canvas().origin
+	var place := func() -> void:
+		if not is_instance_valid(panel):
+			return
+		var sz := panel.get_combined_minimum_size()
+		panel.size = sz
+		var vp := panel.get_viewport_rect().size
+		var pos := anchor - Vector2(sz.x * 0.5, sz.y + 70.0)
+		if anchor == Vector2.ZERO:
+			pos = (vp - sz) * 0.5
+		pos.x = clampf(pos.x, 12.0, vp.x - sz.x - 12.0)
+		pos.y = clampf(pos.y, 200.0, vp.y - sz.y - 12.0)
+		panel.position = pos
+	place.call_deferred()
 
 	parent.add_child(root)
 	_attack_choice_popup = root

@@ -11,7 +11,7 @@ const StatusDefsScript = preload("res://scripts/effects/status_defs.gd")
 const EffectVisualsScript = preload("res://scripts/visu/effect_visuals.gd")
 const UiTheme = preload("res://scripts/ui/ui_theme.gd")
 
-const COLOR_BG := Color(UiTheme.COLOR_PANEL, 0.96)
+const COLOR_BG := UiTheme.COLOR_PANEL
 const COLOR_BORDER := UiTheme.COLOR_BORDER
 const COLOR_CARD_BG := UiTheme.COLOR_CARD
 const COLOR_ACTION_WELL := UiTheme.COLOR_PRESSED
@@ -48,6 +48,10 @@ var _live_cards: Dictionary = {}  # log_seq (int) -> live card handles
 var _expanded: bool = true
 var _battle_mode: bool = false
 var _dock_tween: Tween
+## Entries added while the dock is closed (shown on the toggle).
+var _unread: int = 0
+## The player's last open/closed choice; the log starts closed so the map stays clear.
+static var _user_expanded := false
 
 func _ready() -> void:
 	name = "BattleActionLogPanel"
@@ -74,7 +78,8 @@ func enter_battle(action_log: BattleActionLog = null) -> void:
 	clear_entries()
 	if action_log:
 		bind_log(action_log)
-	_set_expanded(true)
+	_unread = 0
+	_set_expanded(_user_expanded)
 	if _dock:
 		UiTheme.juice_pop_in(_dock, 0.14)
 
@@ -107,6 +112,9 @@ func receive_entry(entry: Dictionary) -> void:
 	var visible := _is_visible(entry)
 	if not visible:
 		return
+	if not _expanded and String(entry.get("action_id", "")) != "turn_start":
+		_unread += 1
+		_apply_toggle_chrome(false)
 	if BattleActionLog.should_defer_ui(entry):
 		_pending.append(entry)
 		if _should_show_live(entry):
@@ -160,6 +168,9 @@ func append_entry(entry: Dictionary) -> void:
 		return
 	_add_entry_row(entry, true)
 	_scroll_to_bottom()
+
+func dock_width() -> float:
+	return DOCK_WIDTH
 
 func is_expanded() -> bool:
 	return _expanded
@@ -267,7 +278,8 @@ func _style_toggle_button() -> void:
 
 func _on_toggle_pressed() -> void:
 	UiTheme.juice_press(_toggle_btn)
-	_set_expanded(not _expanded)
+	_user_expanded = not _expanded
+	_set_expanded(_user_expanded)
 
 func _rebuild_visible_entries() -> void:
 	clear_entries()
@@ -324,7 +336,9 @@ func _set_expanded(expanded: bool) -> void:
 			, CONNECT_ONE_SHOT)
 
 func _apply_toggle_chrome(expanded: bool) -> void:
-	_toggle_btn.text = "‹" if expanded else "›"
+	if expanded:
+		_unread = 0
+	_toggle_btn.text = "‹" if expanded else ("›" if _unread <= 0 else "›\n%d" % mini(_unread, 99))
 	_toggle_btn.tooltip_text = "Hide battle log" if expanded else "Show battle log"
 	if expanded:
 		_toggle_btn.offset_left = DOCK_WIDTH

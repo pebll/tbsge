@@ -16,6 +16,10 @@ extends Resource
 ## like the 700x650 originals (dx/dy in original texture pixels); computed from the art.
 @export var variants: Array[Texture2D] = []
 @export var variant_fit: PackedVector3Array = PackedVector3Array()
+## Busy looks (1-based Tile.variant indexes into `variants`) never picked as the match look;
+## instead each tile of this terrain has `accent_chance` to show one, as a sparse accent.
+@export var accent_variants: PackedInt32Array = PackedInt32Array()
+@export var accent_chance: float = 0.0
 ## Ground units can stand here.
 @export var walkable: bool = true
 ## AP to step onto this tile (ground units).
