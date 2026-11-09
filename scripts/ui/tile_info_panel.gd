@@ -10,6 +10,7 @@ signal draft_clear_slot_pressed
 signal draft_move_pressed
 
 const UnitTags = preload("res://scripts/core/unit_tags.gd")
+const EffectVisuals = preload("res://scripts/visu/effect_visuals.gd")
 const UiTheme = preload("res://scripts/ui/ui_theme.gd")
 const MinigameRulesScript = preload("res://scripts/minigame/minigame_rules.gd")
 
@@ -294,7 +295,7 @@ func _render_legion(legion: Legion) -> void:
 	_apply_team_accent(legion.team_id)
 	legion_block.show()
 	legion_name.text = legion.display_name().to_upper() if legion.is_mixed() else _format_legion_title(legion.unit_type)
-	_set_tags_line(UnitTags.descriptor_line_for_legion(legion))
+	_set_tags_line("\n".join(EffectVisuals.ability_lines_for_legion(legion)))
 
 	var unit0: Unit = legion.units[0] if legion.units.size() > 0 else null
 	if unit0:

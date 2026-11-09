@@ -5,6 +5,7 @@ extends Node2D
 
 const StatusDefs = preload("res://scripts/effects/status_defs.gd")
 const StatusEffects = preload("res://scripts/effects/status_effects.gd")
+const EffectVisuals = preload("res://scripts/visu/effect_visuals.gd")
 
 const RADIUS := 11.0
 const GAP := 4.0
@@ -33,8 +34,8 @@ func _draw() -> void:
 			var s := RADIUS * 1.5
 			draw_texture_rect(def.icon, Rect2(c - Vector2(s, s) * 0.5, Vector2(s, s)), false)
 		else:
-			var letter := StatusEffects.label(String(e["id"])).left(1).to_upper()
-			draw_string(font, c + Vector2(-RADIUS, 5.0), letter, HORIZONTAL_ALIGNMENT_CENTER, RADIUS * 2.0, 14, Color.WHITE)
+			var mark: String = EffectVisuals.look(String(e["id"]))["mark"]
+			draw_string(font, c + Vector2(-RADIUS, 5.0), mark, HORIZONTAL_ALIGNMENT_CENTER, RADIUS * 2.0, 14, Color.WHITE)
 		var stacks := int(e.get("stacks", 1))
 		if stacks > 1:
 			draw_string(font, c + Vector2(RADIUS * 0.3, RADIUS + 9.0), str(stacks), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color.WHITE)

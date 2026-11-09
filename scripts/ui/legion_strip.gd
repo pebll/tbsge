@@ -7,6 +7,7 @@ extends Control
 const UnitTags = preload("res://scripts/core/unit_tags.gd")
 const StatusDefs = preload("res://scripts/effects/status_defs.gd")
 const StatusEffects = preload("res://scripts/effects/status_effects.gd")
+const EffectVisuals = preload("res://scripts/visu/effect_visuals.gd")
 const UiTheme = preload("res://scripts/ui/ui_theme.gd")
 const UiStatIcons = preload("res://scripts/ui/ui_stat_icons.gd")
 const UnitFootprintScript = preload("res://scripts/ui/interact/unit_footprint.gd")
@@ -253,7 +254,8 @@ func _make_status_badge(effect: Dictionary) -> Control:
 		badge.add_child(tex)
 	var stacks := int(effect.get("stacks", 1))
 	var lab := Label.new()
-	lab.text = str(stacks) if stacks > 1 else ("" if def != null and def.icon != null else StatusEffects.label(id).left(1))
+	var mark: String = EffectVisuals.look(id)["mark"]
+	lab.text = ("" if def != null and def.icon != null else mark) + (str(stacks) if stacks > 1 else "")
 	lab.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lab.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	lab.add_theme_color_override("font_color", Color.WHITE)
@@ -356,7 +358,7 @@ func _unit_tooltip_payload_for(u: Unit) -> Dictionary:
 	var title := def.display_name if def and not def.display_name.is_empty() else u.unit_type
 	return {
 		"title": title,
-		"subtitle": UnitTags.descriptor_line_for_type(u.unit_type),
+		"subtitle": "\n".join(EffectVisuals.ability_lines_for_type(u.unit_type)),
 		"rows": UiStatIcons.unit_stat_rows(u, _legion),
 	}
 

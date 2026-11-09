@@ -1,6 +1,6 @@
 # Effects UX: how abilities, statuses and terrain are shown
 
-*2026-11-08. Current state, problems, proposal, and the art list.*
+*2026-11-08, updated 2026-11-09. Current state, problems, proposal, and the art list.*
 
 ## How it works today
 
@@ -8,10 +8,10 @@ There are four kinds of "special rules", and each is shown differently:
 
 | Kind | What it is | Examples | Where the player sees it today |
 |---|---|---|---|
-| **Traits** (abilities) | Permanent, per unit type (`UnitDefinition.traits`) | Flying, Regeneration, Lifesteal, Pierce, Poison strikes | Only a name line under the legion name (info panel) and in the unit tooltip ("Poison strikes · Flying"). **No icon, no explanation.** |
+| **Traits** (abilities) | Permanent, per unit type (`UnitDefinition.traits`) | Flying, Regeneration, Lifesteal, Pierce, Poison strikes | **Abilities list**: one "emoji Name: rule" line each, under the legion name (info panel) and in the unit tooltip. Popups when they trigger |
 | **Statuses** | Temporary, on a legion, with stacks and turns (`Legion.statuses`) | Poison, Empowered, Weakened | Badge above the legion and in the strip's stat row; hover explains (description, stacks, turns left); battle-log card; floating popup when applied or ticking |
 | **Special actions** | Buttons in the action bar | Rally, Curse, Teleport, Heal ally | Action button + tooltip |
-| **Terrain affinities** | Per unit type, per terrain (`UnitDefinition.terrain_affinity`) | Treant in forest, Scorpion Rider on desert | **Not shown anywhere** |
+| **Terrain affinities** | Per unit type, per terrain (`UnitDefinition.terrain_affinity`) | none shipped | **Removed from all units for now (2026-11-09).** The code and tests remain. |
 
 Plus the **tags** (ranged, armored, swarm…): hidden from players since 2026-11-08 and kept for the AI and the future smart draft.
 
@@ -32,7 +32,10 @@ Plus the **tags** (ranged, armored, swarm…): hidden from players since 2026-11
   - The unit tooltip (hover a unit in the legion strip).
   - The info panel (draft picker and right-click inspect).
   - Compact icons in the strip header next to the stats; hovering one shows its row.
-- **Terrain affinities become abilities** with names ("Forest walker", "Desert hunter", "Swamp rat"), so there's one list instead of a hidden second system.
+- **Terrain affinities:** not yet (decided 2026-11-09).
+- **Placeholders:** emojis until the icons exist (decided 2026-11-09). Status emojis are in `data/status/*.tres` (`emoji`); trait emojis are in `scripts/visu/effect_visuals.gd`.
+  - Statuses: 🧪 Poison, 💪 Empowered, 🥀 Weakened.
+  - Traits: 🪶 Flying, 🌿 Regeneration, 🩸 Lifesteal, 🗡️ Pierce, 🐍 Poison strikes.
 - **Data:** each trait gets a definition file like statuses already have (`data/traits/<id>.tres`: name, one-line rule, icon, colour), so the UI, popups and log all read the same data. The rules stay in code.
 - **Statuses stay as they are:** badges, hover and popups. They're temporary, so they belong on the legion rather than in the unit's ability list.
 
@@ -51,20 +54,29 @@ Plus the **tags** (ranged, armored, swarm…): hidden from players since 2026-11
 | Lifesteal | trait | red circle "L" |
 | Pierce | trait | grey circle "P" (clashes with Poison) |
 | Poison strikes | trait | can share the Poison icon with a small arrow |
-| Forest walker / Desert hunter / Swamp rat | affinities | none |
 | Rally | action button | reuses `strong.png` |
 | Curse | action button | reuses `target.png` |
 | Teleport | action button | `spell.png` (fine; was shared with Curse until 2026-11-08) |
 
-### Tiles
-| Tile | Now |
+### Tiles (delivered 2026-11-09)
+- **New tiles:** v2 (388×330) and v3 (700×650) art is fitted to the grid per texture (`texture_fit` / `variant_fit`: scale and offset measured from the art).
+- **Looks per terrain** (each match picks one look per terrain):
+
+| Terrain | Looks |
 |---|---|
-| Swamp | grass texture, tinted darker |
-| Hill, Badlands, Jungle, Tundra (planned) | none (the data model is ready; one `.tres` + one tile image each) |
-| Fog overlay | tiles are darkened with a tint; a cloud/fog texture would read better |
+| Grass | grass, flowers, grass variant |
+| Desert | desert, savanna, bushland, pebbles |
+| Forest | forest, jungle |
+| Water | water, ocean |
+| Mountain | mountain, volcano |
+| Swamp | swamp |
+| **Hill** (new: 2 AP, +1 vision) | grass hill, badlands |
+| **Tundra** | tundra; defined but not generated yet (map weight 0) |
+
+- **Still missing:** a fog texture. Tiles in fog are only darkened.
 
 ### Units
-- All 22 unit types have sprites. The Dragon Rider only has a front view (same as the other `base_uncut` units).
+- All 22 unit types have sprites. 23 new sprites arrived on 2026-11-09 (knight, elves, griffon rider, frog, …) and aren't used yet. The Dragon Rider only has a front view (same as the other `base_uncut` units).
 
 ### Later
 - Sounds: status applied/tick, lifesteal, pierce, wings for flyers (Sounds milestone).

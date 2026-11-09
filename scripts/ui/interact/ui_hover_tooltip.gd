@@ -83,6 +83,8 @@ func _build() -> void:
 	_subtitle = Label.new()
 	_subtitle.add_theme_color_override("font_color", UiTheme.COLOR_TEXT_MUTED)
 	_subtitle.add_theme_font_size_override("font_size", 22)
+	_subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_subtitle.custom_minimum_size = Vector2(320, 0)
 	_subtitle.visible = false
 	vbox.add_child(_subtitle)
 

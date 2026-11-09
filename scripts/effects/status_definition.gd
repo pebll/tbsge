@@ -7,6 +7,8 @@ extends Resource
 @export var display_name: String = ""
 @export_multiline var description: String = ""
 @export var icon: Texture2D
+## Placeholder until the icon exists: shown in badges, popups and the log.
+@export var emoji: String = ""
 ## Badge colour when there is no icon yet (first letter of the name on this colour).
 @export var color: Color = Color(0.5, 0.4, 0.7)
 ## Positive effects are shown with a light badge, negative ones dark.

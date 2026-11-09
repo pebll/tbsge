@@ -39,7 +39,14 @@ func init(p_tile: Tile) -> void:
 	terrain_sprite = base_sprite.get_child(0)
 	var tdef = TerrainRules.get_def(tile.terrain_type)
 	if tdef != null and tdef.texture != null:
-		terrain_sprite.texture = tdef.texture
+		var tex: Texture2D = tdef.texture
+		var fit: Vector3 = tdef.texture_fit
+		if tile.variant > 0 and tile.variant - 1 < tdef.variants.size():
+			tex = tdef.variants[tile.variant - 1]
+			if tile.variant - 1 < tdef.variant_fit.size():
+				fit = tdef.variant_fit[tile.variant - 1]
+		terrain_sprite.texture = tex
+		_apply_terrain_fit(fit)
 		# Tint lives on self_modulate so spent/hover modulate still applies on top.
 		terrain_sprite.self_modulate = tdef.tint
 	else:
@@ -47,6 +54,18 @@ func init(p_tile: Tile) -> void:
 	base_sprite.texture = load("res://assets/tiles_sliced/tiles_bottom/base.png")
 	base_y = base_sprite.position.y
 	qr_label.text = "(%d,%d,%d)" % [tile.cube_q, tile.cube_r, tile.cube_s]
+
+## Place art of any size on the hex like the 700x650 originals: scale around the
+## original centre, then shift by (dx, dy) original pixels.
+const _TERRAIN_POS := Vector2(924.9999, 520)
+const _TERRAIN_OFFSET := Vector2(-931.2499, -512.805)
+
+func _apply_terrain_fit(fit: Vector3) -> void:
+	var s := maxf(0.01, fit.x)
+	terrain_sprite.position = _TERRAIN_POS
+	terrain_sprite.scale = Vector2(s, s)
+	var centre := _TERRAIN_POS + _TERRAIN_OFFSET + Vector2(fit.y, fit.z)
+	terrain_sprite.offset = (centre - _TERRAIN_POS) / s
 
 func has_legion_visu() -> bool:
 	return legion_visu != null

@@ -2,6 +2,9 @@
 
 [ext_resource type="Script" path="res://scripts/terrain/terrain_definition.gd" id="1_def"]
 [ext_resource type="Texture2D" path="res://assets/tiles_sliced/tiles_terrain/desert.png" id="2_tex"]
+[ext_resource type="Texture2D" path="res://assets/tiles_sliced/tiles_terrain/v3-nobase_sprites/savanna.png" id="v0"]
+[ext_resource type="Texture2D" path="res://assets/tiles_sliced/tiles_terrain/v3-nobase_sprites/bushland.png" id="v1"]
+[ext_resource type="Texture2D" path="res://assets/tiles_sliced/tiles_terrain/v3-nobase_sprites/pebbles.png" id="v2"]
 
 [resource]
 script = ExtResource("1_def")
@@ -19,3 +22,5 @@ vision_mod = 0
 flyer_can_cross = true
 flyer_can_stop = true
 map_weight = 14
+variants = Array[Texture2D]([ExtResource("v0"), ExtResource("v1"), ExtResource("v2")])
+variant_fit = PackedVector3Array(0.9566, -4.4, -27.3, 0.9415, -1.5, -3.5, 0.9429, -5.7, -23.7)

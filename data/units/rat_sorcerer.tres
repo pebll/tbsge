@@ -14,8 +14,4 @@ price = 5
 tags = Array[String](["support"])
 action_ids = Array[String](["move", "melee_attack", "self_heal", "curse"])
 icon = ExtResource("2_icon")
-terrain_affinity = {
-"SWAMP": {
-"move_cost": 1
-}
 }

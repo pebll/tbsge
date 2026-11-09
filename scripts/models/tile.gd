@@ -12,6 +12,8 @@ var terrain_type: String
 var walkable: bool
 
 var legion: Legion = null
+## Which look of its terrain this tile uses (TerrainDefinition texture / variants).
+var variant: int = 0
 
 func _init(q: int, r: int, terrain: String = "") -> void:
 	cube_q = q

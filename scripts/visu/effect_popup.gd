@@ -53,7 +53,7 @@ func _draw() -> void:
 		var s := RADIUS * 1.6
 		draw_texture_rect(icon, Rect2(Vector2(-s, -s) * 0.5, Vector2(s, s)), false)
 	else:
-		draw_string(font, Vector2(-RADIUS, 6.0), String(look["letter"]), HORIZONTAL_ALIGNMENT_CENTER, RADIUS * 2.0, 17, Color.WHITE)
+		draw_string(font, Vector2(-RADIUS, 6.0), String(look["mark"]), HORIZONTAL_ALIGNMENT_CENTER, RADIUS * 2.0, 17, Color.WHITE)
 	if not _text.is_empty():
 		var pos := Vector2(RADIUS + 4.0, 7.0)
 		draw_string_outline(font, pos, _text, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, 5, Color(0.12, 0.10, 0.08))

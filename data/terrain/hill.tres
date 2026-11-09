@@ -1,0 +1,19 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/terrain/terrain_definition.gd" id="1_def"]
+[ext_resource type="Texture2D" path="res://assets/tiles_sliced/tiles_terrain/v2-nobase_sprites/grass_hill.png" id="2_tex"]
+[ext_resource type="Texture2D" path="res://assets/tiles_sliced/tiles_terrain/v2-nobase_sprites/badlands.png" id="v0"]
+
+[resource]
+script = ExtResource("1_def")
+id = "HILL"
+display_name = "Hill"
+description = "Costs 2 AP to climb. Legions on a hill see 1 hex further."
+texture = ExtResource("2_tex")
+texture_fit = Vector3(1.7976, 8.4, -45.0)
+walkable = true
+move_cost = 2
+vision_mod = 1
+map_weight = 8
+variants = Array[Texture2D]([ExtResource("v0")])
+variant_fit = PackedVector3Array(1.803, 3.9, -38.7)

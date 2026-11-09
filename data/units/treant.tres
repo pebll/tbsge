@@ -17,9 +17,4 @@ traits = {
 "regeneration": 3
 }
 icon = ExtResource("2_icon")
-terrain_affinity = {
-"FOREST": {
-"move_cost": 1,
-"defense": 0.75
-}
 }

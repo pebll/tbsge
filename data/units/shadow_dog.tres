@@ -18,8 +18,4 @@ traits = {
 "lifesteal": 0.5
 }
 icon = ExtResource("2_icon")
-terrain_affinity = {
-"FOREST": {
-"move_cost": 1
-}
 }

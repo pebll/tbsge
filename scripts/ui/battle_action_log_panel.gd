@@ -8,6 +8,7 @@ extends Control
 
 const StatusEffectsScript = preload("res://scripts/effects/status_effects.gd")
 const StatusDefsScript = preload("res://scripts/effects/status_defs.gd")
+const EffectVisualsScript = preload("res://scripts/visu/effect_visuals.gd")
 const UiTheme = preload("res://scripts/ui/ui_theme.gd")
 
 const COLOR_BG := Color(UiTheme.COLOR_PANEL, 0.96)
@@ -790,7 +791,7 @@ func _make_status_disc(status_id: String) -> Control:
 	sb.set_corner_radius_all(int(ICON_ACTION.x * 0.5))
 	disc.add_theme_stylebox_override("panel", sb)
 	var lab := Label.new()
-	lab.text = StatusEffectsScript.label(status_id).left(1).to_upper()
+	lab.text = EffectVisualsScript.look(status_id)["mark"]
 	lab.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lab.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	lab.add_theme_color_override("font_color", Color.WHITE)

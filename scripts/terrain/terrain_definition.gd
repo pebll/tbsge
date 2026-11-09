@@ -9,6 +9,13 @@ extends Resource
 ## for terrains without their own art reuse another texture with a tint).
 @export var texture: Texture2D
 @export var tint: Color = Color.WHITE
+## (scale, dx, dy) fit of `texture` on the hex grid (see variant_fit).
+@export var texture_fit: Vector3 = Vector3(1, 0, 0)
+## Alternative looks (same rules). A match picks one per terrain (Tile.variant indexes
+## [texture] + variants). variant_fit[i] = (scale, dx, dy) to sit the art on the hex grid
+## like the 700x650 originals (dx/dy in original texture pixels); computed from the art.
+@export var variants: Array[Texture2D] = []
+@export var variant_fit: PackedVector3Array = PackedVector3Array()
 ## Ground units can stand here.
 @export var walkable: bool = true
 ## AP to step onto this tile (ground units).

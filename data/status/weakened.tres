@@ -6,6 +6,7 @@
 [resource]
 script = ExtResource("1_def")
 id = "weakened"
+emoji = "🥀"
 display_name = "Weakened"
 description = "Every strike deals -1 damage per stack."
 color = Color(0.45, 0.38, 0.58, 1)

@@ -47,6 +47,15 @@ func _board(terrain: Dictionary, specs: Array) -> Dictionary:
 		out.append(legion)
 	return {"session": session, "legions": out}
 
+## Affinities aren't on any shipped unit yet; tests put one on a copied definition.
+func _give_affinity(L: Legion, affinity: Dictionary, only_type: String = "") -> void:
+	for u in L.units:
+		if not only_type.is_empty() and u.unit_type != only_type:
+			continue
+		var def: UnitDefinition = u.definition.duplicate()
+		def.terrain_affinity = affinity
+		u.definition = def
+
 func _test_definitions() -> bool:
 	for id in ["GRASS", "DESERT", "FOREST", "SWAMP", "WATER", "MOUNTAIN"]:
 		if TerrainRules.get_def(id) == null:
@@ -80,10 +89,12 @@ func _test_affinity_move_cost() -> bool:
 		["a", "GOBLIN", 1, Vector2i(0, 1)],
 	])
 	var tile: Tile = b["session"].grid[Vector2i(1, 0)]
+	_give_affinity(b["legions"][0], {"FOREST": {"move_cost": 1}})
 	if TerrainRules.enter_cost(b["legions"][0], tile) != 1:
 		push_error("Treant walks through forest for 1 AP")
 		return false
 	var mixed := Legion.from_composition([["TREANT", 1], ["GOBLIN", 1]], Vector2i.ZERO, "GREEN")
+	_give_affinity(mixed, {"FOREST": {"move_cost": 1}}, "TREANT")
 	if TerrainRules.enter_cost(mixed, tile) != 2:
 		push_error("A mixed legion moves at its slowest unit's cost")
 		return false
@@ -118,6 +129,7 @@ func _test_forest_cover_and_desert_attack() -> bool:
 		push_error("Forest cover: 4 ranged x0.7, got %s" % r["hits"][0]["raw_damage"])
 		return false
 	var rider := Legion.new("SCORPION_RIDER", 1, Vector2i.ZERO, "GREEN")
+	_give_affinity(rider, {"DESERT": {"attack": 2}})
 	var g := Legion.new("GOLEM", 1, Vector2i(1, 0), "BLUE")
 	var r2: Dictionary = CombatResolver.resolve_combat(rider, g, 1, {
 		"mode": "melee", "distance": 1, "attacker_terrain": "DESERT", "defender_terrain": "GRASS",

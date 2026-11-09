@@ -2,6 +2,8 @@
 
 [ext_resource type="Script" path="res://scripts/terrain/terrain_definition.gd" id="1_def"]
 [ext_resource type="Texture2D" path="res://assets/tiles_sliced/tiles_terrain/grass.png" id="2_tex"]
+[ext_resource type="Texture2D" path="res://assets/tiles_sliced/tiles_terrain/v2-nobase_sprites/flowers.png" id="v0"]
+[ext_resource type="Texture2D" path="res://assets/tiles_sliced/tiles_terrain/v3-nobase_sprites/grass_variant.png" id="v1"]
 
 [resource]
 script = ExtResource("1_def")
@@ -19,3 +21,5 @@ vision_mod = 0
 flyer_can_cross = true
 flyer_can_stop = true
 map_weight = 34
+variants = Array[Texture2D]([ExtResource("v0"), ExtResource("v1")])
+variant_fit = PackedVector3Array(1.7976, -0.6, -43.2, 0.9415, -6.2, -3.5)

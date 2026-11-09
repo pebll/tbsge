@@ -39,7 +39,19 @@ static func build_grid(
 	if team_ids.size() >= 2:
 		_ensure_deploy_back_rows_walkable(grid, radius, team_ids, rng)
 		_ensure_deploy_zones_connected(grid, radius, team_ids, rng)
+	_pick_variants(grid, rng)
 	return grid
+
+## One look per terrain for the whole match: coherent maps, variety between matches.
+static func _pick_variants(grid: Dictionary, rng: RandomNumberGenerator) -> void:
+	var chosen: Dictionary = {}
+	for c in _all_coords(grid):
+		var t: Tile = grid[c]
+		if not chosen.has(t.terrain_type):
+			var def = TerrainRules.get_def(t.terrain_type)
+			var n: int = 1 + (def.variants.size() if def != null else 0)
+			chosen[t.terrain_type] = rng.randi() % n
+		t.variant = int(chosen[t.terrain_type])
 
 ## Weighted terrain (TerrainDefinition.map_weight) and one clustering pass so forests and
 ## lakes form patches; mirrored through the centre when _mirror (AI test maps).
