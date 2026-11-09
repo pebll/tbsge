@@ -30,6 +30,8 @@ var _spent: bool = false
 
 const COLOR_SPENT := Color(0.72, 0.72, 0.74, 1.0)
 
+static var _warned_missing: Dictionary = {}
+
 func init(p_tile: Tile) -> void:
 	tile = p_tile
 	# This can be called before the node enters the tree (e.g. when the parent is added deferred),
@@ -50,7 +52,15 @@ func init(p_tile: Tile) -> void:
 		# Tint lives on self_modulate so spent/hover modulate still applies on top.
 		terrain_sprite.self_modulate = tdef.tint
 	else:
-		terrain_sprite.texture = load("res://assets/tiles_sliced/tiles_terrain/" + tile.terrain_type.to_lower() + ".png")
+		# Definition or its art failed to load (usually: new art not imported yet; open the
+		# editor or run `godot --headless --import`). Warn once and fall back to grass.
+		if not _warned_missing.has(tile.terrain_type):
+			_warned_missing[tile.terrain_type] = true
+			push_warning("Terrain art for %s did not load (re-import assets?); drawing grass instead." % tile.terrain_type)
+		var grass = TerrainRules.get_def("GRASS")
+		if grass != null and grass.texture != null:
+			terrain_sprite.texture = grass.texture
+			_apply_terrain_fit(grass.texture_fit)
 	base_sprite.texture = load("res://assets/tiles_sliced/tiles_bottom/base.png")
 	base_y = base_sprite.position.y
 	qr_label.text = "(%d,%d,%d)" % [tile.cube_q, tile.cube_r, tile.cube_s]
