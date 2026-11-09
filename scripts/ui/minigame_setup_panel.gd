@@ -19,10 +19,17 @@ const COLOR_TEXT := Color(0.12, 0.10, 0.08)
 const BORDER_THICK := 4
 const RADIUS := 16
 
+var _hint: Label
+
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_apply_style()
 	_add_gold_icon()
+	_hint = Label.new()
+	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_hint.add_theme_font_size_override("font_size", 18)
+	_hint.add_theme_color_override("font_color", Color(0.36, 0.30, 0.24))
+	gold_value.get_parent().get_parent().add_child(_hint)
 	random_team_button.pressed.connect(func(): random_team_pressed.emit())
 	ready_button.pressed.connect(func(): ready_pressed.emit())
 
@@ -66,6 +73,17 @@ func show_for_team(team_id: String, draft_data: Dictionary, can_edit: bool = tru
 	gold_value.text = "%d" % remaining
 	gold_total.text = "/ %d gold left" % budget_total
 	random_team_button.button_disabled = not can_edit
+	# Tell new players where the shop is: it opens from a deploy hex.
+	var used := int(draft_data.get("slots_used", 0))
+	if not can_edit:
+		_hint.text = ""
+	elif used == 0:
+		_hint.text = "Click a green hex to recruit a legion"
+	elif remaining > 0:
+		_hint.text = "Click a legion to change it, or a free hex for another"
+	else:
+		_hint.text = "Army complete. Ready when you are"
+	_hint.visible = not _hint.text.is_empty()
 	ready_button.button_disabled = not can_edit
 	show()
 

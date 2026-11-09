@@ -60,7 +60,7 @@ Plus the **tags** (ranged, armored, swarm…): hidden from players since 2026-11
 
 ### Tiles (delivered 2026-11-09)
 - **New tiles:** v2 (388×330) and v3 (700×650) art is fitted to the grid per texture (`texture_fit` / `variant_fit`: scale and offset measured from the art).
-- **Looks per terrain** (each match picks one look per terrain):
+- **Looks per terrain** (each match picks one look per terrain; busy looks, flowers and pebbles, are never the match look and only appear as a sparse accent on about 12% of tiles):
 
 | Terrain | Looks |
 |---|---|
