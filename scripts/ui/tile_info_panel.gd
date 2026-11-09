@@ -10,7 +10,8 @@ signal draft_clear_slot_pressed
 signal draft_move_pressed
 
 const UnitTags = preload("res://scripts/core/unit_tags.gd")
-const EffectVisuals = preload("res://scripts/visu/effect_visuals.gd")
+const EffectChipScript = preload("res://scripts/ui/effect_chip.gd")
+const UnitTraitsScript = preload("res://scripts/effects/unit_traits.gd")
 const UiTheme = preload("res://scripts/ui/ui_theme.gd")
 const MinigameRulesScript = preload("res://scripts/minigame/minigame_rules.gd")
 
@@ -20,7 +21,7 @@ const MinigameRulesScript = preload("res://scripts/minigame/minigame_rules.gd")
 @onready var team_name_label: Label = %TeamName
 @onready var team_footer: PanelContainer = %TeamFooter
 @onready var unit_icon: TextureRect = %UnitIcon
-var _tags_label: Label = null
+var _chips: HFlowContainer = null
 @onready var legion_name: Label = %LegionName
 @onready var attack_icon: TextureRect = %AttackIcon
 @onready var attack_value: Label = %AttackValue
@@ -295,7 +296,7 @@ func _render_legion(legion: Legion) -> void:
 	_apply_team_accent(legion.team_id)
 	legion_block.show()
 	legion_name.text = legion.display_name().to_upper() if legion.is_mixed() else _format_legion_title(legion.unit_type)
-	_set_tags_line("\n".join(EffectVisuals.ability_lines_for_legion(legion)))
+	_set_effect_chips(legion)
 
 	var unit0: Unit = legion.units[0] if legion.units.size() > 0 else null
 	if unit0:
@@ -604,20 +605,25 @@ func _apply_team_accent(team_id: String) -> void:
 	footer_sb.corner_radius_bottom_right = 8
 	team_footer.add_theme_stylebox_override("panel", footer_sb)
 
-## Counter tags under the legion name ("Ranged · Support"); built on first use.
-func _set_tags_line(text: String) -> void:
-	if _tags_label == null:
-		_tags_label = Label.new()
-		_tags_label.name = "LegionTags"
-		_tags_label.add_theme_color_override("font_color", UiTheme.COLOR_TEXT_MUTED)
-		_tags_label.add_theme_font_size_override("font_size", 22)
-		_tags_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		_tags_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+## Ability chips (unit traits) and status chips under the legion name; hover or
+## right-click a chip for its rule. Built on first use.
+func _set_effect_chips(legion: Legion) -> void:
+	if _chips == null:
+		_chips = HFlowContainer.new()
+		_chips.name = "EffectChips"
+		_chips.add_theme_constant_override("h_separation", 6)
+		_chips.add_theme_constant_override("v_separation", 6)
+		_chips.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var parent := legion_name.get_parent()
-		parent.add_child(_tags_label)
-		parent.move_child(_tags_label, legion_name.get_index() + 1)
-	_tags_label.text = text
-	_tags_label.visible = not text.is_empty()
+		parent.add_child(_chips)
+		parent.move_child(_chips, legion_name.get_index() + 1)
+	for c in _chips.get_children():
+		c.queue_free()
+	for id in UnitTraitsScript.for_legion(legion):
+		_chips.add_child(EffectChipScript.make(id, {"tooltip": _tooltip}))
+	for e in legion.statuses:
+		_chips.add_child(EffectChipScript.make(String(e["id"]), {"effect": e, "tooltip": _tooltip}))
+	_chips.visible = _chips.get_child_count() > 0
 
 func _render_unit_type_stats(unit0: Unit, unit_type: String) -> void:
 	var def: UnitDefinition = unit0.definition if unit0 and unit0.definition else UnitDefs.get_def(unit_type)

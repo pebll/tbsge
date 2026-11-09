@@ -8,8 +8,8 @@ There are four kinds of "special rules", and each is shown differently:
 
 | Kind | What it is | Examples | Where the player sees it today |
 |---|---|---|---|
-| **Traits** (abilities) | Permanent, per unit type (`UnitDefinition.traits`) | Flying, Regeneration, Lifesteal, Pierce, Poison strikes | **Abilities list**: one "emoji Name: rule" line each, under the legion name (info panel) and in the unit tooltip. Popups when they trigger |
-| **Statuses** | Temporary, on a legion, with stacks and turns (`Legion.statuses`) | Poison, Empowered, Weakened | Badge above the legion and in the strip's stat row; hover explains (description, stacks, turns left); battle-log card; floating popup when applied or ticking |
+| **Traits** (abilities) | Permanent, per unit type (`UnitDefinition.traits`) | Flying, Regeneration, Lifesteal, Pierce, Poison strikes | **Chips** (`scripts/ui/effect_chip.gd`). Info panel: emoji + name. Legion strip: emoji only, next to the stats. Hover shows the rule; right-click pins it (or opens the popup in the info panel). The unit tooltip lists the names. Popups when they trigger |
+| **Statuses** | Temporary, on a legion, with stacks and turns (`Legion.statuses`) | Poison, Empowered, Weakened | Badge above the legion on the map; the same chips as abilities in the strip and info panel (with stacks; hover/right-click adds stacks and turns left); battle-log card; floating popup when applied or ticking |
 | **Special actions** | Buttons in the action bar | Rally, Curse, Teleport, Heal ally | Action button + tooltip |
 | **Terrain affinities** | Per unit type, per terrain (`UnitDefinition.terrain_affinity`) | none shipped | **Removed from all units for now (2026-11-09).** The code and tests remain. |
 

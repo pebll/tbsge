@@ -45,6 +45,14 @@ static func look(effect_id: String) -> Dictionary:
 static func ability_lines_for_type(type_id: String) -> PackedStringArray:
 	return _lines(UnitTraits.for_type(type_id))
 
+## "🐍 Poison strikes · 🪶 Flying" (compact; chips carry the rules).
+static func ability_names_for_type(type_id: String) -> String:
+	var parts := PackedStringArray()
+	for id in UnitTraits.for_type(type_id):
+		var l := look(id)
+		parts.append("%s %s" % [l["mark"], l["label"]])
+	return " · ".join(parts)
+
 static func ability_lines_for_legion(legion: Legion) -> PackedStringArray:
 	return _lines(UnitTraits.for_legion(legion))
 
